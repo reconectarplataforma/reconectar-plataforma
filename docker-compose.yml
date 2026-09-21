@@ -16,13 +16,13 @@ services:
       retries: 10
 
   wordpress:
-    image: wordpress:6-php8.2-apache
+    image: wordpress:7-php8.2-apache
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "${WORDPRESS_PORT:-8080}:80"
+      - "${WORDPRESS_PORT:-8090}:80"
     environment:
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST:-db:3306}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-reconectar}
@@ -31,10 +31,18 @@ services:
       WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
       WORDPRESS_DEBUG: "1"
     volumes:
+      - wordpress-data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
 
   wpcli:
     image: wordpress:cli-php8.2
+    # A imagem "wordpress:cli-php8.2" é Alpine-based (www-data = UID 82),
+    # enquanto "wordpress:7-php8.2-apache" (serviço "wordpress") é
+    # Debian-based (www-data = UID 33) e é quem cria os arquivos padrão em
+    # wp-content/ no volume compartilhado.
+    # Sem fixar o UID/GID aqui, o wpcli não consegue escrever nesses arquivos
+    # (ex.: uploads/, upgrade/), pois pertencem ao UID 33.
+    user: "33:33"
     depends_on:
       db:
         condition: service_healthy
@@ -47,8 +55,9 @@ services:
       WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD:-reconectar-admin}
       WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL:-admin@reconectar.local}
       WP_TITLE: ${WP_TITLE:-Reconectar - Incubadora Digital}
-      WP_URL: ${WP_URL:-http://localhost:8080}
+      WP_URL: ${WP_URL:-http://localhost:8090}
     volumes:
+      - wordpress-data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
       - ./scripts:/var/www/scripts
 
@@ -67,3 +76,4 @@ services:
 
 volumes:
   db-data:
+  wordpress-data:

@@ -12,10 +12,17 @@ WP_ADMIN_USER="${WP_ADMIN_USER:-admin}"
 WP_ADMIN_PASSWORD="${WP_ADMIN_PASSWORD:-reconectar-admin}"
 WP_ADMIN_EMAIL="${WP_ADMIN_EMAIL:-admin@reconectar.local}"
 WP_TITLE="${WP_TITLE:-Reconectar - Incubadora Digital}"
-WP_URL="${WP_URL:-http://localhost:8080}"
+WP_URL="${WP_URL:-http://localhost:8090}"
 
 echo "== Aguardando o banco de dados =="
-wp db check --skip-plugins --skip-themes || {
+# "--ssl=0" é necessário porque a imagem wordpress:cli-php8.2 traz um cliente
+# MariaDB Connector/C que exige TLS por padrão, enquanto o serviço "db"
+# (MariaDB local, sem TLS habilitado) não o suporta. Sem essa flag, o
+# comando externo "mariadb-check" (chamado com --no-defaults, que ignora
+# qualquer my.cnf) falha com "SSL is required, but the server does not
+# support it". A conexão ocorre inteiramente na rede interna do Docker
+# Compose, então desabilitar TLS aqui é seguro.
+wp db check --skip-plugins --skip-themes --ssl=0 || {
   echo "Banco de dados ainda não disponível. Verifique se o serviço 'db' está saudável (docker compose ps)."
   exit 1
 }

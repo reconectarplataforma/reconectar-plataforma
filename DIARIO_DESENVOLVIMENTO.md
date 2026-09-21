@@ -102,3 +102,80 @@ pendências que dependem de ação humana ou processo participativo.
 - Nenhuma nesta task.
 
 ---
+
+## 2026-09-21 — Task 4: Subida do ambiente Docker e validação
+
+**O que foi feito**
+- Executado `docker compose up -d` e, em seguida, o script completo
+  `docker compose run --rm wpcli bash /var/www/scripts/provision.sh`.
+- Confirmado com sucesso: núcleo do WordPress instalado, idioma pt_BR
+  ativado, tema Storefront ativado (provisório até a Task 5), WooCommerce,
+  Dokan Lite, BuddyPress e bbPress instalados e **ativos**, página
+  "Comunidade" (shortcode `[buddypress]`) e fórum inicial "Fórum Geral"
+  criados.
+- Validado o acesso ao site em `http://localhost:8090` via navegador —
+  título "Reconectar – Incubadora Digital" carregado corretamente.
+- Durante a execução real, foram descobertos e corrigidos **cinco
+  problemas técnicos de infraestrutura** não previstos no plano original:
+
+  1. **Volume `wordpress-data` compartilhado**: o núcleo do WordPress
+     precisa ser persistido em um volume Docker nomeado compartilhado entre
+     os serviços `wordpress` e `wpcli`, para que ambos enxerguem a mesma
+     instalação.
+  2. **Conflito de porta 8080**: a porta padrão inicialmente escolhida para
+     o serviço `wordpress` já estava em uso por outro serviço de terceiros
+     (`transfer-service`) na máquina. Migrado para a porta `8090`
+     (`WORDPRESS_PORT:-8090`), refletido no `docker-compose.yml`, no
+     `scripts/provision.sh` (`WP_URL`) e no `README.md`.
+  3. **Incompatibilidade de SSL/TLS entre cliente e servidor MariaDB**: a
+     imagem `wordpress:cli-php8.2` traz um cliente MariaDB Connector/C que
+     exige TLS por padrão para comandos externos (`mariadb-check`,
+     `mariadb-dump`), enquanto o serviço `db` (MariaDB local) não tem TLS
+     habilitado. O WP-CLI invoca essas ferramentas com `--no-defaults`, que
+     ignora qualquer arquivo `my.cnf` — por isso uma tentativa anterior de
+     resolver o problema com um arquivo `.my.cnf` montado no container não
+     funcionou e foi removida. **Solução definitiva**: passar `--ssl=0`
+     diretamente como argumento na linha de comando do WP-CLI (ex.:
+     `wp db check --skip-plugins --skip-themes --ssl=0`), mantendo a
+     checagem de saúde do banco no início do script.
+  4. **Incompatibilidade de UID entre imagens Docker**: a imagem
+     `wordpress:cli-php8.2` (usada pelo serviço `wpcli`) é *Alpine-based*,
+     onde o usuário `www-data` tem UID/GID **82**; já a imagem
+     `wordpress:*-php8.2-apache` (usada pelo serviço `wordpress`) é
+     *Debian-based*, onde `www-data` tem UID/GID **33**. Como é o serviço
+     `wordpress` quem cria os arquivos padrão em `wp-content/` (bind-mount
+     compartilhado com o host), esses arquivos ficam com dono UID 33 — e o
+     `wpcli`, rodando por padrão como UID 82, não conseguia escrever em
+     subpastas como `wp-content/uploads/` e `wp-content/upgrade/` (erros de
+     "Unable to create directory" / "Could not create directory").
+     **Solução**: fixar `user: "33:33"` no serviço `wpcli` no
+     `docker-compose.yml`, alinhando-o ao UID/GID do serviço `wordpress`.
+  5. **Incompatibilidade de versão mínima do WordPress exigida pelo
+     WooCommerce**: a imagem `wordpress:6-php8.2-apache` trava o WordPress
+     na branch major 6 (versão instalada: 6.9.4), mas a versão atual do
+     WooCommerce no repositório oficial exige WordPress mínimo 7.0,
+     resultando em "This plugin does not work with your version of
+     WordPress" e falha na instalação de todos os plugins subsequentes.
+     **Solução**: migrar a imagem do serviço `wordpress` para
+     `wordpress:7-php8.2-apache` (tag confirmada disponível no Docker Hub).
+     Como essa mudança exige um núcleo novo, os volumes Docker nomeados
+     `db-data` e `wordpress-data` foram recriados do zero
+     (`docker compose down -v` + `docker compose up -d`) — sem perda de
+     trabalho relevante, pois eram dados de teste efêmeros desta sessão; o
+     bind-mount `wp-content` (tema e idioma já instalados) não foi afetado.
+
+**Decisões técnicas**
+- Preferida a flag `--ssl=0` no comando WP-CLI, em vez de um arquivo de
+  configuração `my.cnf`, por ser a solução que de fato funciona com o
+  `--no-defaults` usado internamente pelo WP-CLI.
+- Fixado o UID/GID do serviço `wpcli` via `user: "33:33"` em vez de alterar
+  permissões do bind-mount no host, mantendo a solução inteiramente dentro
+  do `docker-compose.yml` (mais portável entre máquinas da equipe).
+- Migração para `wordpress:7-php8.2-apache` em vez de fixar uma versão
+  antiga do WooCommerce, para manter a stack alinhada com versões
+  correntes e evitar dívida técnica de compatibilidade.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Nenhuma nesta task.
+
+---

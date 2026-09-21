@@ -70,8 +70,8 @@ docker compose run --rm wpcli bash /var/www/scripts/provision.sh
 
 Após o provisionamento:
 
-- Site: http://localhost:8080
-- Painel de administração: http://localhost:8080/wp-admin
+- Site: http://localhost:8090
+- Painel de administração: http://localhost:8090/wp-admin
 - phpMyAdmin (suporte ao banco de dados): http://localhost:8081
 
 As credenciais de administrador usadas localmente e as demais variáveis do
