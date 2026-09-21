@@ -65,7 +65,7 @@ docker compose up -d
 docker compose ps
 
 # 3. Rodar o script de provisionamento (instala WordPress, plugins e páginas)
-docker compose run --rm wpcli /var/www/scripts/provision.sh
+docker compose run --rm wpcli bash /var/www/scripts/provision.sh
 ```
 
 Após o provisionamento:

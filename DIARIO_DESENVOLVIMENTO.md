@@ -38,3 +38,34 @@ pendências que dependem de ação humana ou processo participativo.
 - Nenhuma nesta task.
 
 ---
+
+## 2026-09-21 — Task 2: Ambiente Docker
+
+**O que foi feito**
+- Criado `docker-compose.yml` com quatro serviços:
+  - `db` (MariaDB 10.11), com healthcheck para garantir que o banco esteja
+    pronto antes do WordPress subir.
+  - `wordpress` (imagem oficial `wordpress:6-php8.2-apache`), com
+    `wp-content/` mapeado via bind-mount para o repositório — assim, o tema
+    e o plugin autoral desenvolvidos localmente aparecem imediatamente no
+    container, sem rebuild de imagem.
+  - `wpcli` (imagem oficial `wordpress:cli-php8.2`), usada sob demanda via
+    `docker compose run --rm wpcli ...` para rodar comandos WP-CLI e o
+    script de provisionamento.
+  - `phpmyadmin`, para facilitar inspeção/suporte do banco de dados durante
+    o desenvolvimento (não é dependência de produção).
+- Todas as variáveis (credenciais de banco, portas, dados do admin) têm
+  valores-padrão seguros para uso local via sintaxe `${VAR:-padrão}`, então
+  o ambiente sobe mesmo sem um arquivo `.env`.
+- Validada a sintaxe do arquivo com `docker compose config` (sem erros).
+
+**Decisões técnicas**
+- MariaDB (em vez de MySQL) por ser a opção padrão recomendada pela imagem
+  oficial do WordPress para bancos compatíveis.
+- `wpcli` não fica em execução contínua (evita consumir recursos à toa);
+  é invocado pontualmente via `docker compose run --rm`.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Nenhuma nesta task.
+
+---
