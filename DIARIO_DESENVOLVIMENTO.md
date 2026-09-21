@@ -315,3 +315,48 @@ pendências que dependem de ação humana ou processo participativo.
   interativa, ainda não implementada.
 
 ---
+
+## 2026-09-21 — Task 7: Documentação do módulo de pagamentos (Pix/Cartão/Boleto)
+
+**O que foi feito**
+- Criado [docs/PAGAMENTOS.md](../docs/PAGAMENTOS.md), documentando:
+  - Por que nenhum gateway de pagamento foi instalado/configurado ainda
+    (decisão do provedor — Mercado Pago, Asaas, PagSeguro etc. — ainda
+    depende de definição da equipe, incluindo taxas, prazos de repasse e
+    suporte a split de pagamento entre vendedores do marketplace).
+  - Como a estrutura já está pronta para receber um gateway: o
+    WooCommerce (já instalado e ativo) expõe uma API nativa e extensível
+    de gateways de pagamento (`WC_Payment_Gateway`), então basta instalar
+    o plugin oficial do provedor escolhido — nenhum código autoral
+    adicional é necessário no `reconectar-core` para isso.
+  - Onde as credenciais deverão ser inseridas quando a equipe decidir
+    (interface administrativa do WooCommerce, nunca em código-fonte
+    versionado) e o uso do `.env` (já ignorado pelo Git) apenas para
+    credenciais de ambiente de teste/sandbox durante o desenvolvimento.
+  - Pendências explícitas que dependem de decisão da equipe.
+- Atualizado o [README.md](../README.md) para referenciar a nova
+  documentação.
+- **Nenhum plugin de gateway de pagamento foi instalado e nenhuma
+  credencial (real ou de teste) foi criada, inserida ou commitada** nesta
+  task — conforme decisão já validada com o usuário antes do início desta
+  fase de desenvolvimento.
+
+**Decisões técnicas**
+- Documentação centralizada em arquivo próprio (`docs/PAGAMENTOS.md`) em
+  vez de apenas expandir a seção já existente no README, para manter o
+  README enxuto como visão geral e permitir que a equipe (que decidirá o
+  provedor) encontre rapidamente todo o contexto relevante em um único
+  lugar.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Escolha do provedor de pagamento (Mercado Pago, Asaas, PagSeguro ou
+  outro), considerando taxas, prazos de repasse e suporte a split de
+  pagamento para o marketplace multi-vendedor.
+- Definição de quem (qual CNPJ/conta) recebe os repasses de cada
+  vendedor/iniciativa cadastrada na plataforma.
+- Decisão sobre uso do Dokan Pro (pago) caso o split de pagamento nativo do
+  Dokan Lite não seja suficiente para o modelo de negócio do projeto.
+- Homologação/cadastro junto ao provedor escolhido e obtenção das
+  credenciais de produção.
+
+---

@@ -6,9 +6,11 @@ de um marketplace multi-vendedor, comunidade colaborativa e mecanismos de
 governança digital participativa.
 
 Consulte [PLANO_DESENVOLVIMENTO.md](PLANO_DESENVOLVIMENTO.md) para o plano
-completo (fases, cronograma do edital, indicadores) e
+completo (fases, cronograma do edital, indicadores),
 [DIARIO_DESENVOLVIMENTO.md](DIARIO_DESENVOLVIMENTO.md) para o histórico
-cronológico de cada etapa concluída.
+cronológico de cada etapa concluída, e
+[docs/PAGAMENTOS.md](docs/PAGAMENTOS.md) para a estrutura do módulo de
+pagamentos (Pix/Cartão/Boleto).
 
 ## Stack técnica
 
