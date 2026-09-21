@@ -243,3 +243,75 @@ pendências que dependem de ação humana ou processo participativo.
 - Nenhuma nesta task.
 
 ---
+
+## 2026-09-21 — Task 6: Plugin autoral "reconectar-core" (esqueleto do módulo de Governança Digital)
+
+**O que foi feito**
+- Criado `wp-content/plugins/reconectar-core/`, plugin autoral (GPL-2.0-or-later)
+  com:
+  - `reconectar-core.php`: arquivo principal do plugin, com cabeçalho de
+    metadados do WordPress e carregamento das duas classes do plugin via
+    `require_once`, inicializadas no hook `plugins_loaded`.
+  - `includes/class-reconectar-proposta-votacao.php`: classe
+    `Reconectar_Proposta_Votacao`, que registra o Custom Post Type
+    `proposta_votacao` ("Proposta de Votação", com labels em pt-BR,
+    `show_in_rest` habilitado para compatibilidade com Gutenberg/REST API,
+    suporte a título/editor/resumo) e dois post meta —
+    `_reconectar_votos_favor` e `_reconectar_votos_contra` — via
+    `register_post_meta()`, ambos expostos na REST API e protegidos por
+    `auth_callback` (exige capacidade `edit_posts` para escrita).
+  - `includes/class-reconectar-painel-transparencia.php`: classe
+    `Reconectar_Painel_Transparencia`, que registra o shortcode
+    `[reconectar_painel_transparencia]`. O callback do shortcode executa
+    uma consulta (`get_posts`) pelas propostas publicadas e renderiza, para
+    cada uma, título, resumo e o placar de votos (a favor, contra e
+    total), em marcação HTML simples, com todo texto dinâmico escapado
+    (`esc_html`, `esc_attr`, `wp_kses_post`) e um estado vazio ("nenhuma
+    proposta publicada") quando não há propostas.
+  - `README.md`: explica o escopo do plugin, deixando explícito que é um
+    MVP/esqueleto — apenas a estrutura de dados e o painel de leitura
+    estão implementados; a interface de votação interativa (quem pode
+    votar, uma vez por beneficiário, prazo) depende da definição
+    participativa das regras de funcionamento da plataforma.
+- Plugin sincronizado para dentro do volume Docker e ativado com sucesso
+  via WP-CLI (`wp plugin activate reconectar-core`); confirmado em
+  `wp plugin list` como `active`, sem conflito com os demais plugins já
+  ativos (WooCommerce, Dokan Lite, BuddyPress, bbPress).
+- Validado funcionalmente: criadas duas propostas de teste via WP-CLI
+  ("Instalação de ponto de wi-fi comunitário" e "Horário de funcionamento
+  do espaço de coworking"), cada uma com valores de votos definidos nos
+  post meta; criada uma página "Transparência" com o shortcode
+  `[reconectar_painel_transparencia]`; confirmado visualmente em
+  `http://localhost:8090/?page_id=19` que as duas propostas aparecem com
+  título, resumo e placar de votos corretos (ex.: "A favor: 12 Contra: 3
+  Total de votos: 15").
+
+**Decisões técnicas**
+- Reaplicada a mesma estratégia de contorno de permissão de arquivo (UID
+  do host vs. UID 33/`www-data` do container) já usada na Task 5 para o
+  tema: arquivos do plugin preparados em `/tmp/reconectar-core-plugin/`
+  (gravável pelo host) e copiados para dentro do volume via
+  `docker compose run --rm -v /tmp/reconectar-core-plugin:/mnt/plugin-src:ro
+  wpcli bash -c "cp -r ..."`.
+- Post meta de votos implementado como simples contadores inteiros
+  (`_reconectar_votos_favor`/`_reconectar_votos_contra`), sem lógica de
+  incremento/decremento neste momento — a forma como um voto individual é
+  registrado (endpoint REST customizado, formulário, validação de
+  duplicidade) é parte da interface de votação ainda não implementada,
+  dependente da Atividade 2.10.
+- Painel de transparência implementado como shortcode (em vez de bloco
+  Gutenberg customizado) por ser a forma mais simples de embutir o
+  conteúdo em qualquer página existente do tema Storefront/reconectar sem
+  exigir build de assets JavaScript nesta etapa inicial do MVP.
+- `scripts/provision.sh` já continha, desde a Task 3, a lógica condicional
+  de ativação do `reconectar-core` assim que o diretório do plugin
+  existisse — não foi necessário alterar o script nesta task.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Definição das regras de funcionamento da votação (Atividade 2.10):
+  quem pode votar, se cada beneficiário vota uma única vez por proposta,
+  prazo de abertura/encerramento de cada votação, e se o voto é público ou
+  anônimo. Essas regras determinam o desenho da interface de votação
+  interativa, ainda não implementada.
+
+---
