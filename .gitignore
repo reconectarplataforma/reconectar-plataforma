@@ -9,6 +9,8 @@ wp-content/cache/
 wp-content/backup*/
 wp-content/wp-config.php
 wp-config.php
+wp-content/index.php
+wp-content/languages/
 
 # Plugins e temas de terceiros (instalados via scripts/provision.sh, não versionados)
 wp-content/plugins/*

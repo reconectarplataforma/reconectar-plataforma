@@ -1,0 +1,72 @@
+/*
+Theme Name: Reconectar
+Description: Tema institucional da plataforma Reconectar — Incubadora Digital para Vínculos e Negócios. Child theme do Storefront com a identidade visual do projeto (paleta de cores e tipografia Poppins/Thoge).
+Author: Reconectar
+Template: storefront
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: reconectar
+*/
+
+:root {
+  --reconectar-cor-primaria: #31BEB1;
+  --reconectar-cor-secundaria: #CF6442;
+  --reconectar-cor-destaque: #F1BF3D;
+  --reconectar-cor-institucional: #663191;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.site-title {
+  font-family: 'Thoge', 'Poppins', sans-serif;
+}
+
+a {
+  color: var(--reconectar-cor-primaria);
+}
+
+a:hover,
+a:focus {
+  color: var(--reconectar-cor-secundaria);
+}
+
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce input.button,
+button,
+input[type="submit"] {
+  background-color: var(--reconectar-cor-primaria);
+  color: #fff;
+  border: none;
+}
+
+.woocommerce a.button:hover,
+.woocommerce button.button:hover,
+.woocommerce input.button:hover,
+button:hover,
+input[type="submit"]:hover {
+  background-color: var(--reconectar-cor-secundaria);
+}
+
+.site-branding img {
+  max-height: 60px;
+  width: auto;
+}
+
+.reconectar-destaque {
+  color: var(--reconectar-cor-destaque);
+}
+
+.reconectar-institucional {
+  background-color: var(--reconectar-cor-institucional);
+  color: #fff;
+}

@@ -179,3 +179,67 @@ pendências que dependem de ação humana ou processo participativo.
 - Nenhuma nesta task.
 
 ---
+
+## 2026-09-21 — Task 5/5b: Tema customizado "reconectar" e identidade visual
+
+**O que foi feito**
+- Criado `wp-content/themes/reconectar/`, child theme do **Storefront**
+  (tema oficial do WooCommerce, GPL), com:
+  - `style.css`: cabeçalho de tema (`Template: storefront`), variáveis CSS
+    com a paleta de cores do projeto (`--reconectar-cor-primaria: #31BEB1`,
+    `--reconectar-cor-secundaria: #CF6442`, `--reconectar-cor-destaque:
+    #F1BF3D`, `--reconectar-cor-institucional: #663191`) e regras aplicando
+    a paleta a links, botões e ao branding do site.
+  - `functions.php`: enfileira o estilo do tema pai (Storefront), a folha
+    `assets/css/fonts.css` e o `style.css` do child theme (com
+    `filemtime()` para cache-busting); e registra suporte nativo a
+    **`add_theme_support('custom-logo', ...)`** do WordPress, para que o
+    logo seja gerenciável via Personalizador em vez de hard-coded em
+    templates.
+  - `assets/css/fonts.css`: 18 declarações `@font-face` para a fonte
+    **Poppins** (todos os pesos 100–900, normal e itálico, formato
+    `truetype`) e 1 para a fonte **Thoge** (formato `opentype`) — Poppins
+    usada no corpo do texto/UI, Thoge em títulos e no nome do site.
+  - `assets/fonts/poppins/` (20 arquivos `.ttf`) e `assets/fonts/thoge/`
+    (`thoge.otf`), copiados de `identidade_visual/Fonts/` (pasta local do
+    usuário, fora do repositório).
+  - `assets/img/`: três variações do logo copiadas de
+    `identidade_visual/Logo/` (`logo-principal-cor.png`,
+    `logo-apoio-cor.png`, `logo-apoio-branco.png`).
+- Tema ativado com sucesso via reexecução idempotente do
+  `scripts/provision.sh` (`wp theme list` confirmou `reconectar | active`).
+- Logo configurado via WP-CLI: `wp media import` da variante horizontal
+  colorida (`logo-apoio-cor.png`) seguido de
+  `wp theme mod set custom_logo <ID>`.
+- Validado visualmente em `http://localhost:8090`: logo exibido no
+  cabeçalho, paleta de cores aplicada a links/botões, tipografia Thoge nos
+  títulos e Poppins no corpo do texto.
+
+**Decisões técnicas**
+- **Contorno de permissão de arquivo (UID do host vs. do container)**: a
+  pasta `wp-content/themes/`, criada pelo container `wordpress`
+  (Debian-based, `www-data` = UID/GID 33), não pode ser escrita
+  diretamente pelo usuário do host (UID 1000) — o mesmo problema de UID já
+  identificado e resolvido na Task 4 para o serviço `wpcli`. Em vez de
+  alterar permissões no host (`sudo chown`), o que quebraria a estratégia
+  de UID já validada, os arquivos do tema foram preparados em `/tmp`
+  (permissão do host) e copiados para dentro do volume via
+  `docker compose run --rm -v /tmp/...:/mnt/theme-src:ro wpcli bash -c
+  "cp ..."`, já que o serviço `wpcli` roda fixado como `user: "33:33"`.
+- Preferido `add_theme_support('custom-logo', ...)` (recurso nativo do
+  WordPress, gerenciável via Personalizador/WP-CLI) em vez de hard-code de
+  `<img>` no template do tema, por ser a forma idiomática e mais flexível
+  de aplicar o logo.
+- **Ajuste no `.gitignore`**: identificado que a regra original
+  (`wp-content/*` com negação apenas para `plugins/reconectar-core` e
+  `themes/reconectar`/`themes/storefront`) deixaria passar
+  `wp-content/index.php` (arquivo padrão do WordPress core) e todo o
+  conteúdo de `wp-content/languages/` (arquivos `.mo`/`.po`/`.l10n.php`
+  gerados pela instalação do idioma pt_BR) — nenhum dos dois é código
+  autoral. Adicionadas exclusões explícitas para ambos, mantendo a
+  estratégia já documentada na Task 1 de versionar apenas código autoral.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Nenhuma nesta task.
+
+---
