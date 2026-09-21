@@ -69,3 +69,36 @@ pendências que dependem de ação humana ou processo participativo.
 - Nenhuma nesta task.
 
 ---
+
+## 2026-09-21 — Task 3: Script de provisionamento (WP-CLI)
+
+**O que foi feito**
+- Criado `scripts/provision.sh`, executado via
+  `docker compose run --rm wpcli bash /var/www/scripts/provision.sh`.
+- O script é **idempotente** (pode ser rodado novamente sem causar erro ou
+  duplicar conteúdo) e realiza:
+  - Instalação do núcleo do WordPress (se ainda não instalado) e do idioma
+    pt_BR.
+  - Instalação do tema `storefront` (dependência do child theme
+    `reconectar`); ativa `reconectar` automaticamente assim que ele existir
+    (Task 5) — até lá, ativa `storefront` como tema provisório.
+  - Instalação e ativação de WooCommerce, Dokan Lite, BuddyPress e bbPress.
+  - Ativação do plugin autoral `reconectar-core` assim que ele existir
+    (Task 6).
+  - Criação da página "Comunidade" com o shortcode `[buddypress]` e de um
+    fórum inicial ("Fórum Geral") via bbPress.
+  - As páginas essenciais do WooCommerce (Loja, Carrinho, Checkout, Minha
+    Conta) são criadas automaticamente pelo próprio WooCommerce ao ser
+    ativado — não é necessário criá-las manualmente no script.
+- Validada apenas a sintaxe do script (`bash -n`); a execução real dentro
+  do container acontece na Task 4.
+
+**Decisões técnicas**
+- Script escrito para ser seguro de rodar múltiplas vezes, já que o
+  ambiente evoluirá em tasks futuras (tema e plugin autoral ainda não
+  existem nesta task).
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- Nenhuma nesta task.
+
+---
