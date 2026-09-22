@@ -360,3 +360,83 @@ pendências que dependem de ação humana ou processo participativo.
   credenciais de produção.
 
 ---
+
+## 2026-09-22 — Task 8: Bootstrap e layout responsivo
+
+**O que foi feito**
+- Diagnosticado o layout quebrado reportado pelo usuário (menu de
+  navegação transbordando em várias linhas, listando 11 páginas). Causa
+  raiz: nenhum menu estava atribuído ao local `primary` do tema
+  (`wp menu list` vazio), o que fazia `wp_nav_menu()` recorrer ao
+  fallback padrão do WordPress (`wp_page_menu()`), listando
+  automaticamente **todas** as páginas publicadas como itens de nível
+  superior — sem nenhuma curadoria nem estrutura responsiva.
+- Auto-hospedado o **Bootstrap 5.3.3** (CSS + JS bundle, minificados,
+  licença MIT) em
+  `wp-content/themes/reconectar/assets/bootstrap/`, sem uso de CDN e sem
+  pipeline de build, mantendo a simplicidade já adotada no projeto.
+- Enfileirado o Bootstrap em `functions.php`
+  (`reconectar_enqueue_assets()`), com `reconectar-style` passando a
+  depender também de `reconectar-bootstrap`.
+- Criado um menu de navegação curado via WP-CLI (Início, Loja,
+  Comunidade, Transparência, Minha Conta) e atribuído ao local
+  `primary`. A criação foi adicionada de forma idempotente ao
+  `scripts/provision.sh` (verifica se já existe um menu atribuído ao
+  local `primary` antes de criar), garantindo que o ambiente continue
+  reproduzível do zero.
+- Sobrescrita a função `storefront_primary_navigation()` no
+  `functions.php` do tema `reconectar` — o Storefront protege essa
+  função com `function_exists()`, então bastou declará-la no child
+  theme (carregado antes do pai) para substituir a navegação padrão por
+  uma navbar Bootstrap (`navbar navbar-expand-lg`) com botão hambúrguer
+  colapsável (`navbar-toggler` + `collapse`) em telas pequenas.
+- Adicionados os filtros `nav_menu_css_class` e
+  `nav_menu_link_attributes` para aplicar as classes Bootstrap
+  (`nav-item`, `nav-link`) aos itens do menu primário sem precisar de um
+  Walker completo.
+- Ajustado `style.css`: cabeçalho com `display: flex` e `flex-wrap`
+  (logo + busca lado a lado, empilhando em telas ≤568px), cores da
+  navbar seguindo a paleta institucional do projeto, e espaçamento do
+  painel de transparência.
+- Atualizado o shortcode `[reconectar_painel_transparencia]`
+  (`reconectar-core`) para renderizar as propostas como cards Bootstrap
+  responsivos (`row row-cols-1 row-cols-md-2 g-3`, `card`, `card-body`,
+  badges de placar de votos), por ser conteúdo 100% autoral do projeto.
+- Validado visualmente no navegador interno em três larguras de
+  viewport (mobile ~375px, tablet ~768px, desktop ~1280px): sem overflow
+  horizontal em nenhuma delas, e o menu colapsa corretamente em um botão
+  hambúrguer funcional em mobile e tablet.
+
+**Diagnóstico técnico adicional: bug do item "Início" cortado**
+- Durante a validação, o primeiro item do menu ("Início") aparecia
+  cortado/deslocado para a esquerda. Causa: o WordPress core injeta
+  automaticamente a classe `nav-menu` no `<ul>` do menu do
+  `theme_location` primário, independentemente do `menu_class` passado
+  em `wp_nav_menu()`. Isso ativa a regra legada
+  `.main-navigation ul.menu, .main-navigation ul.nav-menu { margin-left: -1em; ... }`
+  (dentro de `@media (min-width: 768px)`) do `storefront/style.css`,
+  cuja especificidade CSS (2 classes + 1 elemento) supera a de
+  `.reconectar-navbar .navbar-nav` (2 classes). Corrigido aplicando
+  `!important` na propriedade `margin` desse seletor, documentado em
+  comentário no próprio `style.css`.
+
+**Decisões técnicas**
+- Escopo delimitado ao "chrome" do site (cabeçalho, navegação) e ao
+  conteúdo autoral (tema `reconectar` + shortcode do
+  `reconectar-core`). Ficou **fora do escopo** o reskin dos templates
+  nativos do WooCommerce/Dokan (loja, produto, checkout, minha conta,
+  lista de lojas) — essas páginas já usam o grid responsivo nativo do
+  Storefront/WooCommerce (que não estava quebrado, apenas sem a marca
+  visual do Bootstrap), evitando retrabalho de reescrever templates de
+  terceiros e preservando compatibilidade com atualizações futuras
+  desses plugins.
+- Itens como Cart, Checkout, My Orders, Store List, Vendor Onboarding e
+  Sample Page foram deixados de fora do menu principal — continuam
+  acessíveis pelos ícones de carrinho/conta padrão do
+  WooCommerce/Dokan, não pela navegação de topo.
+
+**Pendências**
+- Nenhuma pendência de negócio/processo participativo nesta task —
+  trabalho puramente técnico.
+
+---

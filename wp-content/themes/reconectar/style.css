@@ -70,3 +70,80 @@ input[type="submit"]:hover {
   background-color: var(--reconectar-cor-institucional);
   color: #fff;
 }
+
+/* ==========================================================================
+   Layout responsivo (Bootstrap) — Task 8
+   ==========================================================================
+   O container `.col-full` já é nativo do Storefront (centralizado,
+   max-width ~1064px, com breakpoints próprios em 568px); reaproveitamos
+   esse container em vez de duplicá-lo com `.container` do Bootstrap.
+*/
+
+/* Cabeçalho: logo + busca de produto lado a lado, empilhando em telas
+   estreitas em vez de comprimir/transbordar. */
+.site-header > .col-full {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.site-header .site-search {
+  flex: 1 1 260px;
+  max-width: 320px;
+}
+
+@media (max-width: 568px) {
+  .site-header > .col-full {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .site-header .site-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+/* Navbar principal (Bootstrap), sobrescrita em functions.php. */
+.reconectar-navbar {
+  background-color: var(--reconectar-cor-institucional);
+}
+
+.reconectar-navbar .nav-link {
+  color: #fff;
+}
+
+.reconectar-navbar .nav-link:hover,
+.reconectar-navbar .nav-link:focus,
+.reconectar-navbar .nav-link.current-menu-item {
+  color: var(--reconectar-cor-destaque);
+}
+
+.reconectar-navbar .navbar-toggler {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.reconectar-navbar .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.85)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+/* Neutraliza margem/padding legados que o CSS nativo do Storefront aplica a
+   listas <ul> de navegação (pensados para menus sem Bootstrap). O WordPress
+   core injeta automaticamente a classe `nav-menu` no <ul> do menu primário,
+   o que ativa a regra `.main-navigation ul.nav-menu { margin-left: -1em }`
+   do Storefront — com especificidade maior (2 classes + 1 elemento) do que
+   este seletor (2 classes), cortando o primeiro item do menu. O !important
+   é necessário para vencer essa regra legada de forma robusta. */
+.reconectar-navbar .navbar-nav {
+  margin: 0 !important;
+  padding: 0;
+}
+
+/* Painel de transparência: espaçamento vertical do bloco de cards dentro
+   do fluxo de conteúdo padrão (`.col-full`/`.site-content`). */
+.reconectar-painel-transparencia {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}

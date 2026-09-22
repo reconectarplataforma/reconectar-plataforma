@@ -98,6 +98,28 @@ else
   echo "Já existe pelo menos um fórum."
 fi
 
+echo "== Menu principal (navegação) =="
+if wp menu list --fields=locations --format=csv | grep -q "primary"; then
+  echo "Já existe um menu atribuído ao local 'primary', pulando."
+else
+  wp menu create "Menu Principal"
+  wp menu item add-custom "menu-principal" "Início" "$WP_URL/" --position=1
+
+  loja_id=$(wp post list --post_type=page --name=shop --post_status=publish --field=ID)
+  [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Loja" --position=2
+
+  comunidade_id=$(wp post list --post_type=page --name=comunidade --post_status=publish --field=ID)
+  [ -n "$comunidade_id" ] && wp menu item add-post "menu-principal" "$comunidade_id" --title="Comunidade" --position=3
+
+  transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
+  [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=4
+
+  conta_id=$(wp post list --post_type=page --name=my-account --post_status=publish --field=ID)
+  [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=5
+
+  wp menu location assign menu-principal primary
+fi
+
 echo "== Resumo =="
 wp theme list
 wp plugin list

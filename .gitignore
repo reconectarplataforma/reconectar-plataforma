@@ -17,7 +17,6 @@ wp-content/plugins/*
 !wp-content/plugins/reconectar-core/
 wp-content/themes/*
 !wp-content/themes/reconectar/
-!wp-content/themes/storefront/
 
 # Dados do banco de dados (volume Docker)
 docker/db-data/
