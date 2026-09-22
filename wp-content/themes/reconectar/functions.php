@@ -108,3 +108,87 @@ function reconectar_nav_menu_link_attributes( $atts, $item, $args ) {
 	return $atts;
 }
 add_filter( 'nav_menu_link_attributes', 'reconectar_nav_menu_link_attributes', 10, 3 );
+
+/**
+ * Home institucional — Task 9.
+ *
+ * A home passa a usar `front-page.php`, que reaproveita a mesma action
+ * `homepage` do template-homepage.php nativo do Storefront. Removemos os
+ * hooks de produtos que não fazem parte do escopo escolhido (recentes,
+ * destaque, populares, em promoção, mais vendidos) e o conteúdo de página
+ * (não há page associada à home), mantendo apenas as categorias de
+ * produtos. A remoção precisa ocorrer depois que o Storefront já registrou
+ * esses hooks (feito em `after_setup_theme`/`init` do tema pai), por isso
+ * usamos `init` com prioridade tardia.
+ */
+function reconectar_ajustar_hooks_homepage() {
+	remove_action( 'homepage', 'storefront_homepage_content', 10 );
+	remove_action( 'homepage', 'storefront_recent_products', 30 );
+	remove_action( 'homepage', 'storefront_featured_products', 40 );
+	remove_action( 'homepage', 'storefront_popular_products', 50 );
+	remove_action( 'homepage', 'storefront_on_sale_products', 60 );
+	remove_action( 'homepage', 'storefront_best_selling_products', 70 );
+	// "Shop by Brand" é registrado condicionalmente pelo Storefront quando a
+	// classe WC_Brands existe (marcas nativas do WooCommerce). Não faz parte
+	// do escopo de seções aprovado para esta home (hero, categorias,
+	// comunidade/transparência), por isso também é removido aqui.
+	remove_action( 'homepage', 'storefront_woocommerce_brands_homepage_section', 80 );
+}
+add_action( 'init', 'reconectar_ajustar_hooks_homepage', 20 );
+
+function reconectar_homepage_hero() {
+	?>
+	<section class="reconectar-hero">
+		<div class="container">
+			<div class="row justify-content-center text-center">
+				<div class="col-lg-8">
+					<h1 class="reconectar-hero__titulo"><?php esc_html_e( 'Reconectar — Incubadora Digital para Vínculos e Negócios', 'reconectar' ); ?></h1>
+					<p class="reconectar-hero__subtitulo"><?php esc_html_e( 'Uma plataforma colaborativa que conecta pessoas, negócios locais e iniciativas de comunidade.', 'reconectar' ); ?></p>
+					<a class="btn btn-lg reconectar-hero__cta" href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>">
+						<?php esc_html_e( 'Ver produtos', 'reconectar' ); ?>
+					</a>
+				</div>
+			</div>
+		</div>
+	</section>
+	<?php
+}
+add_action( 'homepage', 'reconectar_homepage_hero', 5 );
+
+function reconectar_homepage_comunidade_transparencia() {
+	$comunidade    = get_page_by_path( 'comunidade' );
+	$transparencia = get_page_by_path( 'transparencia' );
+
+	if ( ! $comunidade && ! $transparencia ) {
+		return;
+	}
+	?>
+	<section class="reconectar-home-comunidade-transparencia">
+		<div class="container">
+			<div class="row row-cols-1 row-cols-md-2 g-3">
+				<?php if ( $comunidade ) : ?>
+					<div class="col">
+						<a class="card h-100 text-decoration-none" href="<?php echo esc_url( get_permalink( $comunidade ) ); ?>">
+							<div class="card-body">
+								<h3 class="card-title h5"><?php esc_html_e( 'Comunidade', 'reconectar' ); ?></h3>
+								<p class="card-text"><?php esc_html_e( 'Participe da rede de pessoas e negócios conectados pela plataforma.', 'reconectar' ); ?></p>
+							</div>
+						</a>
+					</div>
+				<?php endif; ?>
+				<?php if ( $transparencia ) : ?>
+					<div class="col">
+						<a class="card h-100 text-decoration-none" href="<?php echo esc_url( get_permalink( $transparencia ) ); ?>">
+							<div class="card-body">
+								<h3 class="card-title h5"><?php esc_html_e( 'Transparência', 'reconectar' ); ?></h3>
+								<p class="card-text"><?php esc_html_e( 'Acompanhe as propostas de votação e as decisões coletivas da plataforma.', 'reconectar' ); ?></p>
+							</div>
+						</a>
+					</div>
+				<?php endif; ?>
+			</div>
+		</div>
+	</section>
+	<?php
+}
+add_action( 'homepage', 'reconectar_homepage_comunidade_transparencia', 25 );

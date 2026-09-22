@@ -440,3 +440,91 @@ pendências que dependem de ação humana ou processo participativo.
   trabalho puramente técnico.
 
 ---
+
+## 2026-09-22 — Task 9: Redesenho da home institucional
+
+**O que foi feito**
+- Diagnosticado, por leitura de código (sem alterações), que a home
+  atual usava o modo "posts" do WordPress
+  (`show_on_front = "posts"`), ou seja, era apenas o índice padrão de
+  posts do blog (`index.php` → `loop.php`), sem nenhuma seção
+  institucional ou de produtos — o tema `reconectar` não possuía
+  nenhum template PHP próprio, dependendo 100% dos templates do
+  Storefront.
+- Confirmado que o Storefront não define `front-page.php`, mas tem um
+  page template opcional (`template-homepage.php`) que já registra,
+  via `do_action( 'homepage' )`, as seções nativas: conteúdo de página
+  (10), categorias de produtos (20), recentes (30), destaque (40),
+  populares (50), em promoção (60), mais vendidos (70) e,
+  condicionalmente, "Shop by Brand" (80, quando a classe `WC_Brands`
+  existe). Como um `front-page.php` presente no child theme é usado
+  para a home independentemente do valor de `show_on_front`, não foi
+  necessário alterar essa configuração via WP-CLI.
+- Criado `wp-content/themes/reconectar/front-page.php`, adaptado da
+  estrutura de `template-homepage.php` do tema pai: `get_header()`,
+  wrapper `#primary`/`#main`, `do_action( 'homepage' )`, `get_footer()`.
+- Em `functions.php`, ajustados os hooks da action `homepage`:
+  removidos `storefront_homepage_content` (10, sem page associada à
+  home), `storefront_recent_products` (30), `storefront_featured_products`
+  (40), `storefront_popular_products` (50), `storefront_on_sale_products`
+  (60) e `storefront_best_selling_products` (70) — seções de produtos
+  fora do escopo aprovado para esta home. Mantido intacto
+  `storefront_product_categories` (20), reaproveitando o widget nativo
+  do WooCommerce sem reescrevê-lo. Adicionadas duas novas seções
+  autorais: `reconectar_homepage_hero` (prioridade 5, banner
+  institucional com título, subtítulo e botão CTA "Ver produtos"
+  apontando para `wc_get_page_permalink( 'shop' )`) e
+  `reconectar_homepage_comunidade_transparencia` (prioridade 25, cards
+  linkando para as páginas "Comunidade" e "Transparência" via
+  `get_page_by_path()`, com fallback silencioso caso alguma delas não
+  exista).
+- Descoberto durante a implementação que o Storefront também registra
+  condicionalmente o hook `storefront_woocommerce_brands_homepage_section`
+  (80, "Shop by Brand") quando o plugin WooCommerce Brands está ativo
+  (`class_exists( 'WC_Brands' )`). Essa seção não fazia parte do
+  escopo aprovado (hero, categorias, comunidade/transparência) e foi
+  removida junto com as demais seções de produto.
+- Em `style.css`, adicionada a seção "Home institucional — Task 9":
+  estilo do hero (gradiente com as cores institucional e primária do
+  projeto, título em Thoge, botão CTA na cor de destaque), espaçamento
+  vertical uniforme entre as seções da home
+  (`.reconectar-hero`, `.storefront-product-section`,
+  `.reconectar-home-comunidade-transparencia`), e estilo dos cards de
+  Comunidade/Transparência reaproveitando o padrão de card já criado
+  na Task 8 para o painel de transparência.
+- Validado visualmente no navegador interno em três larguras de
+  viewport (mobile ~375px, tablet ~768px, desktop ~1280px): hero
+  legível e centralizado, categorias em grid responsivo, cards de
+  Comunidade/Transparência empilhando corretamente em mobile, sem
+  overflow horizontal em nenhuma largura testada.
+
+**Diagnóstico técnico adicional: regressão acidental em comentários PHPDoc**
+- Durante a revisão do diff antes do commit, foi identificado que a
+  edição de `functions.php` havia removido, por engano, três blocos de
+  comentário PHPDoc pré-existentes da Task 8 (documentando
+  `storefront_primary_navigation()` e `reconectar_nav_menu_css_class()`).
+  Os comentários foram restaurados integralmente, preservando a
+  documentação original dessas funções.
+
+**Decisões técnicas**
+- Optou-se por reaproveitar os hooks nativos do Storefront em vez de
+  reescrever a home do zero, mantendo compatibilidade com atualizações
+  futuras do WooCommerce/Dokan e evitando duplicar lógica já resolvida
+  pelo tema pai (especialmente a seção de categorias de produtos, que
+  já é responsiva e compatível com o marketplace multi-vendedor sem
+  código adicional).
+- As seções nativas de produtos recentes, em destaque, populares, em
+  promoção e mais vendidos foram deliberadamente excluídas do escopo
+  desta home institucional, por decisão do usuário — a home prioriza
+  a identidade institucional do projeto (hero + chamada para
+  comunidade/transparência) sobre uma vitrine de produtos completa.
+
+**Pendências que dependem de decisão da equipe/processo participativo**
+- A seção de categorias de produtos (`storefront_product_categories`)
+  só exibe categorias que tenham produtos associados; hoje a única
+  categoria existente no ambiente de desenvolvimento é "Uncategorized",
+  sem produtos vinculados — isso é uma pendência de conteúdo/cadastro,
+  não de código, e será resolvida naturalmente à medida que os
+  vendedores cadastrarem produtos categorizados na plataforma.
+
+---

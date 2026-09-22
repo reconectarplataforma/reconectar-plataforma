@@ -147,3 +147,62 @@ input[type="submit"]:hover {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
 }
+
+/* ==========================================================================
+   Home institucional — Task 9
+   ==========================================================================
+   Seções renderizadas via `front-page.php` + action `homepage`
+   (reconectar_homepage_hero, storefront_product_categories,
+   reconectar_homepage_comunidade_transparencia). `.storefront-product-section`
+   é a classe nativa do Storefront usada em todas as seções da home
+   (inclusive `storefront_product_categories`), reaproveitada aqui apenas
+   para uniformizar o espaçamento vertical entre seções.
+*/
+
+.reconectar-hero,
+.storefront-product-section,
+.reconectar-home-comunidade-transparencia {
+  padding: 3rem 1rem;
+}
+
+.reconectar-hero {
+  background: linear-gradient(135deg, var(--reconectar-cor-institucional), var(--reconectar-cor-primaria));
+  color: #fff;
+  text-align: center;
+}
+
+.reconectar-hero__titulo {
+  color: #fff;
+  font-size: 2rem;
+}
+
+.reconectar-hero__subtitulo {
+  font-size: 1.125rem;
+  margin-bottom: 1.5rem;
+}
+
+.reconectar-hero__cta {
+  background-color: var(--reconectar-cor-destaque);
+  color: #212529;
+  border: none;
+  font-weight: 600;
+}
+
+.reconectar-hero__cta:hover,
+.reconectar-hero__cta:focus {
+  background-color: var(--reconectar-cor-secundaria);
+  color: #fff;
+}
+
+.reconectar-home-comunidade-transparencia .card {
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.reconectar-home-comunidade-transparencia .card:hover,
+.reconectar-home-comunidade-transparencia .card:focus-within {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.reconectar-home-comunidade-transparencia .card-title {
+  color: var(--reconectar-cor-institucional);
+}
