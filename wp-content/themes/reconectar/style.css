@@ -20,12 +20,20 @@ body {
   font-family: 'Poppins', sans-serif;
 }
 
+/* A Thoge é uma fonte de display (formas fechadas, contraste alto): legível em
+   uma palavra isolada, ilegível em títulos corridos. Por isso fica restrita ao
+   logotipo textual (`.site-title`, usado quando não há logo em imagem) e os
+   títulos do site passam a usar Poppins com peso maior. */
 h1,
 h2,
 h3,
 h4,
 h5,
-h6,
+h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+}
+
 .site-title {
   font-family: 'Thoge', 'Poppins', sans-serif;
 }
