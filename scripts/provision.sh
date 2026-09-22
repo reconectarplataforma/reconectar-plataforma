@@ -120,6 +120,20 @@ else
   wp menu location assign menu-principal primary
 fi
 
+echo "== Permalinks =="
+# O WordPress instala com a estrutura "plain" (?p=123), em que as URLs por
+# slug não resolvem. Isso não é cosmético: o dashboard do vendedor (Dokan) e
+# as telas do BuddyPress são servidos por rewrite rules, e sem elas caem na
+# home. O flush precisa rodar DEPOIS da ativação dos plugins e da criação das
+# páginas/fóruns, para que os CPTs de Dokan/BuddyPress/bbPress já estejam
+# registrados e entrem nas regras geradas.
+if [ "$(wp option get permalink_structure)" = "/%postname%/" ]; then
+  echo "Permalinks já configurados como /%postname%/."
+else
+  wp rewrite structure '/%postname%/'
+fi
+wp rewrite flush
+
 echo "== Resumo =="
 wp theme list
 wp plugin list

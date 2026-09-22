@@ -21,6 +21,10 @@ wp-content/themes/*
 # Dados do banco de dados (volume Docker)
 docker/db-data/
 
+# Dumps de banco gerados localmente (rede de segurança antes de migrações;
+# contêm dados de instalação e não devem ir para o repositório público)
+docker/backup-*.sql
+
 # Logs
 *.log
 
