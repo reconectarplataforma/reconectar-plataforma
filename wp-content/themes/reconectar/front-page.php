@@ -2,10 +2,11 @@
 /**
  * Template da home institucional da Reconectar.
  *
- * Reaproveita a action `homepage` nativa do Storefront (ver
- * template-homepage.php do tema pai), com os hooks reordenados em
- * functions.php: hero institucional, categorias de produtos e chamada
- * para Comunidade/Transparência.
+ * As seções são impressas por uma action própria do tema, `reconectar_home`,
+ * e não pela action `homepage` do Storefront. A diferença importa na troca do
+ * tema pai: `homepage` é disparada e povoada pelo Storefront, então a home
+ * inteira desapareceria junto com ele. Com hook próprio, cada seção vive em
+ * `inc/home/` e se registra sozinha, independente de quem seja o pai.
  *
  * @package reconectar
  */
@@ -17,13 +18,13 @@ get_header(); ?>
 
 			<?php
 			/**
-			 * Functions hooked in to homepage action
+			 * Funções registradas na action `reconectar_home`.
 			 *
-			 * @hooked reconectar_homepage_hero                     - 5
-			 * @hooked storefront_product_categories                - 20
-			 * @hooked reconectar_homepage_comunidade_transparencia - 25
+			 * @hooked reconectar_home_hero                     - 10
+			 * @hooked reconectar_home_categorias               - 20
+			 * @hooked reconectar_home_comunidade_transparencia - 50
 			 */
-			do_action( 'homepage' );
+			do_action( 'reconectar_home' );
 			?>
 
 		</main><!-- #main -->

@@ -157,20 +157,42 @@ input[type="submit"]:hover {
 }
 
 /* ==========================================================================
-   Home institucional — Task 9
+   Home institucional
    ==========================================================================
-   Seções renderizadas via `front-page.php` + action `homepage`
-   (reconectar_homepage_hero, storefront_product_categories,
-   reconectar_homepage_comunidade_transparencia). `.storefront-product-section`
-   é a classe nativa do Storefront usada em todas as seções da home
-   (inclusive `storefront_product_categories`), reaproveitada aqui apenas
-   para uniformizar o espaçamento vertical entre seções.
+   Seções renderizadas via `front-page.php` + action própria `reconectar_home`
+   (reconectar_home_hero, reconectar_home_categorias,
+   reconectar_home_comunidade_transparencia). Todas usam classes do próprio
+   tema: a home não depende mais de `.storefront-product-section` nem de
+   qualquer outra classe do tema pai para o espaçamento vertical.
 */
 
 .reconectar-hero,
-.storefront-product-section,
+.reconectar-home-categorias,
 .reconectar-home-comunidade-transparencia {
   padding: 3rem 1rem;
+}
+
+.reconectar-home-categorias__titulo {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.reconectar-home-categorias__item {
+  color: inherit;
+  display: block;
+  text-align: center;
+}
+
+.reconectar-home-categorias__imagem {
+  border-radius: 50%;
+  height: auto;
+  margin-bottom: 0.5rem;
+  max-width: 100%;
+}
+
+.reconectar-home-categorias__nome {
+  display: block;
+  font-weight: 600;
 }
 
 .reconectar-hero {
