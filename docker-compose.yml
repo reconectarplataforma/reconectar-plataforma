@@ -61,6 +61,46 @@ services:
       - ./wp-content:/var/www/html/wp-content
       - ./scripts:/var/www/scripts
 
+  # Monta a demonstração inteira (provisionamento + carga de dados) em uma
+  # execução. Não é uma imagem própria: é a mesma "wordpress:cli-php8.2" do
+  # serviço "wpcli", que já traz tudo de que a carga precisa — WP-CLI, PHP 8.2 e
+  # a extensão GD, usada para gerar as imagens dos produtos. Construir uma
+  # imagem autoral significaria empacotar um script que já chega pelo
+  # bind-mount, ao custo de um rebuild a cada ajuste nele.
+  #
+  # O profile "demo" mantém o serviço fora do "docker compose up" comum: ele
+  # roda até o fim e sai, e um serviço assim no conjunto padrão apareceria como
+  # container "Exited (0)" toda vez que o ambiente subisse.
+  #
+  #   docker compose run --rm demo
+  #   ./scripts/demo-completa.sh   (equivalente, subindo os serviços antes)
+  demo:
+    image: wordpress:cli-php8.2
+    profiles: ["demo"]
+    # Mesmo motivo do serviço "wpcli": a imagem CLI é Alpine (www-data = 82) e
+    # os arquivos do volume pertencem ao UID 33, criado pela imagem Apache.
+    user: "33:33"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST:-db:3306}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-reconectar}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-reconectar}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-reconectar}
+      WP_ADMIN_USER: ${WP_ADMIN_USER:-admin}
+      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD:-reconectar-admin}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL:-admin@reconectar.local}
+      WP_TITLE: ${WP_TITLE:-Reconectar - Incubadora Digital}
+      WP_URL: ${WP_URL:-http://localhost:8090}
+      PHPMYADMIN_PORT: ${PHPMYADMIN_PORT:-8081}
+      RECONECTAR_DEMO_SENHA: ${RECONECTAR_DEMO_SENHA:-reconectar-demo}
+    volumes:
+      - wordpress-data:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+      - ./scripts:/var/www/scripts
+    command: ["bash", "/var/www/scripts/demo-completa.sh"]
+
   phpmyadmin:
     image: phpmyadmin:5
     restart: unless-stopped

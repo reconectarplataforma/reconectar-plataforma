@@ -18,8 +18,29 @@ define( 'RECONECTAR_CORE_URL', plugin_dir_url( __FILE__ ) );
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-proposta-votacao.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-transparencia.php';
 
+// A faixa de aviso de dados de demonstração vive aqui, e não no tema, para
+// não depender de qual tema esteja ativo: o aviso precisa continuar de pé
+// mesmo em um ambiente que troque de tema (como a migração para o Blocksy).
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-aviso-demo.php';
+
+// Regras de negócio da plataforma. Ficam no plugin, e não no tema, porque
+// controle de acesso e fluxo de pedido não são aparência: precisam valer
+// mesmo que alguém troque o tema ativo ou o desative por engano.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-permissoes.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-status-pedido.php';
+
+/**
+ * Inicializa os módulos do plugin.
+ *
+ * Roda em `plugins_loaded`, e não em `init`: os módulos precisam ter seus
+ * ganchos registrados antes que o WordPress comece a disparar `init`, que é
+ * onde vários deles se penduram.
+ */
 function reconectar_core_init() {
 	Reconectar_Proposta_Votacao::init();
 	Reconectar_Painel_Transparencia::init();
+	Reconectar_Aviso_Demo::init();
+	Reconectar_Permissoes::init();
+	Reconectar_Status_Pedido::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );
