@@ -39,9 +39,21 @@ código-fonte aberto e livremente reutilizável.
 reconectar-plataforma/
 ├── PLANO_DESENVOLVIMENTO.md   # plano completo do projeto
 ├── DIARIO_DESENVOLVIMENTO.md  # log cronológico de desenvolvimento
+├── CLAUDE.md                  # instruções e armadilhas para agentes de código
 ├── docker-compose.yml         # ambiente local (WordPress + MariaDB + WP-CLI)
+├── docs/
+│   ├── STACKS.md              # as camadas da plataforma e por que cada uma existe
+│   ├── PERFIS_E_PERMISSOES.md # os três atores e a matriz de permissões
+│   ├── ROTEIRO_PERFIS.md      # roteiro de demonstração, com credenciais
+│   ├── DADOS_DEMONSTRACAO.md  # o que a carga de demonstração cria
+│   └── PAGAMENTOS.md          # meios de pagamento e o que falta decidir
 ├── scripts/
-│   └── provision.sh           # instala WordPress, plugins e páginas essenciais
+│   ├── provision.sh           # instala WordPress, plugins e páginas essenciais
+│   ├── demo-completa.sh       # ambiente + provisionamento + carga, em um comando
+│   ├── seed-demo.sh           # instala ou remove só os dados de demonstração
+│   ├── verificar-acessos.sh   # testa as travas de permissão por HTTP
+│   ├── permissoes-dev.sh      # acerta dono e permissões de wp-content/
+│   └── seed/                  # catálogo declarativo e motor da carga
 └── wp-content/                 # único conteúdo de WordPress versionado
     ├── themes/
     │   └── reconectar/         # tema autoral (child theme do Storefront)
@@ -59,22 +71,53 @@ rastreado no Git.
 
 Pré-requisitos: **Docker** e **Docker Compose**.
 
+Para ter a plataforma de pé **com conteúdo na tela**, um comando basta:
+
 ```bash
-# 1. Subir os containers (WordPress + MariaDB + phpMyAdmin)
+./scripts/demo-completa.sh
+```
+
+Ele sobe os contêineres, espera o núcleo do WordPress terminar de se instalar
+no volume, provisiona (idioma, tema, plugins, páginas, permalinks) e popula a
+base de demonstração. É idempotente: rodar de novo não duplica nada.
+
+Se preferir só a instalação, vazia:
+
+```bash
 docker compose up -d
-
-# 2. Aguardar os containers ficarem saudáveis
-docker compose ps
-
-# 3. Rodar o script de provisionamento (instala WordPress, plugins e páginas)
 docker compose run --rm wpcli bash /var/www/scripts/provision.sh
 ```
 
-Após o provisionamento:
+Em qualquer dos dois caminhos:
 
 - Site: http://localhost:8090
 - Painel de administração: http://localhost:8090/wp-admin
+- Painel do vendedor (Dokan): http://localhost:8090/dashboard
 - phpMyAdmin (suporte ao banco de dados): http://localhost:8081
+
+A porta é **8090**, e não a 8080 usual — esta estava ocupada na máquina de
+desenvolvimento.
+
+Os dados de demonstração são fictícios e se identificam como tais: enquanto
+estiverem no banco, uma faixa de advertência aparece no site e no painel. Para
+apagá-los sem desfazer a instalação, `./scripts/seed-demo.sh remover`. O que a
+carga cria está detalhado em [docs/DADOS_DEMONSTRACAO.md](docs/DADOS_DEMONSTRACAO.md),
+e o passo a passo para demonstrar cada perfil, com as credenciais, está em
+[docs/ROTEIRO_PERFIS.md](docs/ROTEIRO_PERFIS.md).
+
+Depois de mexer em permissões, confira as travas:
+
+```bash
+./scripts/verificar-acessos.sh
+```
+
+Se em algum momento o painel reclamar que não consegue criar um diretório, ou
+se o seu editor esbarrar em `Permission denied` dentro de `wp-content/`, é a
+disputa de dono entre o host e o contêiner:
+
+```bash
+./scripts/permissoes-dev.sh
+```
 
 As credenciais de administrador usadas localmente e as demais variáveis do
 ambiente podem ser customizadas criando um arquivo `.env` na raiz do projeto
