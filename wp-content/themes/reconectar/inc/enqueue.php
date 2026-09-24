@@ -1,9 +1,14 @@
 <?php
 /**
- * Enfileiramento de estilos do tema.
+ * Enfileiramento de estilos e scripts do tema.
  *
- * O JavaScript do Bootstrap não é carregado aqui: ele existe apenas por causa
- * da navbar herdada do Storefront e vive junto dela, em `inc/legado-storefront.php`.
+ * O JavaScript do Bootstrap não é carregado: ele existia apenas por causa da
+ * navbar herdada do Storefront, substituída pelo cabeçalho autoral. Nenhum
+ * componente do tema usa `data-bs-` hoje — o menu colapsa com `<details>` e os
+ * carrosséis têm script próprio, bem menor que os ~80 KB do bundle.
+ *
+ * O CSS do Bootstrap permanece: grade, utilitários e tipografia dele são usados
+ * em todo o projeto, inclusive pelas telas do plugin `reconectar-core`.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -56,6 +61,31 @@ function reconectar_enqueue_assets() {
 		get_stylesheet_uri(),
 		array( 'storefront-parent-style', 'reconectar-fonts' ),
 		reconectar_versao_asset( 'style.css' )
+	);
+
+	/*
+	 * Estilos do marketplace por último, depois de `reconectar-style`: as regras
+	 * de cabeçalho, carrossel e vitrine precisam vencer tanto o Bootstrap quanto
+	 * o que o Storefront define para os mesmos seletores estruturais.
+	 */
+	wp_enqueue_style(
+		'reconectar-marketplace',
+		$theme_uri . '/assets/css/marketplace.css',
+		array( 'reconectar-style' ),
+		reconectar_versao_asset( 'assets/css/marketplace.css' )
+	);
+
+	/*
+	 * O script dos carrosséis é um progressive enhancement: sem ele a faixa
+	 * continua rolável no dedo, no trackpad e pelo teclado. Por isso vai no
+	 * rodapé (`true`) e sem nenhuma dependência.
+	 */
+	wp_enqueue_script(
+		'reconectar-marketplace',
+		$theme_uri . '/assets/js/marketplace.js',
+		array(),
+		reconectar_versao_asset( 'assets/js/marketplace.js' ),
+		true
 	);
 }
 add_action( 'wp_enqueue_scripts', 'reconectar_enqueue_assets' );

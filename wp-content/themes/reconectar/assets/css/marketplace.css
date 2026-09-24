@@ -1,0 +1,860 @@
+/*
+ * Estilos do marketplace: cabeçalho, carrosséis, cards, filtros, vitrine e rodapé.
+ *
+ * Separado do `style.css` porque aquele arquivo carrega a identidade visual do
+ * tema (cores, tipografia, ajustes no Storefront) e este carrega a interface da
+ * loja. São dois ciclos de vida diferentes: a identidade é estável, a interface
+ * da loja muda a cada ajuste de layout.
+ *
+ * As variáveis de cor vêm do `:root` do `style.css`, enfileirado antes deste.
+ *
+ * Convenção de nomes: BEM com prefixo `rc-`. O prefixo evita colisão com as
+ * classes do Storefront, do WooCommerce, do Dokan e do Bootstrap, todos ativos
+ * na mesma página.
+ */
+
+:root {
+  --rc-superficie: #ffffff;
+  --rc-fundo: #f7f7f8;
+  --rc-borda: #e4e4e7;
+  --rc-texto: #27272a;
+  --rc-texto-suave: #71717a;
+  --rc-raio: 8px;
+  --rc-sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --rc-largura: 1200px;
+  --rc-espaco: 16px;
+}
+
+/* ==========================================================================
+   Cabeçalho
+   ========================================================================== */
+
+.rc-cabecalho {
+  background: var(--rc-superficie);
+  border-bottom: 1px solid var(--rc-borda);
+  padding: 0;
+}
+
+.rc-cabecalho__interno {
+  align-items: center;
+  display: flex;
+  gap: var(--rc-espaco);
+  margin: 0 auto;
+  max-width: var(--rc-largura);
+  padding: 12px var(--rc-espaco);
+}
+
+.rc-cabecalho__topo {
+  width: 100%;
+}
+
+.rc-cabecalho__marca {
+  flex: 0 0 auto;
+}
+
+.rc-cabecalho__marca img {
+  display: block;
+  height: auto;
+  max-height: 44px;
+  width: auto;
+}
+
+.rc-cabecalho__nome {
+  color: var(--reconectar-cor-institucional);
+  font-family: 'Thoge', 'Poppins', sans-serif;
+  font-size: 1.35rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rc-cabecalho__acoes {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* Busca
+   -------------------------------------------------------------------------- */
+
+.rc-busca {
+  flex: 1 1 auto;
+  max-width: 520px;
+  position: relative;
+}
+
+.rc-busca__campo {
+  background: var(--rc-fundo);
+  border: 1px solid var(--rc-borda);
+  border-radius: 999px;
+  color: var(--rc-texto);
+  padding: 10px 44px 10px 18px;
+  width: 100%;
+}
+
+.rc-busca__campo:focus {
+  background: var(--rc-superficie);
+  border-color: var(--reconectar-cor-primaria);
+  outline: 2px solid transparent;
+}
+
+.rc-busca__enviar {
+  background: none;
+  border: 0;
+  color: var(--rc-texto-suave);
+  cursor: pointer;
+  padding: 6px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.rc-busca__enviar:hover {
+  color: var(--reconectar-cor-primaria);
+}
+
+.rc-busca__icone {
+  display: block;
+  height: 20px;
+  width: 20px;
+}
+
+/* Seletor de município e atalho de conta
+   -------------------------------------------------------------------------- */
+
+.rc-municipio {
+  position: relative;
+}
+
+.rc-municipio__gatilho {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  padding: 6px 8px;
+}
+
+/* O marcador padrão do `<summary>` precisa ser removido nos dois formatos: o
+   WebKit usa um pseudo-elemento próprio, os demais usam `list-style`. */
+.rc-municipio__gatilho::-webkit-details-marker {
+  display: none;
+}
+
+.rc-municipio__icone {
+  color: var(--reconectar-cor-secundaria);
+  height: 18px;
+  width: 18px;
+}
+
+.rc-municipio__rotulo {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--rc-texto-suave);
+}
+
+.rc-municipio__valor {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rc-municipio__lista {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  box-shadow: var(--rc-sombra);
+  list-style: none;
+  margin: 0;
+  max-height: 320px;
+  min-width: 220px;
+  overflow-y: auto;
+  padding: 8px 0;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+}
+
+.rc-municipio__opcao {
+  color: var(--rc-texto);
+  display: block;
+  padding: 8px 16px;
+  text-decoration: none;
+}
+
+.rc-municipio__opcao:hover,
+.rc-municipio__opcao:focus {
+  background: var(--rc-fundo);
+}
+
+/* O município ativo ganha peso e barra lateral, não só cor: a WCAG 2.1 (critério
+   1.4.1) não aceita cor como único indicador de estado. */
+.rc-municipio__opcao[aria-current] {
+  border-left: 3px solid var(--reconectar-cor-primaria);
+  font-weight: 600;
+  padding-left: 13px;
+}
+
+.rc-conta,
+.rc-carrinho__link {
+  align-items: center;
+  color: var(--rc-texto);
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  text-decoration: none;
+}
+
+.rc-conta__icone,
+.rc-carrinho__icone {
+  height: 20px;
+  width: 20px;
+}
+
+.rc-conta__rotulo,
+.rc-carrinho__texto {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rc-carrinho__total {
+  display: block;
+}
+
+.rc-carrinho__itens {
+  color: var(--rc-texto-suave);
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* Menu principal
+   -------------------------------------------------------------------------- */
+
+.rc-menu {
+  border-top: 1px solid var(--rc-borda);
+}
+
+.rc-menu__gatilho {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 10px var(--rc-espaco);
+}
+
+.rc-menu__gatilho::-webkit-details-marker {
+  display: none;
+}
+
+/* Hambúrguer desenhado em CSS: três linhas com `box-shadow`, sem imagem nem
+   fonte de ícones para baixar. */
+.rc-menu__gatilho-icone {
+  background: currentColor;
+  box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor;
+  display: block;
+  height: 2px;
+  width: 18px;
+}
+
+.rc-menu__lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 10px;
+}
+
+.rc-menu__lista a {
+  color: var(--rc-texto);
+  display: block;
+  font-size: 0.9rem;
+  padding: 6px 0;
+  text-decoration: none;
+}
+
+.rc-menu__lista a:hover,
+.rc-menu__lista .current-menu-item > a {
+  color: var(--reconectar-cor-primaria);
+}
+
+/* A partir do tablet o menu deixa de ser colapsável: o `<summary>` some e a
+   navegação é forçada a aparecer mesmo com o `<details>` fechado, sobrescrevendo
+   a regra `details:not([open]) > *:not(summary) { display: none }` do navegador.
+   Sem isso o menu só abriria com clique também no desktop. */
+@media (min-width: 768px) {
+  .rc-menu__gatilho {
+    display: none;
+  }
+
+  .rc-menu__nav {
+    display: block !important;
+  }
+
+  .rc-menu__lista {
+    padding: 0;
+  }
+
+  .rc-menu__lista a {
+    padding: 12px 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .rc-cabecalho__interno {
+    flex-wrap: wrap;
+  }
+
+  .rc-busca {
+    max-width: none;
+    order: 3;
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Carrossel
+   ========================================================================== */
+
+.rc-carrossel {
+  margin: 32px auto;
+  max-width: var(--rc-largura);
+  padding: 0 var(--rc-espaco);
+}
+
+.rc-carrossel__cabecalho {
+  align-items: center;
+  display: flex;
+  gap: var(--rc-espaco);
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.rc-carrossel__titulo {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.rc-carrossel__controles {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.rc-carrossel__ver-todos {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* As setas nascem escondidas e só aparecem quando o script confirma que há
+   conteúdo além da borda (classe `is-interativo`). Um botão que não rola nada
+   seria ruído para quem usa mouse e uma armadilha para quem usa teclado. */
+.rc-carrossel__seta {
+  display: none;
+}
+
+.rc-carrossel.is-interativo .rc-carrossel__seta {
+  align-items: center;
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: 50%;
+  color: var(--rc-texto);
+  cursor: pointer;
+  display: flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.rc-carrossel.is-interativo .rc-carrossel__seta:hover:not(:disabled) {
+  border-color: var(--reconectar-cor-primaria);
+  color: var(--reconectar-cor-primaria);
+}
+
+.rc-carrossel.is-interativo .rc-carrossel__seta:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.rc-carrossel__seta-icone {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.rc-carrossel__faixa {
+  display: grid;
+  grid-auto-columns: minmax(150px, 1fr);
+  grid-auto-flow: column;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+  /* `scrollbar-width` em vez de esconder a barra por completo: em desktop sem o
+     script, ela é a única pista de que a faixa rola. */
+  scrollbar-width: thin;
+}
+
+.rc-carrossel__faixa > * {
+  scroll-snap-align: start;
+}
+
+.rc-carrossel__faixa:focus-visible {
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 4px;
+}
+
+.rc-carrossel__faixa--categorias {
+  grid-auto-columns: minmax(104px, 1fr);
+}
+
+.rc-carrossel__faixa--destaque {
+  grid-auto-columns: minmax(260px, 1fr);
+}
+
+.rc-carrossel__faixa--produtos {
+  grid-auto-columns: minmax(180px, 1fr);
+}
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.rc-card-categoria,
+.rc-card-loja,
+.rc-card-produto,
+.rc-card-destaque {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  overflow: hidden;
+}
+
+.rc-card-categoria__figura,
+.rc-card-produto__figura,
+.rc-card-destaque__banner {
+  background: var(--rc-fundo);
+  display: block;
+  overflow: hidden;
+}
+
+.rc-card-categoria__figura img,
+.rc-card-produto__figura img,
+.rc-card-destaque__banner img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* Categoria
+   -------------------------------------------------------------------------- */
+
+.rc-card-categoria {
+  border: 0;
+  text-align: center;
+}
+
+.rc-card-categoria a {
+  color: var(--rc-texto);
+  display: block;
+  text-decoration: none;
+}
+
+.rc-card-categoria__figura,
+.rc-card-categoria__inicial {
+  align-items: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 8px;
+  width: 80px;
+}
+
+/* Categoria sem imagem cadastrada mostra a inicial em um círculo colorido, e não
+   um espaço vazio: a faixa fica alinhada e o lugar continua clicável. */
+.rc-card-categoria__inicial {
+  background: var(--reconectar-cor-primaria);
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.rc-card-categoria__nome {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Loja
+   -------------------------------------------------------------------------- */
+
+.rc-card-loja__link {
+  align-items: center;
+  color: var(--rc-texto);
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.rc-card-loja__logo,
+.rc-card-loja__inicial {
+  align-items: center;
+  border-radius: 50%;
+  display: flex;
+  flex: 0 0 auto;
+  height: 56px;
+  justify-content: center;
+  overflow: hidden;
+  width: 56px;
+}
+
+.rc-card-loja__logo img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rc-card-loja__inicial {
+  background: var(--reconectar-cor-institucional);
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.rc-card-loja__conteudo {
+  min-width: 0;
+}
+
+.rc-card-loja__nome {
+  font-size: 0.95rem;
+  margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-card-loja__meta,
+.rc-card-loja__entrega {
+  color: var(--rc-texto-suave);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: 6px;
+  margin: 0;
+}
+
+.rc-card-loja__taxa--gratis {
+  color: var(--reconectar-cor-primaria);
+  font-weight: 600;
+}
+
+.rc-card-loja__separador,
+.rc-card-destaque__separador {
+  color: var(--rc-borda);
+}
+
+/* Produto
+   -------------------------------------------------------------------------- */
+
+.rc-card-produto__link {
+  color: var(--rc-texto);
+  display: block;
+  text-decoration: none;
+}
+
+.rc-card-produto__figura {
+  aspect-ratio: 4 / 3;
+}
+
+.rc-card-produto__conteudo {
+  padding: 10px 12px 12px;
+}
+
+.rc-card-produto__nome {
+  font-size: 0.9rem;
+  margin: 0 0 4px;
+}
+
+.rc-card-produto__loja {
+  color: var(--rc-texto-suave);
+  font-size: 0.78rem;
+  margin: 0 0 6px;
+}
+
+.rc-card-produto__preco {
+  font-weight: 600;
+  margin: 0;
+}
+
+.rc-card-produto__preco del {
+  color: var(--rc-texto-suave);
+  font-weight: 400;
+  margin-right: 6px;
+}
+
+.rc-card-produto__selo {
+  background: var(--reconectar-cor-destaque);
+  border-radius: 999px;
+  color: var(--rc-texto);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+/* Loja em destaque
+   -------------------------------------------------------------------------- */
+
+.rc-card-destaque__link {
+  color: var(--rc-texto);
+  display: block;
+  text-decoration: none;
+}
+
+.rc-card-destaque__banner {
+  aspect-ratio: 16 / 9;
+}
+
+/* Loja sem banner recebe uma faixa sólida do mesmo tamanho que o banner teria,
+   para que os cards da faixa não fiquem com alturas diferentes. */
+.rc-card-destaque--sem-banner .rc-card-destaque__conteudo {
+  border-top: 4px solid var(--reconectar-cor-institucional);
+}
+
+.rc-card-destaque__conteudo {
+  padding: 12px;
+}
+
+.rc-card-destaque__nome {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.rc-card-destaque__meta {
+  color: var(--rc-texto-suave);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: 6px;
+  margin: 0;
+}
+
+/* Nota
+   -------------------------------------------------------------------------- */
+
+.rc-nota {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.rc-nota__estrela {
+  color: var(--reconectar-cor-destaque);
+}
+
+.rc-nota--sem-avaliacao {
+  color: var(--rc-texto-suave);
+  font-style: italic;
+}
+
+/* ==========================================================================
+   Filtros
+   ========================================================================== */
+
+.rc-filtros {
+  margin-bottom: var(--rc-espaco);
+}
+
+.rc-filtros__lista {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+}
+
+.rc-filtros__lista > li {
+  flex: 0 0 auto;
+}
+
+.rc-pilula,
+.rc-filtros__limpar {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: 999px;
+  color: var(--rc-texto);
+  display: inline-block;
+  font-size: 0.82rem;
+  padding: 7px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rc-pilula:hover,
+.rc-filtros__limpar:hover {
+  border-color: var(--reconectar-cor-primaria);
+  color: var(--reconectar-cor-primaria);
+}
+
+/* Filtro ativo muda fundo, borda e peso da fonte — três sinais além da cor,
+   pelo mesmo motivo do município selecionado. */
+.rc-pilula--ativa {
+  background: var(--reconectar-cor-primaria);
+  border-color: var(--reconectar-cor-primaria);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.rc-pilula--ativa:hover {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.rc-filtros__limpar {
+  border-style: dashed;
+}
+
+/* ==========================================================================
+   Vitrine de lojas
+   ========================================================================== */
+
+.rc-vitrine {
+  margin: 32px auto;
+  max-width: var(--rc-largura);
+  padding: 0 var(--rc-espaco);
+}
+
+.rc-vitrine__titulo {
+  font-size: 1.25rem;
+  margin: 0 0 12px;
+}
+
+.rc-vitrine__grade {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.rc-vitrine__mais {
+  margin: 24px 0 0;
+  text-align: center;
+}
+
+.rc-vitrine__vazia {
+  background: var(--rc-fundo);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto-suave);
+  padding: 40px var(--rc-espaco);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Botões
+   ========================================================================== */
+
+.rc-botao {
+  background: var(--reconectar-cor-secundaria);
+  border-radius: var(--rc-raio);
+  color: #ffffff;
+  display: inline-block;
+  font-weight: 600;
+  padding: 12px 28px;
+  text-decoration: none;
+}
+
+.rc-botao:hover,
+.rc-botao:focus {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.rc-botao--largo {
+  display: block;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Rodapé
+   ========================================================================== */
+
+.rc-rodape {
+  background: var(--rc-fundo);
+  border-top: 1px solid var(--rc-borda);
+  padding: 40px 0 24px;
+}
+
+.rc-rodape__colunas {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 32px;
+}
+
+.rc-rodape__titulo {
+  font-size: 0.95rem;
+  margin: 0 0 12px;
+}
+
+.rc-rodape__bloco ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rc-rodape__bloco a {
+  color: var(--rc-texto);
+  font-size: 0.87rem;
+  text-decoration: none;
+}
+
+.rc-rodape__bloco a:hover {
+  color: var(--reconectar-cor-primaria);
+}
+
+.rc-rodape__legal {
+  border-top: 1px solid var(--rc-borda);
+  color: var(--rc-texto-suave);
+  font-size: 0.8rem;
+  padding-top: 16px;
+}
+
+.rc-rodape__legal p {
+  margin: 0 0 4px;
+}
+
+.rc-rodape__identificacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+/* ==========================================================================
+   Impressão
+   ========================================================================== */
+
+@media print {
+  /* Faixas roláveis viram grades: no papel não há como rolar, e o que estivesse
+     fora da borda simplesmente não sairia impresso. */
+  .rc-carrossel__faixa {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, 1fr);
+    overflow: visible;
+  }
+
+  .rc-busca,
+  .rc-filtros,
+  .rc-carrossel__controles,
+  .rc-vitrine__mais {
+    display: none;
+  }
+}

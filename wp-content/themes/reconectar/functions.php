@@ -17,16 +17,23 @@ $reconectar_modulos = array(
 	'inc/enqueue.php',
 
 	/*
-	 * Código que só existe para conviver com o tema pai Storefront. Está
-	 * isolado em um único arquivo para que a migração para o Blocksy seja a
-	 * remoção deste require e do arquivo — e não uma caça a trechos espalhados.
+	 * Marketplace. A ordem importa: `consultas.php` define as funções de dados
+	 * que os componentes e o cabeçalho consomem, e `filtros.php` define as
+	 * constantes de paginação que a vitrine usa.
 	 */
-	'inc/legado-storefront.php',
+	'inc/marketplace/consultas.php',
+	'inc/marketplace/componentes.php',
+	'inc/marketplace/filtros.php',
+	'inc/marketplace/cabecalho.php',
+	'inc/marketplace/rodape.php',
 
 	// Seções da home. Cada arquivo se registra sozinho na action
 	// `reconectar_home`, com a prioridade que define sua posição na página.
 	'inc/home/secao-hero.php',
 	'inc/home/secao-categorias.php',
+	'inc/home/secao-lojas-destaque.php',
+	'inc/home/secao-ofertas.php',
+	'inc/home/secao-lojas.php',
 	'inc/home/secao-comunidade-transparencia.php',
 );
 
