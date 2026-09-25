@@ -149,3 +149,129 @@ function reconectar_remover_titulo_da_tela_de_acesso() {
 // `wp` é o primeiro gancho em que as condicionais já respondem e ainda falta
 // disparar `storefront_page`, que só acontece dentro do template.
 add_action( 'wp', 'reconectar_remover_titulo_da_tela_de_acesso' );
+
+/**
+ * Tira o título do tema pai na listagem do fórum.
+ *
+ * É o mesmo defeito que `reconectar_ajustar_cabecalho_da_pergunta()` corrigiu na
+ * tela de uma pergunta, reaparecido um nível acima: a listagem nasce com
+ * `<h1 class="entry-title">Fóruns</h1>`, do tema pai, e logo abaixo com o
+ * `<h1 class="rc-forum__titulo">Todas as perguntas</h1>`, da camada autoral. Dois
+ * cabeçalhos de primeiro nível na mesma página, e quem navega por cabeçalhos
+ * precisa decidir qual dos dois nomeia o documento.
+ *
+ * Sai o do tema pai porque "Todas as perguntas" é o que descreve a tela — o
+ * outro é o nome do post type.
+ *
+ * O gancho é `storefront_page`, e não `storefront_archive`, embora o `<body>`
+ * receba `post-type-archive-forum`: o bbPress serve a listagem pela camada de
+ * compatibilidade de tema, que injeta o conteúdo num post falso (`post-0`) e
+ * deixa o Storefront renderizar `content-page.php`. Medido no DOM antes de
+ * escrever o `remove_action` — presumir `storefront_archive` aqui custaria uma
+ * remoção que não remove nada, e o sintoma seria "o código está lá e não faz".
+ *
+ * Restrito à listagem: a pergunta única já é tratada pela função irmã, e a
+ * categoria de fórum não imprime título próprio.
+ *
+ * @return void
+ */
+function reconectar_remover_titulo_da_listagem_do_forum() {
+	if ( ! is_post_type_archive( 'forum' ) ) {
+		return;
+	}
+
+	remove_action( 'storefront_page', 'storefront_page_header', 10 );
+}
+add_action( 'wp', 'reconectar_remover_titulo_da_listagem_do_forum' );
+
+/**
+ * Marca as páginas cujo título deve sair da tela, mas não do documento.
+ *
+ * Nas páginas de catálogo e nas do WooCommerce o `<h1>` diz o mesmo que a trilha
+ * de navegação logo acima — "Início / Shop" seguido de "Shop" —, e ainda o diz
+ * em 41,89px, acima do teto de `--rc-fonte-3xl`. Ele ocupa a primeira dobra sem
+ * informar nada que já não esteja dito.
+ *
+ * O que separa esta função das duas acima é o que se faz com o cabeçalho, e a
+ * distinção não é visível na leitura: ali há **dois** `<h1>` na página, e um
+ * precisa deixar de existir; aqui há **um só**, que é o nome do documento. Tirá-lo
+ * do DOM deixaria quem navega por cabeçalhos sem saber em que página está, o que
+ * a WCAG 2.1 exigida pelo edital não admite. Por isso a saída é uma classe no
+ * `<body>` e um `.screen-reader-text` aplicado por CSS: some da tela, fica para o
+ * leitor de tela.
+ *
+ * Pelo mesmo motivo não se usa o filtro `woocommerce_show_page_title`, que seria
+ * o caminho óbvio para o catálogo: ele não esconde o título, ele apaga o `<h1>`
+ * de `loop/header.php`.
+ *
+ * A tela de acesso fica de fora porque já é caso da função acima — lá existe o
+ * segundo `<h1>` ("Acessar a plataforma") e a remoção é a correta. Daí o
+ * `is_user_logged_in()` na condição de `is_account_page()`: dentro do painel,
+ * "Minha conta" volta a ser título único e passa a ser caso desta função.
+ *
+ * `function_exists()` em tudo que é de terceiro, como as cinco condições de
+ * `reconectar_ajustar_classes_de_layout()` já fazem: o tema não pode exigir o
+ * WooCommerce nem o Dokan.
+ *
+ * @param string[] $classes Classes do elemento `<body>`.
+ * @return string[] Classes ajustadas.
+ */
+function reconectar_marcar_pagina_sem_titulo( $classes ) {
+	$do_woocommerce = function_exists( 'is_shop' )
+		&& ( is_shop() || is_product_taxonomy() || is_cart() || is_checkout() || ( is_account_page() && is_user_logged_in() ) );
+
+	$listagem_de_lojas = function_exists( 'dokan_is_store_listing' ) && dokan_is_store_listing();
+
+	if ( $do_woocommerce || $listagem_de_lojas ) {
+		$classes[] = 'rc-sem-titulo-de-pagina';
+	}
+
+	return $classes;
+}
+add_filter( 'body_class', 'reconectar_marcar_pagina_sem_titulo' );
+
+/**
+ * Recoloca a paginação do catálogo fora da barra de ordenação, só no rodapé.
+ *
+ * O Storefront monta duas barras simétricas
+ * (`storefront-woocommerce-template-hooks.php:45-55`): `storefront_sorting_wrapper`
+ * na prioridade 9, ordenação em 10, contagem em 20, paginação em 30 e o
+ * fechamento da `<div>` em 31 — a mesma sequência em `woocommerce_before_shop_loop`
+ * e em `woocommerce_after_shop_loop`. O resultado medido em `/shop/` eram duas
+ * `.storefront-sorting` na página, com paginação impressa **antes** de o visitante
+ * ver um único produto.
+ *
+ * Cada barra perde uma coisa diferente, e a assimetria é o ponto:
+ *
+ * De cima sai só a paginação. Ordenação e contagem ficam, porque dizem o que a
+ * lista logo abaixo contém; paginar antes de existir lista, não.
+ *
+ * De baixo sai a barra inteira — o `<div>`, a ordenação e a contagem —, porque
+ * ali elas eram repetição do que já está no topo, e repetição custa mais a quem
+ * navega por teclado ou por leitor de tela do que a quem só rola a página.
+ *
+ * Fica a paginação, e ela passa da prioridade 30 para a 40, isto é, para depois
+ * do `storefront_sorting_wrapper_close` da 31. Isso importaria mesmo que a barra
+ * continuasse existindo: dentro dela a paginação herda o `float: right`, e era
+ * isso que a jogava contra a margem direita. Fora, centralizar é uma declaração.
+ *
+ * O `after_setup_theme` não é cerimônia. O `functions.php` do tema **filho** é
+ * carregado antes do pai (`wp-settings.php` inclui `STYLESHEETPATH` primeiro),
+ * então um `remove_action` escrito no corpo do arquivo tentaria remover um gancho
+ * que ainda não foi registrado: a chamada devolve `false`, nada acontece e o
+ * sintoma é o pior de todos — o código está no lugar certo e não faz nada.
+ *
+ * @return void
+ */
+function reconectar_reposicionar_paginacao_do_catalogo() {
+	remove_action( 'woocommerce_before_shop_loop', 'storefront_woocommerce_pagination', 30 );
+
+	remove_action( 'woocommerce_after_shop_loop', 'storefront_sorting_wrapper', 9 );
+	remove_action( 'woocommerce_after_shop_loop', 'woocommerce_catalog_ordering', 10 );
+	remove_action( 'woocommerce_after_shop_loop', 'woocommerce_result_count', 20 );
+	remove_action( 'woocommerce_after_shop_loop', 'storefront_sorting_wrapper_close', 31 );
+
+	remove_action( 'woocommerce_after_shop_loop', 'woocommerce_pagination', 30 );
+	add_action( 'woocommerce_after_shop_loop', 'woocommerce_pagination', 40 );
+}
+add_action( 'after_setup_theme', 'reconectar_reposicionar_paginacao_do_catalogo', 20 );

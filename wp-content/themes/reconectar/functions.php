@@ -24,12 +24,16 @@ $reconectar_modulos = array(
 	 */
 	'inc/marketplace/consultas.php',
 	'inc/marketplace/componentes.php',
+	// Depois de `componentes.php`: a listagem reaproveita
+	// `reconectar_card_categoria()`.
+	'inc/marketplace/categorias.php',
 	'inc/marketplace/filtros.php',
 	'inc/marketplace/vitrine.php',
 	'inc/marketplace/busca-sugestoes.php',
 	'inc/marketplace/loja.php',
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',
+	'inc/marketplace/barra-inferior.php',
 
 	// Seções da home. Cada arquivo se registra sozinho na action
 	// `reconectar_home`, com a prioridade que define sua posição na página.

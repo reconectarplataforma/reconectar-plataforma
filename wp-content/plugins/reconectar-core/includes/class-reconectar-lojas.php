@@ -1,6 +1,6 @@
 <?php
 /**
- * Cadastro e manutenção de vendedores pelo Administrador de Empresas.
+ * Cadastro e manutenção de lojas pelo Administrador de Empresas.
  *
  * Esta classe existe porque a via natural do WordPress para criar usuários —
  * conceder `create_users` e mandar a pessoa ao `/wp-admin/user-new.php` — abriria
@@ -13,32 +13,40 @@
  * carga de demonstração — o que garante que a demonstração exercite o caminho
  * real de cadastro, em vez de uma segunda implementação que diverge em silêncio.
  *
+ * Uma loja é, no banco, um usuário com o papel `seller` do Dokan. "Loja" é o
+ * nome da entidade na plataforma; `seller` é o nome do papel no plugin de
+ * terceiro, e os dois não se confundem — ver `PAPEL`.
+ *
  * @package reconectar-core
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class Reconectar_Vendedores {
+class Reconectar_Lojas {
 
 	/**
-	 * O papel de todo vendedor criado por aqui.
+	 * O papel de toda loja criada por aqui.
+	 *
+	 * Continua `seller` — e continuará — porque é o papel que o Dokan cria e
+	 * consulta: renomeá-lo por causa do vocabulário da plataforma daria um nome
+	 * nosso a um conceito de terceiro e quebraria o plugin inteiro.
 	 *
 	 * Constante, e nunca um valor vindo da requisição. Esta é a trava contra
 	 * escalada de privilégio de todo o módulo: `wp_insert_user()` não verifica
 	 * capacidade nenhuma — ela cria o que mandarem, inclusive um
 	 * `administrator` — e quem verifica somos nós. Um `role` lido do `$_POST`
-	 * transformaria o cadastro de vendedor em criação de administrador por
+	 * transformaria o cadastro de loja em criação de administrador por
 	 * requisição forjada, e nada mais neste módulo conteria isso.
 	 */
 	const PAPEL = 'seller';
 
 	/**
-	 * Cadastra um vendedor e o vincula a uma empresa.
+	 * Cadastra uma loja e a vincula a uma empresa.
 	 *
 	 * @param array $dados {
 	 *     @type string $login      Obrigatório. Nome de usuário.
 	 *     @type string $email      Obrigatório. E-mail.
-	 *     @type int    $empresa_id Obrigatório. Empresa a que o vendedor pertence.
+	 *     @type int    $empresa_id Obrigatório. Empresa a que a loja pertence.
 	 *     @type string $nome       Nome de exibição e nome da loja.
 	 *     @type string $primeiro   Primeiro nome.
 	 *     @type string $ultimo     Sobrenome.
@@ -55,7 +63,7 @@ class Reconectar_Vendedores {
 		if ( ! self::pode_gerir( $empresa_id ) ) {
 			return new WP_Error(
 				'reconectar_sem_permissao',
-				__( 'Você não tem permissão para cadastrar vendedores nesta empresa.', 'reconectar-core' )
+				__( 'Você não tem permissão para cadastrar lojas nesta empresa.', 'reconectar-core' )
 			);
 		}
 
@@ -109,15 +117,15 @@ class Reconectar_Vendedores {
 
 		// Sem empresa, sem meta de vínculo: um `0` gravado seria indistinguível de
 		// "pertence à empresa 0" em qualquer leitura futura, e a ausência já é a
-		// representação correta de um vendedor independente.
+		// representação correta de uma loja independente.
 		if ( $empresa_id ) {
 			update_user_meta( $usuario_id, Reconectar_Empresa::META_VINCULO, $empresa_id );
 		}
 
-		update_user_meta( $usuario_id, Reconectar_Empresa::META_VENDEDOR_ATIVO, 'sim' );
+		update_user_meta( $usuario_id, Reconectar_Empresa::META_LOJA_ATIVA, 'sim' );
 
-		// Nasce herdando o estado da empresa: um vendedor cadastrado em empresa
-		// desativada não entra em operação sozinho.
+		// Nasce herdando o estado da empresa: uma loja cadastrada em empresa
+		// desativada não entra em operação sozinha.
 		Reconectar_Empresa::aplicar_permissao_de_venda( $usuario_id );
 
 		if ( ! empty( $dados['notificar'] ) ) {
@@ -131,27 +139,27 @@ class Reconectar_Vendedores {
 	}
 
 	/**
-	 * Atualiza os dados cadastrais de um vendedor.
+	 * Atualiza os dados cadastrais de uma loja.
 	 *
-	 * Não mexe em papel, em login nem em vínculo: mudar a empresa de um vendedor
-	 * move junto o histórico de pedidos dele para outro administrador, e essa é
+	 * Não mexe em papel, em login nem em vínculo: mudar a empresa de uma loja
+	 * move junto o histórico de pedidos dela para outro administrador, e essa é
 	 * uma decisão de outro peso que a edição de um telefone.
 	 *
-	 * @param int   $vendedor_id ID do vendedor.
-	 * @param array $dados       Campos a atualizar (`nome`, `primeiro`, `ultimo`, `email`, `telefone`, `descricao`).
+	 * @param int   $loja_id ID da loja.
+	 * @param array $dados   Campos a atualizar (`nome`, `primeiro`, `ultimo`, `email`, `telefone`, `descricao`).
 	 * @return true|WP_Error
 	 */
-	public static function atualizar( $vendedor_id, array $dados ) {
-		$vendedor_id = (int) $vendedor_id;
+	public static function atualizar( $loja_id, array $dados ) {
+		$loja_id = (int) $loja_id;
 
-		if ( ! self::pode_gerir( Reconectar_Empresa::empresa_do_vendedor( $vendedor_id ) ) ) {
+		if ( ! self::pode_gerir( Reconectar_Empresa::empresa_da_loja( $loja_id ) ) ) {
 			return new WP_Error(
 				'reconectar_sem_permissao',
-				__( 'Você não tem permissão para editar este vendedor.', 'reconectar-core' )
+				__( 'Você não tem permissão para editar esta loja.', 'reconectar-core' )
 			);
 		}
 
-		$campos = array( 'ID' => $vendedor_id );
+		$campos = array( 'ID' => $loja_id );
 
 		if ( isset( $dados['email'] ) ) {
 			$email = sanitize_email( $dados['email'] );
@@ -165,7 +173,7 @@ class Reconectar_Vendedores {
 
 			$dono = email_exists( $email );
 
-			if ( $dono && (int) $dono !== $vendedor_id ) {
+			if ( $dono && (int) $dono !== $loja_id ) {
 				return new WP_Error(
 					'reconectar_email_em_uso',
 					__( 'Já existe uma conta com este e-mail.', 'reconectar-core' )
@@ -197,46 +205,46 @@ class Reconectar_Vendedores {
 			return $resultado;
 		}
 
-		$perfil = get_user_meta( $vendedor_id, 'dokan_profile_settings', true );
+		$perfil = get_user_meta( $loja_id, 'dokan_profile_settings', true );
 		$perfil = is_array( $perfil ) ? $perfil : array();
 
 		if ( isset( $campos['display_name'] ) ) {
 			$perfil['store_name'] = $campos['display_name'];
-			update_user_meta( $vendedor_id, 'dokan_store_name', $campos['display_name'] );
+			update_user_meta( $loja_id, 'dokan_store_name', $campos['display_name'] );
 		}
 
 		if ( isset( $dados['telefone'] ) ) {
 			$perfil['phone'] = sanitize_text_field( $dados['telefone'] );
 		}
 
-		update_user_meta( $vendedor_id, 'dokan_profile_settings', $perfil );
+		update_user_meta( $loja_id, 'dokan_profile_settings', $perfil );
 
 		return true;
 	}
 
 	/**
-	 * Ativa ou desativa um vendedor.
+	 * Ativa ou desativa uma loja.
 	 *
 	 * Grava o estado individual e deixa o cálculo do efetivo com
 	 * `Reconectar_Empresa::aplicar_permissao_de_venda()` — que é quem sabe
 	 * combinar este estado com o da empresa.
 	 *
-	 * @param int  $vendedor_id ID do vendedor.
-	 * @param bool $ativo       Novo estado.
+	 * @param int  $loja_id ID da loja.
+	 * @param bool $ativa   Novo estado.
 	 * @return true|WP_Error
 	 */
-	public static function definir_ativo( $vendedor_id, $ativo ) {
-		$vendedor_id = (int) $vendedor_id;
+	public static function definir_ativa( $loja_id, $ativa ) {
+		$loja_id = (int) $loja_id;
 
-		if ( ! self::pode_gerir( Reconectar_Empresa::empresa_do_vendedor( $vendedor_id ) ) ) {
+		if ( ! self::pode_gerir( Reconectar_Empresa::empresa_da_loja( $loja_id ) ) ) {
 			return new WP_Error(
 				'reconectar_sem_permissao',
-				__( 'Você não tem permissão para alterar este vendedor.', 'reconectar-core' )
+				__( 'Você não tem permissão para alterar esta loja.', 'reconectar-core' )
 			);
 		}
 
-		update_user_meta( $vendedor_id, Reconectar_Empresa::META_VENDEDOR_ATIVO, $ativo ? 'sim' : 'nao' );
-		Reconectar_Empresa::aplicar_permissao_de_venda( $vendedor_id );
+		update_user_meta( $loja_id, Reconectar_Empresa::META_LOJA_ATIVA, $ativa ? 'sim' : 'nao' );
+		Reconectar_Empresa::aplicar_permissao_de_venda( $loja_id );
 
 		return true;
 	}
@@ -246,7 +254,7 @@ class Reconectar_Vendedores {
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * O usuário atual pode cadastrar ou alterar vendedores desta empresa?
+	 * O usuário atual pode cadastrar ou alterar lojas desta empresa?
 	 *
 	 * A exceção do WP-CLI não é uma brecha: quem roda a linha de comando já tem
 	 * acesso irrestrito ao banco de dados por baixo desta camada, e exigir
@@ -262,7 +270,7 @@ class Reconectar_Vendedores {
 			return true;
 		}
 
-		if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_VENDEDORES ) ) {
+		if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_LOJAS ) ) {
 			return false;
 		}
 
@@ -273,10 +281,10 @@ class Reconectar_Vendedores {
 	 * Grava o perfil mínimo que o Dokan espera de uma loja.
 	 *
 	 * Sem `dokan_profile_settings` e `dokan_store_name` a loja existe como
-	 * usuário e não como loja: o painel do vendedor abre sem nome e a vitrine não
-	 * sabe o que exibir no card.
+	 * usuário e não como loja: o painel dela abre sem nome e a vitrine não sabe o
+	 * que exibir no card.
 	 *
-	 * @param int    $usuario_id ID do vendedor.
+	 * @param int    $usuario_id ID da loja.
 	 * @param string $nome       Nome da loja.
 	 * @param string $telefone   Telefone de contato.
 	 * @return void
@@ -315,13 +323,13 @@ class Reconectar_Vendedores {
 		update_user_meta( $usuario_id, 'dokan_profile_settings', $perfil );
 		update_user_meta( $usuario_id, 'dokan_store_name', $nome );
 
-		// Sem `dokan_publishing` o produto do vendedor nasce pendente de revisão,
+		// Sem `dokan_publishing` o produto da loja nasce pendente de revisão,
 		// o que não é a regra desta plataforma.
 		update_user_meta( $usuario_id, 'dokan_publishing', 'yes' );
 	}
 
 	/**
-	 * Monta o link de definição de senha do vendedor recém-criado.
+	 * Monta o link de definição de senha da loja recém-criada.
 	 *
 	 * O painel mostra este link para o administrador repassar, em vez de anunciar
 	 * um e-mail que pode não ter saído: o ambiente de demonstração usa endereços
@@ -329,7 +337,7 @@ class Reconectar_Vendedores {
 	 * informação falsa na tela — o oposto da honestidade de dados que o resto da
 	 * plataforma segue.
 	 *
-	 * @param int $usuario_id ID do vendedor.
+	 * @param int $usuario_id ID da loja.
 	 * @return string URL, ou string vazia se a chave não pôde ser gerada.
 	 */
 	public static function link_de_definicao_de_senha( $usuario_id ) {

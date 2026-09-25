@@ -242,6 +242,10 @@ if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   conferir "$JAR_VENDEDOR" "/wp-admin/"             "302 /dashboard/"  "volta ao painel dele"
   conferir "$JAR_VENDEDOR" "/wp-admin/plugins.php"  "403"              "não gere plugins"
   conferir "$JAR_VENDEDOR" "/painel-empresas/"      "403"              "vender não é administrar a empresa"
+  # A listagem de lojas é rota nova, e rota nova é porta nova: sem este caso, o
+  # dia em que `/painel-empresas/loja/` deixasse de passar por `proteger()`
+  # abriria a relação de todas as lojas a quem só administra a própria.
+  conferir "$JAR_VENDEDOR" "/painel-empresas/loja/" "403"              "a listagem de lojas é do painel gerencial"
 else
   falhas=$((falhas + 1))
 fi
@@ -258,6 +262,7 @@ echo "Administrador de empresas (demo-admin-nosso-chao)"
 JAR_EMPRESAS=/tmp/reconectar-acessos-empresas.txt
 if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
   conferir "$JAR_EMPRESAS" "/painel-empresas/"     "200"                     "o painel é dele"
+  conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200"                    "a listagem das lojas sob sua gestão"
   conferir "$JAR_EMPRESAS" "/comunidade/"          "200"                     "participa da comunidade"
   conferir "$JAR_EMPRESAS" "/wp-admin/"            "302 /painel-empresas/"   "volta ao painel dele"
   conferir "$JAR_EMPRESAS" "/wp-admin/plugins.php" "403"                     "não gere plugins"

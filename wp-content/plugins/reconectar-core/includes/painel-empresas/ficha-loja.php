@@ -1,6 +1,6 @@
 <?php
 /**
- * Ficha de um vendedor: edição cadastral, situação e a operação dele.
+ * Ficha de uma loja: edição cadastral, situação e a operação dela.
  *
  * Tudo abaixo da edição cadastral é **leitura**. O alcance deste ator, decidido
  * com o usuário, é consultar produtos, pedidos, estoque e faturamento — não
@@ -12,17 +12,17 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$vendedor_id = (int) $contexto['id'];
-$usuario     = get_userdata( $vendedor_id );
+$loja_id = (int) $contexto['id'];
+$usuario = get_userdata( $loja_id );
 
 if ( ! $usuario ) {
 	return;
 }
 
-$empresa_id = Reconectar_Empresa::empresa_do_vendedor( $vendedor_id );
-$em_venda   = Reconectar_Empresa::vendedor_esta_ativo( $vendedor_id );
-$individual = 'nao' !== get_user_meta( $vendedor_id, Reconectar_Empresa::META_VENDEDOR_ATIVO, true );
-$perfil     = get_user_meta( $vendedor_id, 'dokan_profile_settings', true );
+$empresa_id = Reconectar_Empresa::empresa_da_loja( $loja_id );
+$em_venda   = Reconectar_Empresa::loja_esta_ativa( $loja_id );
+$individual = 'nao' !== get_user_meta( $loja_id, Reconectar_Empresa::META_LOJA_ATIVA, true );
+$perfil     = get_user_meta( $loja_id, 'dokan_profile_settings', true );
 $telefone   = is_array( $perfil ) && isset( $perfil['phone'] ) ? $perfil['phone'] : '';
 $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 ?>
@@ -44,67 +44,67 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 	</p>
 <?php endif; ?>
 
-<?php if ( $senha && (int) $senha['vendedor_id'] === $vendedor_id && '' !== $senha['link'] ) : ?>
+<?php if ( $senha && (int) $senha['loja_id'] === $loja_id && '' !== $senha['link'] ) : ?>
 	<div class="rc-painel-empresas__aviso rc-painel-empresas__aviso--senha" role="status">
 		<p><strong><?php esc_html_e( 'Link de definição de senha', 'reconectar-core' ); ?></strong></p>
-		<p><?php esc_html_e( 'Repasse este link ao vendedor. Ele aparece uma única vez e expira como qualquer link de redefinição de senha do WordPress.', 'reconectar-core' ); ?></p>
+		<p><?php esc_html_e( 'Repasse este link à pessoa responsável pela loja. Ele aparece uma única vez e expira como qualquer link de redefinição de senha do WordPress.', 'reconectar-core' ); ?></p>
 		<p class="rc-painel-empresas__link"><code><?php echo esc_url( $senha['link'] ); ?></code></p>
 	</div>
 <?php endif; ?>
 
 <?php if ( ! $individual ) : ?>
 	<p class="rc-painel-empresas__nota">
-		<?php esc_html_e( 'Este vendedor está desativado individualmente. Reativar a empresa não o coloca de volta em operação.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Esta loja está desativada individualmente. Reativar a empresa não a coloca de volta em operação.', 'reconectar-core' ); ?>
 	</p>
 <?php elseif ( ! $em_venda && $empresa_id && ! Reconectar_Empresa::esta_ativa( $empresa_id ) ) : ?>
 	<p class="rc-painel-empresas__nota">
-		<?php esc_html_e( 'Este vendedor está fora de operação porque a empresa dele está desativada.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Esta loja está fora de operação porque a empresa dela está desativada.', 'reconectar-core' ); ?>
 	</p>
 <?php endif; ?>
 
-<?php if ( current_user_can( Reconectar_Permissoes::CAP_GERIR_VENDEDORES ) ) : ?>
+<?php if ( current_user_can( Reconectar_Permissoes::CAP_GERIR_LOJAS ) ) : ?>
 
 	<h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Dados cadastrais', 'reconectar-core' ); ?></h2>
 
 	<form class="rc-formulario" method="post"
-		action="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'vendedor/' . $vendedor_id ) ); ?>">
-		<?php wp_nonce_field( 'reconectar_painel_vendedor_salvar' ); ?>
-		<input type="hidden" name="reconectar_acao" value="vendedor_salvar">
-		<input type="hidden" name="vendedor_id" value="<?php echo esc_attr( $vendedor_id ); ?>">
+		action="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'loja/' . $loja_id ) ); ?>">
+		<?php wp_nonce_field( 'reconectar_painel_loja_salvar' ); ?>
+		<input type="hidden" name="reconectar_acao" value="loja_salvar">
+		<input type="hidden" name="loja_id" value="<?php echo esc_attr( $loja_id ); ?>">
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-nome"><?php esc_html_e( 'Nome da loja', 'reconectar-core' ); ?></label>
-			<input type="text" id="rc-vendedor-nome" name="nome" required
+			<label for="rc-loja-nome"><?php esc_html_e( 'Nome da loja', 'reconectar-core' ); ?></label>
+			<input type="text" id="rc-loja-nome" name="nome" required
 				value="<?php echo esc_attr( $usuario->display_name ); ?>">
 		</p>
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-email"><?php esc_html_e( 'E-mail', 'reconectar-core' ); ?></label>
-			<input type="email" id="rc-vendedor-email" name="email" required
+			<label for="rc-loja-email"><?php esc_html_e( 'E-mail', 'reconectar-core' ); ?></label>
+			<input type="email" id="rc-loja-email" name="email" required
 				value="<?php echo esc_attr( $usuario->user_email ); ?>">
 		</p>
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-primeiro"><?php esc_html_e( 'Nome', 'reconectar-core' ); ?></label>
-			<input type="text" id="rc-vendedor-primeiro" name="primeiro"
+			<label for="rc-loja-primeiro"><?php esc_html_e( 'Nome', 'reconectar-core' ); ?></label>
+			<input type="text" id="rc-loja-primeiro" name="primeiro"
 				value="<?php echo esc_attr( $usuario->first_name ); ?>">
 		</p>
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-ultimo"><?php esc_html_e( 'Sobrenome', 'reconectar-core' ); ?></label>
-			<input type="text" id="rc-vendedor-ultimo" name="ultimo"
+			<label for="rc-loja-ultimo"><?php esc_html_e( 'Sobrenome', 'reconectar-core' ); ?></label>
+			<input type="text" id="rc-loja-ultimo" name="ultimo"
 				value="<?php echo esc_attr( $usuario->last_name ); ?>">
 		</p>
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-telefone"><?php esc_html_e( 'Telefone', 'reconectar-core' ); ?></label>
-			<input type="text" id="rc-vendedor-telefone" name="telefone"
+			<label for="rc-loja-telefone"><?php esc_html_e( 'Telefone', 'reconectar-core' ); ?></label>
+			<input type="text" id="rc-loja-telefone" name="telefone"
 				value="<?php echo esc_attr( $telefone ); ?>">
 		</p>
 
 		<p class="rc-formulario__campo">
-			<label for="rc-vendedor-descricao"><?php esc_html_e( 'Descrição da loja', 'reconectar-core' ); ?></label>
-			<textarea id="rc-vendedor-descricao" name="descricao" rows="4"><?php echo esc_textarea( $usuario->description ); ?></textarea>
+			<label for="rc-loja-descricao"><?php esc_html_e( 'Descrição da loja', 'reconectar-core' ); ?></label>
+			<textarea id="rc-loja-descricao" name="descricao" rows="4"><?php echo esc_textarea( $usuario->description ); ?></textarea>
 		</p>
 
 		<p class="rc-formulario__acoes">
@@ -115,12 +115,12 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 	</form>
 
 	<form method="post" class="rc-formulario--linha"
-		action="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'vendedor/' . $vendedor_id ) ); ?>">
-		<?php wp_nonce_field( 'reconectar_painel_vendedor_alternar' ); ?>
-		<input type="hidden" name="reconectar_acao" value="vendedor_alternar">
-		<input type="hidden" name="vendedor_id" value="<?php echo esc_attr( $vendedor_id ); ?>">
+		action="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'loja/' . $loja_id ) ); ?>">
+		<?php wp_nonce_field( 'reconectar_painel_loja_alternar' ); ?>
+		<input type="hidden" name="reconectar_acao" value="loja_alternar">
+		<input type="hidden" name="loja_id" value="<?php echo esc_attr( $loja_id ); ?>">
 		<button type="submit" class="rc-botao rc-botao--discreto">
-			<?php echo esc_html( $individual ? __( 'Desativar vendedor', 'reconectar-core' ) : __( 'Reativar vendedor', 'reconectar-core' ) ); ?>
+			<?php echo esc_html( $individual ? __( 'Desativar loja', 'reconectar-core' ) : __( 'Reativar loja', 'reconectar-core' ) ); ?>
 		</button>
 	</form>
 
@@ -128,7 +128,7 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 
 <h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Produtos', 'reconectar-core' ); ?></h2>
 
-<?php $produtos = Reconectar_Painel_Empresas::produtos_do_vendedor( $vendedor_id ); ?>
+<?php $produtos = Reconectar_Painel_Empresas::produtos_da_loja( $loja_id ); ?>
 
 <?php if ( empty( $produtos ) ) : ?>
 
@@ -138,7 +138,7 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 
 	<table class="rc-tabela">
 		<caption class="rc-tabela__legenda">
-			<?php esc_html_e( 'Produtos deste vendedor, com preço, estoque e situação de publicação.', 'reconectar-core' ); ?>
+			<?php esc_html_e( 'Produtos desta loja, com preço, estoque e situação de publicação.', 'reconectar-core' ); ?>
 		</caption>
 		<thead>
 			<tr>
@@ -169,7 +169,7 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 
 <h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Pedidos recentes', 'reconectar-core' ); ?></h2>
 
-<?php $pedidos = Reconectar_Painel_Empresas::pedidos_do_vendedor( $vendedor_id ); ?>
+<?php $pedidos = Reconectar_Painel_Empresas::pedidos_da_loja( $loja_id ); ?>
 
 <?php if ( empty( $pedidos ) ) : ?>
 
@@ -179,7 +179,7 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 
 	<table class="rc-tabela">
 		<caption class="rc-tabela__legenda">
-			<?php esc_html_e( 'Pedidos mais recentes deste vendedor.', 'reconectar-core' ); ?>
+			<?php esc_html_e( 'Pedidos mais recentes desta loja.', 'reconectar-core' ); ?>
 		</caption>
 		<thead>
 			<tr>
@@ -224,9 +224,9 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 <h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Ganhos liberados', 'reconectar-core' ); ?></h2>
 
 <p class="rc-painel-empresas__numero">
-	<?php echo Reconectar_Painel_Empresas::dinheiro( Reconectar_Painel_Empresas::faturamento_do_vendedor( $vendedor_id ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — já escapado no método. ?>
+	<?php echo Reconectar_Painel_Empresas::dinheiro( Reconectar_Painel_Empresas::faturamento_da_loja( $loja_id ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — já escapado no método. ?>
 </p>
 
 <p class="rc-painel-empresas__nota">
-	<?php esc_html_e( 'Soma dos pedidos concluídos, descontadas as devoluções. Pedido em preparação ou a caminho ainda não entra na conta — é o mesmo número que o vendedor vê no painel dele.', 'reconectar-core' ); ?>
+	<?php esc_html_e( 'Soma dos pedidos concluídos, descontadas as devoluções. Pedido em preparação ou a caminho ainda não entra na conta — é o mesmo número que a loja vê no painel dela.', 'reconectar-core' ); ?>
 </p>

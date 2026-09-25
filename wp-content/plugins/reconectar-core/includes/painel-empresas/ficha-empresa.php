@@ -1,6 +1,6 @@
 <?php
 /**
- * Ficha de uma empresa: dados cadastrais, vendedores e a operação deles.
+ * Ficha de uma empresa: dados cadastrais, lojas e a operação delas.
  *
  * Incluída por `Reconectar_Painel_Empresas::renderizar()`, com `$contexto` no
  * escopo. A permissão sobre esta empresa já foi verificada em `proteger()`.
@@ -18,8 +18,8 @@ if ( ! empty( $_GET['editar'] ) ) {
 	return;
 }
 
-$ativa      = Reconectar_Empresa::esta_ativa( $empresa_id );
-$vendedores = Reconectar_Empresa::vendedores_da_empresa( $empresa_id );
+$ativa = Reconectar_Empresa::esta_ativa( $empresa_id );
+$lojas = Reconectar_Empresa::lojas_da_empresa( $empresa_id );
 ?>
 
 <div class="rc-painel-empresas__topo">
@@ -48,17 +48,17 @@ $vendedores = Reconectar_Empresa::vendedores_da_empresa( $empresa_id );
 		</form>
 	<?php endif; ?>
 
-	<?php if ( current_user_can( Reconectar_Permissoes::CAP_GERIR_VENDEDORES ) ) : ?>
+	<?php if ( current_user_can( Reconectar_Permissoes::CAP_GERIR_LOJAS ) ) : ?>
 		<a class="rc-botao rc-botao--primario"
-			href="<?php echo esc_url( add_query_arg( 'empresa', $empresa_id, Reconectar_Painel_Empresas::url( 'vendedor/novo' ) ) ); ?>">
-			<?php esc_html_e( 'Cadastrar vendedor', 'reconectar-core' ); ?>
+			href="<?php echo esc_url( add_query_arg( 'empresa', $empresa_id, Reconectar_Painel_Empresas::url( 'loja/nova' ) ) ); ?>">
+			<?php esc_html_e( 'Cadastrar loja', 'reconectar-core' ); ?>
 		</a>
 	<?php endif; ?>
 </div>
 
 <?php if ( ! $ativa ) : ?>
 	<p class="rc-painel-empresas__nota">
-		<?php esc_html_e( 'Enquanto a empresa estiver desativada, nenhum vendedor dela pode vender. Ao reativá-la, cada vendedor volta ao estado individual em que estava.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Enquanto a empresa estiver desativada, nenhuma loja dela pode vender. Ao reativá-la, cada loja volta ao estado individual em que estava.', 'reconectar-core' ); ?>
 	</p>
 <?php endif; ?>
 
@@ -74,40 +74,40 @@ $vendedores = Reconectar_Empresa::vendedores_da_empresa( $empresa_id );
 	<?php endforeach; ?>
 </dl>
 
-<h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Vendedores', 'reconectar-core' ); ?></h2>
+<h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Lojas', 'reconectar-core' ); ?></h2>
 
-<?php if ( empty( $vendedores ) ) : ?>
+<?php if ( empty( $lojas ) ) : ?>
 
 	<p class="rc-painel-empresas__vazio">
-		<?php esc_html_e( 'Esta empresa ainda não tem vendedores cadastrados.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Esta empresa ainda não tem lojas cadastradas.', 'reconectar-core' ); ?>
 	</p>
 
 <?php else : ?>
 
 	<table class="rc-tabela">
 		<caption class="rc-tabela__legenda">
-			<?php esc_html_e( 'Vendedores desta empresa, com produtos publicados e ganhos já liberados. Pedido ainda em andamento não entra na coluna de ganhos — é o mesmo critério do painel do vendedor.', 'reconectar-core' ); ?>
+			<?php esc_html_e( 'Lojas desta empresa, com produtos publicados e ganhos já liberados. Pedido ainda em andamento não entra na coluna de ganhos — é o mesmo critério do painel do Dokan.', 'reconectar-core' ); ?>
 		</caption>
 		<thead>
 			<tr>
-				<th scope="col"><?php esc_html_e( 'Vendedor', 'reconectar-core' ); ?></th>
+				<th scope="col"><?php esc_html_e( 'Loja', 'reconectar-core' ); ?></th>
 				<th scope="col"><?php esc_html_e( 'Produtos', 'reconectar-core' ); ?></th>
 				<th scope="col"><?php esc_html_e( 'Ganhos liberados', 'reconectar-core' ); ?></th>
 				<th scope="col"><?php esc_html_e( 'Situação', 'reconectar-core' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
-			<?php foreach ( $vendedores as $vendedor_id ) : ?>
+			<?php foreach ( $lojas as $loja_id ) : ?>
 				<?php
-				$usuario   = get_userdata( $vendedor_id );
-				$produtos  = count_user_posts( $vendedor_id, 'product', true );
-				$em_venda  = Reconectar_Empresa::vendedor_esta_ativo( $vendedor_id );
-				$ganhos    = Reconectar_Painel_Empresas::faturamento_do_vendedor( $vendedor_id );
+				$usuario  = get_userdata( $loja_id );
+				$produtos = count_user_posts( $loja_id, 'product', true );
+				$em_venda = Reconectar_Empresa::loja_esta_ativa( $loja_id );
+				$ganhos   = Reconectar_Painel_Empresas::faturamento_da_loja( $loja_id );
 				?>
 				<tr>
 					<th scope="row">
-						<a href="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'vendedor/' . $vendedor_id ) ); ?>">
-							<?php echo esc_html( $usuario ? $usuario->display_name : '#' . $vendedor_id ); ?>
+						<a href="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'loja/' . $loja_id ) ); ?>">
+							<?php echo esc_html( $usuario ? $usuario->display_name : '#' . $loja_id ); ?>
 						</a>
 					</th>
 					<td><?php echo esc_html( number_format_i18n( (int) $produtos ) ); ?></td>

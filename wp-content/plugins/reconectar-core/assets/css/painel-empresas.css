@@ -34,36 +34,91 @@
 	--rc-pe-fonte-xl: var( --rc-fonte-xl, 1.5rem );
 	--rc-pe-fonte-2xl: var( --rc-fonte-2xl, 1.75rem );
 
-	max-width: 1100px;
+	/* Subiu de 1100px quando o painel ganhou menu lateral: a largura antiga era a
+	   do conteúdo sozinho, e mantê-la faria a coluna de tabelas encolher na
+	   mesma medida do menu. */
+	max-width: 1280px;
 	margin: 0 auto;
 }
 
-/* Trilha, sessão e títulos
+/* Casca de dashboard
    ------------------------------------------------------------------------- */
 
-/* Trilha à esquerda, sessão à direita; embaixo da outra quando não couberem —
-   este perfil também trabalha do celular, e um "Sair" fora da tela é um "Sair"
-   que não existe. */
-.rc-painel-empresas__barra {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.5rem 1rem;
-	margin-bottom: 1rem;
-	padding-bottom: 0.75rem;
-	border-bottom: 1px solid var( --rc-pe-borda );
+.rc-painel-empresas--dashboard {
+	display: grid;
+	grid-template-columns: 15rem minmax( 0, 1fr );
+	gap: 2rem;
+	align-items: start;
 }
 
-.rc-painel-empresas__trilha {
-	font-size: var( --rc-pe-fonte-sm );
+/* `minmax( 0, 1fr )` acima, e não `1fr`: o mínimo automático de um grid item é o
+   tamanho do conteúdo, e uma tabela larga empurraria a coluna além da grade em
+   vez de rolar dentro dela. */
+.rc-painel-empresas__area {
+	min-width: 0;
+}
+
+.rc-painel-empresas__menu {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	padding: 1.25rem;
+	background: #f5f7f8;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 0.5rem;
+}
+
+.rc-painel-empresas__marca {
+	margin: 0;
+	color: var( --rc-pe-texto-suave );
+	font-size: var( --rc-pe-fonte-xs );
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.rc-painel-empresas__navegacao ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-painel-empresas__navegacao li + li {
+	margin-top: 0.25rem;
+}
+
+.rc-painel-empresas__item {
+	display: block;
+	padding: 0.5rem 0.75rem;
+	border-radius: 0.375rem;
+	color: var( --rc-pe-institucional );
+	font-size: var( --rc-pe-fonte-base );
+	text-decoration: none;
+}
+
+.rc-painel-empresas__item:hover,
+.rc-painel-empresas__item:focus {
+	background: #ffffff;
+	text-decoration: underline;
+}
+
+/* Branco sobre o institucional mede 8,69:1 — bem acima do 4,5:1 exigido. O peso
+   acompanha a cor porque cor sozinha não pode ser o único indicador de estado. */
+.rc-painel-empresas__item--ativo,
+.rc-painel-empresas__item--ativo:hover,
+.rc-painel-empresas__item--ativo:focus {
+	background: var( --rc-pe-institucional );
+	color: #ffffff;
+	font-weight: 600;
 }
 
 .rc-painel-empresas__sessao {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.75rem;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: auto;
+	padding-top: 1rem;
+	border-top: 1px solid var( --rc-pe-borda );
 	font-size: var( --rc-pe-fonte-sm );
 }
 
@@ -76,15 +131,80 @@
 	font-weight: 600;
 }
 
-.rc-painel-empresas__trilha a {
-	color: var( --rc-pe-institucional );
+/* Resumo da tela inicial
+   ------------------------------------------------------------------------- */
+
+.rc-painel-empresas__resumo {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 10rem, 1fr ) );
+	gap: 1rem;
+	margin: 0 0 2rem;
+	padding: 0;
+	list-style: none;
 }
 
-/* `aria-current`, nunca `aria-pressed`: o elemento é um link, e leitores de tela
-   anunciam "pressionado" como estado de botão. */
-.rc-painel-empresas__trilha a[aria-current="page"] {
-	font-weight: 600;
-	text-decoration: none;
+/* O tema pai limpa contêineres com `::before`/`::after`, e num contêiner de
+   grade esses pseudo-elementos deixam de ser invisíveis: `content` gera caixa, e
+   caixa dentro de grade ocupa célula. `content: none` apaga a caixa;
+   `display: none` deixaria o item na contagem. */
+.rc-painel-empresas__resumo::before,
+.rc-painel-empresas__resumo::after {
+	content: none;
+}
+
+.rc-painel-empresas__cartao {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 1rem 1.25rem;
+	background: #ffffff;
+	border: 1px solid var( --rc-pe-borda );
+	border-left: 4px solid var( --rc-pe-primaria );
+	border-radius: 0.5rem;
+}
+
+.rc-painel-empresas__cartao-numero {
+	font-size: var( --rc-pe-fonte-2xl );
+	font-weight: 700;
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+}
+
+.rc-painel-empresas__cartao-rotulo {
+	color: var( --rc-pe-texto-suave );
+	font-size: var( --rc-pe-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+/* Em tela estreita o menu passa a faixa horizontal acima do conteúdo. Faixa, e
+   não `<details>`: um menu retrátil abriria justamente no celular, que é onde
+   ele precisa ocupar menos espaço. */
+@media ( max-width: 860px ) {
+
+	.rc-painel-empresas--dashboard {
+		grid-template-columns: minmax( 0, 1fr );
+		gap: 1.5rem;
+	}
+
+	.rc-painel-empresas__navegacao ul {
+		display: flex;
+		gap: 0.5rem;
+		overflow-x: auto;
+	}
+
+	.rc-painel-empresas__navegacao li + li {
+		margin-top: 0;
+	}
+
+	.rc-painel-empresas__item {
+		white-space: nowrap;
+	}
+
+	.rc-painel-empresas__sessao {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+	}
 }
 
 .rc-painel-empresas__topo {
@@ -243,8 +363,14 @@
 	font-weight: 600;
 }
 
+/* `box-sizing` declarado aqui, e não herdado: o reset que o Storefront aplica a
+   `*` deixava `width: 100%` somar padding e borda por fora, e o campo saía 23px
+   mais largo que a coluna — medido em 375px. Funcionava por acidente do tema, e
+   este painel é plugin: não pode exigir tema nenhum, pela mesma razão que os
+   tokens `--rc-pe-*` trazem fallback literal. */
 .rc-formulario__campo input,
 .rc-formulario__campo textarea {
+	box-sizing: border-box;
 	width: 100%;
 	padding: 0.5rem 0.65rem;
 	border: 1px solid var( --rc-pe-borda );

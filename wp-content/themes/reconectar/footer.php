@@ -32,6 +32,27 @@
 
 </div><!-- #page -->
 
+<?php
+/*
+ * Fora de `#page`, e não dentro dele junto do rodapé, porque o Storefront
+ * declara `.site { overflow-x: hidden }` — e `overflow-x` definido sozinho faz
+ * o `overflow-y` computar `auto`, o que transforma o `<div class="hfeed site">`
+ * num scroll container. A propagação que salva o `<body>` (o overflow dele sobe
+ * para o viewport enquanto o `<html>` for `visible`) não vale para um `<div>`
+ * comum, e `position: fixed` dentro de scroll container é terreno onde
+ * navegador de celular diverge da especificação.
+ *
+ * Registre-se que **não era isto** que fazia a barra sumir na home: a causa
+ * medida era a rolagem horizontal do documento, corrigida em
+ * `.rc-carrossel__faixa` (veja o comentário lá). Esta chamada ficou aqui mesmo
+ * assim por ser a posição defensável de um componente fixo, e porque a única
+ * coisa que o lugar no DOM decide é a ordem de tabulação: quem usa teclado
+ * percorre o conteúdo inteiro antes de chegar aos quatro atalhos, em vez de
+ * esbarrar neles logo depois do cabeçalho.
+ */
+reconectar_barra_inferior();
+?>
+
 <?php wp_footer(); ?>
 
 </body>

@@ -44,9 +44,14 @@ class Reconectar_Painel_Empresas {
 	const ENDPOINT_EMPRESA = 'empresa';
 
 	/**
-	 * Endpoint de reescrita das telas de vendedor.
+	 * Endpoint de reescrita das telas de loja.
+	 *
+	 * Três telas saem daqui: `/loja/` lista, `/loja/nova/` cadastra e `/loja/12/`
+	 * é a ficha. O endpoint já se chamou `vendedor`, e a troca apaga a rota
+	 * antiga — URLs guardadas por alguém passam a cair na listagem de empresas.
+	 * Aceitável porque o painel é interno; e exige `wp rewrite flush`.
 	 */
-	const ENDPOINT_VENDEDOR = 'vendedor';
+	const ENDPOINT_LOJA = 'loja';
 
 	/**
 	 * Registra os ganchos.
@@ -75,7 +80,7 @@ class Reconectar_Painel_Empresas {
 	 */
 	public static function registrar_endpoints() {
 		add_rewrite_endpoint( self::ENDPOINT_EMPRESA, EP_PAGES );
-		add_rewrite_endpoint( self::ENDPOINT_VENDEDOR, EP_PAGES );
+		add_rewrite_endpoint( self::ENDPOINT_LOJA, EP_PAGES );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -140,11 +145,21 @@ class Reconectar_Painel_Empresas {
 		// (`/painel-empresas/empresa/`) devolve string vazia, que é falsy — e
 		// confundi-la com "endpoint ausente" mandaria para a listagem uma URL que
 		// na verdade está incompleta.
-		if ( isset( $vars[ self::ENDPOINT_VENDEDOR ] ) ) {
-			$valor = trim( (string) $vars[ self::ENDPOINT_VENDEDOR ], '/' );
+		if ( isset( $vars[ self::ENDPOINT_LOJA ] ) ) {
+			$valor = trim( (string) $vars[ self::ENDPOINT_LOJA ], '/' );
+
+			// O ramo do valor vazio vem **antes** do teste de id, e não depois:
+			// `(int) 'nova'` é 0 tanto quanto `(int) ''`, e os dois casos
+			// colidiriam numa ficha de loja com id 0 — que termina em 403.
+			if ( '' === $valor ) {
+				return array(
+					'tela' => 'lojas',
+					'id'   => 0,
+				);
+			}
 
 			return array(
-				'tela' => 'novo' === $valor ? 'vendedor-novo' : 'vendedor',
+				'tela' => 'nova' === $valor ? 'loja-nova' : 'loja',
 				'id'   => (int) $valor,
 			);
 		}
@@ -206,20 +221,24 @@ class Reconectar_Painel_Empresas {
 				}
 				break;
 
-			case 'vendedor-novo':
+			case 'loja-nova':
 				$empresa_id = isset( $_GET['empresa'] ) ? (int) $_GET['empresa'] : 0;
 
-				if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_VENDEDORES )
+				if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_LOJAS )
 					|| ! Reconectar_Empresa::pode_gerir_empresa( $empresa_id ) ) {
 					self::recusar();
 				}
 				break;
 
-			case 'vendedor':
-				if ( ! Reconectar_Empresa::pode_gerir_vendedor( $contexto['id'] ) ) {
+			case 'loja':
+				if ( ! Reconectar_Empresa::pode_gerir_loja( $contexto['id'] ) ) {
 					self::recusar();
 				}
 				break;
+
+			// `lojas` não tem caso próprio: a listagem já é filtrada pelo escopo
+			// do usuário em `Reconectar_Empresa::lojas_no_escopo()`, e o
+			// `CAP_PAINEL_EMPRESAS` conferido acima é a única trava que falta.
 		}
 
 		self::processar( $contexto );
@@ -261,7 +280,7 @@ class Reconectar_Painel_Empresas {
 	 * Processa o POST da tela atual e redireciona.
 	 *
 	 * Redirecionar depois de gravar (padrão POST/Redirect/GET) evita que um F5
-	 * reenvie o formulário — o que, em "cadastrar vendedor", significaria uma
+	 * reenvie o formulário — o que, em "cadastrar loja", significaria uma
 	 * segunda conta criada por um toque de teclado.
 	 *
 	 * Cada ação revalida permissão no servidor. Esconder o botão na tela não é
@@ -298,16 +317,16 @@ class Reconectar_Painel_Empresas {
 				self::acao_empresa_alternar( $campos );
 				break;
 
-			case 'vendedor_criar':
-				self::acao_vendedor_criar( $campos );
+			case 'loja_criar':
+				self::acao_loja_criar( $campos );
 				break;
 
-			case 'vendedor_salvar':
-				self::acao_vendedor_salvar( $campos );
+			case 'loja_salvar':
+				self::acao_loja_salvar( $campos );
 				break;
 
-			case 'vendedor_alternar':
-				self::acao_vendedor_alternar( $campos );
+			case 'loja_alternar':
+				self::acao_loja_alternar( $campos );
 				break;
 		}
 	}
@@ -362,15 +381,15 @@ class Reconectar_Painel_Empresas {
 	}
 
 	/**
-	 * Cadastra um vendedor.
+	 * Cadastra uma loja.
 	 *
 	 * @param array $campos Dados do POST.
 	 * @return void
 	 */
-	private static function acao_vendedor_criar( $campos ) {
+	private static function acao_loja_criar( $campos ) {
 		$empresa_id = isset( $campos['empresa_id'] ) ? (int) $campos['empresa_id'] : 0;
 
-		$resultado = Reconectar_Vendedores::criar(
+		$resultado = Reconectar_Lojas::criar(
 			array(
 				'empresa_id' => $empresa_id,
 				'login'      => isset( $campos['login'] ) ? $campos['login'] : '',
@@ -385,7 +404,7 @@ class Reconectar_Painel_Empresas {
 
 		if ( is_wp_error( $resultado ) ) {
 			self::redirecionar(
-				'vendedor/novo',
+				'loja/nova',
 				'erro',
 				$resultado->get_error_message(),
 				array( 'empresa' => $empresa_id )
@@ -399,26 +418,26 @@ class Reconectar_Painel_Empresas {
 		set_transient(
 			self::chave_do_aviso_de_senha(),
 			array(
-				'vendedor_id' => $resultado['usuario_id'],
-				'link'        => $resultado['link_de_senha'],
+				'loja_id' => $resultado['usuario_id'],
+				'link'    => $resultado['link_de_senha'],
 			),
 			5 * MINUTE_IN_SECONDS
 		);
 
-		self::redirecionar( 'vendedor/' . $resultado['usuario_id'], 'vendedor-criado' );
+		self::redirecionar( 'loja/' . $resultado['usuario_id'], 'loja-criada' );
 	}
 
 	/**
-	 * Atualiza os dados de um vendedor.
+	 * Atualiza os dados de uma loja.
 	 *
 	 * @param array $campos Dados do POST.
 	 * @return void
 	 */
-	private static function acao_vendedor_salvar( $campos ) {
-		$vendedor_id = isset( $campos['vendedor_id'] ) ? (int) $campos['vendedor_id'] : 0;
+	private static function acao_loja_salvar( $campos ) {
+		$loja_id = isset( $campos['loja_id'] ) ? (int) $campos['loja_id'] : 0;
 
-		$resultado = Reconectar_Vendedores::atualizar(
-			$vendedor_id,
+		$resultado = Reconectar_Lojas::atualizar(
+			$loja_id,
 			array(
 				'email'     => isset( $campos['email'] ) ? $campos['email'] : '',
 				'nome'      => isset( $campos['nome'] ) ? $campos['nome'] : '',
@@ -430,33 +449,33 @@ class Reconectar_Painel_Empresas {
 		);
 
 		if ( is_wp_error( $resultado ) ) {
-			self::redirecionar( 'vendedor/' . $vendedor_id, 'erro', $resultado->get_error_message() );
+			self::redirecionar( 'loja/' . $loja_id, 'erro', $resultado->get_error_message() );
 		}
 
-		self::redirecionar( 'vendedor/' . $vendedor_id, 'vendedor-salvo' );
+		self::redirecionar( 'loja/' . $loja_id, 'loja-salva' );
 	}
 
 	/**
-	 * Ativa ou desativa um vendedor.
+	 * Ativa ou desativa uma loja.
 	 *
 	 * @param array $campos Dados do POST.
 	 * @return void
 	 */
-	private static function acao_vendedor_alternar( $campos ) {
-		$vendedor_id = isset( $campos['vendedor_id'] ) ? (int) $campos['vendedor_id'] : 0;
+	private static function acao_loja_alternar( $campos ) {
+		$loja_id = isset( $campos['loja_id'] ) ? (int) $campos['loja_id'] : 0;
 
-		if ( ! Reconectar_Empresa::pode_gerir_vendedor( $vendedor_id ) ) {
+		if ( ! Reconectar_Empresa::pode_gerir_loja( $loja_id ) ) {
 			self::recusar();
 		}
 
-		$ativo     = 'nao' === get_user_meta( $vendedor_id, Reconectar_Empresa::META_VENDEDOR_ATIVO, true );
-		$resultado = Reconectar_Vendedores::definir_ativo( $vendedor_id, $ativo );
+		$ativa     = 'nao' === get_user_meta( $loja_id, Reconectar_Empresa::META_LOJA_ATIVA, true );
+		$resultado = Reconectar_Lojas::definir_ativa( $loja_id, $ativa );
 
 		if ( is_wp_error( $resultado ) ) {
-			self::redirecionar( 'vendedor/' . $vendedor_id, 'erro', $resultado->get_error_message() );
+			self::redirecionar( 'loja/' . $loja_id, 'erro', $resultado->get_error_message() );
 		}
 
-		self::redirecionar( 'vendedor/' . $vendedor_id, $ativo ? 'vendedor-ativado' : 'vendedor-desativado' );
+		self::redirecionar( 'loja/' . $loja_id, $ativa ? 'loja-ativada' : 'loja-desativada' );
 	}
 
 	/**
@@ -540,7 +559,7 @@ class Reconectar_Painel_Empresas {
 	/**
 	 * Consome o link de senha guardado, se houver.
 	 *
-	 * @return array{vendedor_id:int,link:string}|null
+	 * @return array{loja_id:int,link:string}|null
 	 */
 	public static function link_de_senha_pendente() {
 		$dados = get_transient( self::chave_do_aviso_de_senha() );
@@ -559,22 +578,22 @@ class Reconectar_Painel_Empresas {
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * Produtos de um vendedor.
+	 * Produtos de uma loja.
 	 *
 	 * `WP_Query` com `author`, e não uma consulta por meta: a API central honra os
 	 * argumentos que recebe, ao contrário de `wc_get_orders()` — ver a armadilha
 	 * registrada no CLAUDE.md.
 	 *
-	 * @param int $vendedor_id ID do vendedor.
-	 * @param int $limite      Quantidade máxima.
+	 * @param int $loja_id ID da loja.
+	 * @param int $limite  Quantidade máxima.
 	 * @return WP_Post[]
 	 */
-	public static function produtos_do_vendedor( $vendedor_id, $limite = 20 ) {
+	public static function produtos_da_loja( $loja_id, $limite = 20 ) {
 		return get_posts(
 			array(
 				'post_type'      => 'product',
 				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
-				'author'         => (int) $vendedor_id,
+				'author'         => (int) $loja_id,
 				'posts_per_page' => (int) $limite,
 				'orderby'        => 'date',
 				'order'          => 'DESC',
@@ -583,28 +602,31 @@ class Reconectar_Painel_Empresas {
 	}
 
 	/**
-	 * Pedidos de um vendedor.
+	 * Pedidos de uma loja.
 	 *
 	 * Passa pelo Dokan porque é ele quem sabe relacionar pedido e loja — inclusive
-	 * quando o pedido tem itens de vendedores diferentes, caso em que o
-	 * WooCommerce sozinho não tem resposta.
+	 * quando o pedido tem itens de lojas diferentes, caso em que o WooCommerce
+	 * sozinho não tem resposta.
 	 *
 	 * **Nunca** `wc_get_orders()` filtrando por meta: a função descarta
 	 * `meta_key`, `meta_value` e `meta_query` em silêncio, e o retorno não é vazio
 	 * — é o banco inteiro, que com um `limit` pequeno passa por resposta plausível.
 	 *
-	 * @param int $vendedor_id ID do vendedor.
-	 * @param int $limite      Quantidade máxima.
+	 * `seller_id` fica: é o nome do argumento na API do Dokan, não vocabulário
+	 * nosso.
+	 *
+	 * @param int $loja_id ID da loja.
+	 * @param int $limite  Quantidade máxima.
 	 * @return array Pedidos como o Dokan os devolve, ou array vazio.
 	 */
-	public static function pedidos_do_vendedor( $vendedor_id, $limite = 10 ) {
+	public static function pedidos_da_loja( $loja_id, $limite = 10 ) {
 		if ( ! function_exists( 'dokan' ) ) {
 			return array();
 		}
 
 		$pedidos = dokan()->order->all(
 			array(
-				'seller_id' => (int) $vendedor_id,
+				'seller_id' => (int) $loja_id,
 				'limit'     => (int) $limite,
 				'paged'     => 1,
 			)
@@ -614,35 +636,35 @@ class Reconectar_Painel_Empresas {
 	}
 
 	/**
-	 * Faturamento acumulado de um vendedor.
+	 * Faturamento acumulado de uma loja.
 	 *
 	 * O segundo argumento não é opcional na prática. A assinatura do Dokan é
 	 * `dokan_get_seller_earnings( $seller_id, $formatted = true )`, e o padrão
 	 * `true` devolve o resultado já passado por `wc_price()` — uma string de HTML,
 	 * não um número. Chamando sem ele, o `is_numeric()` abaixo reprovava todo
 	 * valor, a função devolvia `null` e a coluna Faturamento mostrava travessão
-	 * para todos os vendedores, inclusive os que tinham pedidos pagos. O defeito
+	 * para todas as lojas, inclusive as que tinham pedidos pagos. O defeito
 	 * era invisível na leitura do código: a chamada parecia correta e o "—" tem
 	 * significado legítimo neste painel (dado indisponível), então passava por
 	 * comportamento esperado.
 	 *
-	 * O número é o mesmo que o próprio vendedor vê no painel do Dokan — o
+	 * O número é o mesmo que a própria loja vê no painel do Dokan — o
 	 * `big-counter-widget.php` chama esta mesma função. São ganhos liberados: o
 	 * Dokan só soma as linhas de `wp_dokan_vendor_balance` cujo status está entre
 	 * os de saque (`dokan_withdraw_get_active_order_status_in_comma()`), hoje
 	 * `wc-completed` e `wc-refunded`. Pedido em preparação ou a caminho ainda não
 	 * entra na conta, e é assim que deve ser: os dois painéis precisam mostrar o
-	 * mesmo número para o mesmo vendedor.
+	 * mesmo número para a mesma loja.
 	 *
-	 * @param int $vendedor_id ID do vendedor.
+	 * @param int $loja_id ID da loja.
 	 * @return float|null Valor, ou null quando o Dokan não puder informar.
 	 */
-	public static function faturamento_do_vendedor( $vendedor_id ) {
+	public static function faturamento_da_loja( $loja_id ) {
 		if ( ! function_exists( 'dokan_get_seller_earnings' ) ) {
 			return null;
 		}
 
-		$valor = dokan_get_seller_earnings( (int) $vendedor_id, false );
+		$valor = dokan_get_seller_earnings( (int) $loja_id, false );
 
 		return is_numeric( $valor ) ? (float) $valor : null;
 	}
@@ -727,11 +749,12 @@ class Reconectar_Painel_Empresas {
 		$contexto = self::contexto();
 
 		$views = array(
-			'lista'         => 'lista-empresas',
-			'empresa-nova'  => 'form-empresa',
-			'empresa'       => 'ficha-empresa',
-			'vendedor-novo' => 'form-vendedor',
-			'vendedor'      => 'ficha-vendedor',
+			'lista'        => 'lista-empresas',
+			'empresa-nova' => 'form-empresa',
+			'empresa'      => 'ficha-empresa',
+			'lojas'        => 'lista-lojas',
+			'loja-nova'    => 'form-loja',
+			'loja'         => 'ficha-loja',
 		);
 
 		if ( ! isset( $views[ $contexto['tela'] ] ) ) {
@@ -740,19 +763,36 @@ class Reconectar_Painel_Empresas {
 
 		ob_start();
 
-		echo '<div class="rc-painel-empresas">';
-		self::cabecalho();
+		echo '<div class="rc-painel-empresas rc-painel-empresas--dashboard">';
+		self::menu();
+
+		echo '<div class="rc-painel-empresas__area">';
 		self::aviso();
 
 		include RECONECTAR_CORE_PATH . 'includes/painel-empresas/' . $views[ $contexto['tela'] ] . '.php';
 
+		echo '</div>';
 		echo '</div>';
 
 		return ob_get_clean();
 	}
 
 	/**
-	 * Cabeçalho comum às telas.
+	 * Seção do menu a que uma tela pertence.
+	 *
+	 * Existe para que a ficha e o formulário marquem a seção da listagem de onde
+	 * saíram — sem isto, entrar numa ficha apagaria o item ativo e o menu passaria
+	 * a dizer que o usuário não está em lugar nenhum.
+	 *
+	 * @param string $tela Tela corrente, como `contexto()` a devolve.
+	 * @return string `empresas` ou `lojas`.
+	 */
+	private static function secao_da_tela( $tela ) {
+		return in_array( $tela, array( 'lojas', 'loja-nova', 'loja' ), true ) ? 'lojas' : 'empresas';
+	}
+
+	/**
+	 * Menu lateral do painel.
 	 *
 	 * Traz o encerramento de sessão porque este painel é, para o Administrador de
 	 * Empresas, a aplicação inteira: ele não tem `/wp-admin`, não tem o painel do
@@ -764,18 +804,45 @@ class Reconectar_Painel_Empresas {
 	 * `wp_logout_url()` já embute o nonce: sem ele, qualquer página de terceiro
 	 * poderia derrubar a sessão do usuário com uma imagem apontando para a URL.
 	 *
+	 * A seção corrente é marcada com `aria-current="page"`, nunca com
+	 * `aria-pressed`: o item é um `<a>`, e `aria-pressed` só tem sentido em
+	 * controle de dois estados.
+	 *
+	 * Em telas estreitas o menu vira faixa rolável — e não um `<details>`, que
+	 * abriria sozinho no celular.
+	 *
 	 * @return void
 	 */
-	private static function cabecalho() {
-		$contexto = self::contexto();
-		$usuario  = wp_get_current_user();
+	private static function menu() {
+		$secao   = self::secao_da_tela( self::contexto()['tela'] );
+		$usuario = wp_get_current_user();
+
+		$itens = array(
+			'empresas' => array(
+				'rotulo' => __( 'Empresas', 'reconectar-core' ),
+				'url'    => self::url(),
+			),
+			'lojas'    => array(
+				'rotulo' => __( 'Lojas', 'reconectar-core' ),
+				'url'    => self::url( self::ENDPOINT_LOJA ),
+			),
+		);
 		?>
-		<div class="rc-painel-empresas__barra">
-			<nav class="rc-painel-empresas__trilha" aria-label="<?php esc_attr_e( 'Você está em', 'reconectar-core' ); ?>">
-				<a href="<?php echo esc_url( self::url() ); ?>"
-					<?php echo 'lista' === $contexto['tela'] ? 'aria-current="page"' : ''; ?>>
-					<?php esc_html_e( 'Empresas', 'reconectar-core' ); ?>
-				</a>
+		<aside class="rc-painel-empresas__menu">
+			<p class="rc-painel-empresas__marca"><?php esc_html_e( 'Painel gerencial', 'reconectar-core' ); ?></p>
+
+			<nav class="rc-painel-empresas__navegacao" aria-label="<?php esc_attr_e( 'Seções do painel', 'reconectar-core' ); ?>">
+				<ul>
+					<?php foreach ( $itens as $chave => $item ) : ?>
+						<li>
+							<a class="rc-painel-empresas__item<?php echo $chave === $secao ? ' rc-painel-empresas__item--ativo' : ''; ?>"
+								href="<?php echo esc_url( $item['url'] ); ?>"
+								<?php echo $chave === $secao ? 'aria-current="page"' : ''; ?>>
+								<?php echo esc_html( $item['rotulo'] ); ?>
+							</a>
+						</li>
+					<?php endforeach; ?>
+				</ul>
 			</nav>
 
 			<div class="rc-painel-empresas__sessao">
@@ -793,7 +860,7 @@ class Reconectar_Painel_Empresas {
 					<?php esc_html_e( 'Sair', 'reconectar-core' ); ?>
 				</a>
 			</div>
-		</div>
+		</aside>
 		<?php
 	}
 
@@ -810,13 +877,13 @@ class Reconectar_Painel_Empresas {
 		}
 
 		$mensagens = array(
-			'empresa-salva'       => __( 'Empresa salva.', 'reconectar-core' ),
-			'empresa-ativada'     => __( 'Empresa ativada. Os vendedores dela voltaram ao estado individual de cada um.', 'reconectar-core' ),
-			'empresa-desativada'  => __( 'Empresa desativada. Os vendedores dela estão fora de operação.', 'reconectar-core' ),
-			'vendedor-criado'     => __( 'Vendedor cadastrado.', 'reconectar-core' ),
-			'vendedor-salvo'      => __( 'Dados do vendedor atualizados.', 'reconectar-core' ),
-			'vendedor-ativado'    => __( 'Vendedor ativado.', 'reconectar-core' ),
-			'vendedor-desativado' => __( 'Vendedor desativado.', 'reconectar-core' ),
+			'empresa-salva'      => __( 'Empresa salva.', 'reconectar-core' ),
+			'empresa-ativada'    => __( 'Empresa ativada. As lojas dela voltaram ao estado individual de cada uma.', 'reconectar-core' ),
+			'empresa-desativada' => __( 'Empresa desativada. As lojas dela estão fora de operação.', 'reconectar-core' ),
+			'loja-criada'        => __( 'Loja cadastrada.', 'reconectar-core' ),
+			'loja-salva'         => __( 'Dados da loja atualizados.', 'reconectar-core' ),
+			'loja-ativada'       => __( 'Loja ativada.', 'reconectar-core' ),
+			'loja-desativada'    => __( 'Loja desativada.', 'reconectar-core' ),
 		);
 
 		if ( 'erro' === $codigo ) {

@@ -1,8 +1,17 @@
 # Instruções para agentes — Plataforma Reconectar
 
 Marketplace multi-vendedor em WordPress do projeto "Reconectar" (edital
-FUNDEPES/UNOPS, "Nosso Chão Nossa História"). Três atores: Administrador,
-Vendedor e Usuário Comum. Licença GPL-2.0-or-later.
+FUNDEPES/UNOPS, "Nosso Chão Nossa História"). Quatro atores: Administrador,
+Administrador de Empresas, Vendedor e Usuário Comum. Licença GPL-2.0-or-later.
+
+**Vocabulário.** A **empresa** é a Reconectar Incubadora Digital; cada negócio
+que ela cadastra é uma **Loja**. No painel de empresas e no código autoral dele,
+a entidade se chama loja (`Reconectar_Lojas`, `META_LOJA_ATIVA`,
+`/painel-empresas/loja/`). "Vendedor" sobrevive onde o nome é do **Dokan** — o
+papel `seller`, a capacidade `dokandar`, as metas `dokan_*` — e ali não se
+traduz. `Reconectar_Permissoes::eh_vendedor()` e os dois métodos de isolamento
+por vendedor ficam com o nome antigo de propósito: falam do papel, não da
+entidade.
 
 Antes de mexer em qualquer coisa, leia a seção **Armadilhas** abaixo. Ela não
 é uma lista de boas práticas genéricas: cada item corresponde a um erro que já
@@ -18,13 +27,18 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/seed/demo.php` | motor da carga: cria e remove (só lógica) |
 | `scripts/demo-completa.sh` | ambiente + provisionamento + carga, em um comando |
 | `scripts/seed-demo.sh` | atalho para `instalar` / `remover` só a carga |
-| `scripts/verificar-acessos.sh` | testa as travas de RBAC por HTTP, nos três perfis |
+| `scripts/verificar-acessos.sh` | testa as travas de RBAC por HTTP, nos quatro perfis |
+| `scripts/configurar-url-dinamica.php` | grava no `wp-config.php` o bloco que resolve a URL pelo `Host` |
+| `scripts/normalizar-urls.php` | converte em caminho as URLs absolutas já gravadas no banco |
 | `wp-content/themes/reconectar/` | tema autoral (child theme do Storefront) |
 | `wp-content/plugins/reconectar-core/` | plugin autoral: RBAC, status, governança |
+| `…/includes/class-reconectar-painel-empresas.php` | painel gerencial, rota própria fora do `/wp-admin` |
+| `…/includes/painel-empresas/` | os templates das telas do painel |
+| `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
 | `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
 | `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
-| `docs/PERFIS_E_PERMISSOES.md` | os três atores e a matriz de permissões |
+| `docs/PERFIS_E_PERMISSOES.md` | os quatro atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
 | `docs/DADOS_DEMONSTRACAO.md` | o que a carga cria, em detalhe |
 | `DIARIO_DESENVOLVIMENTO.md` | histórico cronológico das entregas |
@@ -58,7 +72,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-16 casos de permissão por HTTP, nos três perfis. Sai com status 1 se algum
+59 casos de permissão por HTTP, nos quatro perfis. Sai com status 1 se algum
 falhar. **Rode depois de mexer em qualquer coisa de RBAC** — as travas não têm
 teste automatizado além deste.
 
@@ -200,6 +214,172 @@ A carga cria termos em `product_cat` e em `topic-tag`. A remoção busca a
 taxonomia no `term_taxonomy` em vez de assumir uma; sem isso, sobrevivem tags
 que levam a listas vazias.
 
+### O `functions.php` do filho carrega **antes** do pai
+
+`wp-settings.php` inclui `STYLESHEETPATH` primeiro. Um `remove_action` escrito no
+corpo do `functions.php` do tema filho — ou de qualquer arquivo que ele inclua —
+tenta remover um gancho que o pai ainda não registrou: devolve `false`, nada
+acontece, e o sintoma é o pior de todos, porque o código está no lugar certo e
+não faz nada. Ganchos do Storefront se removem em `after_setup_theme`, prioridade
+20. Veja `reconectar_reposicionar_paginacao_do_catalogo()`.
+
+### As duas `.storefront-sorting` do catálogo são ganchos simétricos
+
+`storefront-woocommerce-template-hooks.php:45-55` monta a mesma sequência duas
+vezes — wrapper em 9, ordenação em 10, contagem em 20, paginação em 30,
+fechamento em 31 —, uma em `woocommerce_before_shop_loop` e outra em
+`woocommerce_after_shop_loop`. Mexer em uma e esquecer a outra deixa a página
+meio corrigida. E a paginação herda o `float: right` da barra: para centralizá-la
+não basta CSS, é preciso tirá-la de dentro (prioridade > 31).
+
+### `woocommerce_show_page_title` **apaga** o `<h1>`, não o esconde
+
+O filtro decide se `loop/header.php` imprime o cabeçalho. Filtrar para `false`
+tira o elemento do DOM, e quem navega por cabeçalhos fica sem saber em que página
+está. Para sumir da tela e ficar para o leitor de tela, o caminho é classe no
+`<body>` mais a técnica de `.screen-reader-text` — veja
+`reconectar_marcar_pagina_sem_titulo()` e `.rc-sem-titulo-de-pagina`.
+
+### O Storefront veste campos de formulário por seletor de atributo
+
+`input[type="text"], … input[type="search"], …` tem especificidade **(0,1,1)** e
+vence uma classe sozinha (0,1,0). Uma regra autoral que declare `background` ou
+`border` num campo é escrita, aplicada e perdida na cascata — medido: o campo de
+busca do fórum saía em `#f2f2f2` ao lado de um select branco, no mesmo
+formulário. Repita a classe (`.rc-forum__busca.rc-forum__busca`) para chegar a
+(0,2,0).
+
+O pai também declara `select { color: initial; font-family: "Source Sans Pro", … }`,
+o que tira a Poppins herdada do corpo. Todo `<select>` do projeto precisa de
+`font-family: inherit` explícito.
+
+### CSS de plugin não herda o reset do tema — `box-sizing` inclusive
+
+O Storefront aplica `box-sizing: border-box` a `*`, e por causa disso um
+`width: 100%` num campo de formulário **parecia** funcionar dentro do painel de
+empresas, que é plugin. Sem o tema, o padding e a borda voltam a somar por fora:
+medido em 375px, o campo saía 398px numa coluna de 375. O painel não pode exigir
+tema nenhum — é a mesma razão pela qual os tokens `--rc-pe-*` trazem fallback
+literal. Declare `box-sizing` no próprio componente.
+
+### Vários cartões `rc-` **são** o `<a>`, não o contêm
+
+`reconectar_card_categoria()` imprime `<a class="rc-card-categoria">` com dois
+`<span>` dentro. A regra `.rc-card-categoria a` não casava com nada: era escrita,
+ignorada, e o nome da categoria caía no link padrão do tema, `#31BEB1` — medido,
+**2,30:1** sobre o branco, reprovando o critério 1.4.3 da WCAG 2.1 em toda a faixa
+da home. É de novo o sintoma pior: o código está no lugar certo e não faz nada.
+Antes de escrever regra descendente em componente `rc-`, confira o markup.
+
+### O "Ver todos" de um carrossel aponta para a listagem **do mesmo tipo**
+
+Já errou duas vezes na home. Em lojas em destaque,
+`reconectar_url_base_da_vitrine()` devolvia a própria página; em categorias,
+`reconectar_url_loja()` levava ao catálogo de produtos. Nos dois casos o link
+existia, era clicável e abria uma página plausível. Os destinos são
+`reconectar_url_loja()` para produtos, `reconectar_url_das_lojas()` para lojas e
+`reconectar_url_das_categorias()` para categorias — esta última resolvida pelo
+**slug** da página `categorias`, que o `provision.sh` cria.
+
+### `get_page_by_path()` devolve rascunho e lixeira
+
+Sem conferir `post_status`, um helper de URL entrega o permalink de uma página
+despublicada — link válido que leva ao 404 para quem não está logado.
+
+### Clearfix do tema pai vira **grid item**
+
+Ao pôr `display: grid` num contêiner que o Storefront limpava com
+`::before`/`::after`, os pseudo-elementos deixam de ser invisíveis: `content`
+gera caixa, e caixa dentro de grade ocupa célula. Em `ul.products` isso dava
+quatro colunas declaradas e três cartões por linha, com o primeiro começando na
+célula 2. `content: none` apaga a caixa; `display: none` deixaria o item na
+contagem. Vale para qualquer contêiner do pai que vire grade.
+
+### Em `flex-wrap: wrap`, quem decide a quebra é a **base**, não o encolhimento
+
+`flex-shrink: 1` e `min-width: 0` no item certo não impedem a quebra de linha:
+quando o navegador decide quantos itens cabem, ele soma as `flex-basis`, e só
+depois flexiona o que sobrou na linha. Um item com base `auto` entra nessa conta
+com a largura do próprio conteúdo.
+
+Medido no cabeçalho do celular: `.rc-cabecalho__acoes` com base `auto` valia
+285px de conteúdo; somados aos 145px da marca e aos 16px de gap, davam 446
+contra 343 úteis, e a **marca** ia para uma linha só dela. O município, que tem
+`min-width: 0` e reticências justamente para absorver a falta de espaço, nunca
+chegava a encolher. `flex: 1 1 0` resolve — e exige `justify-content: flex-end`
+junto, porque o item passa a ocupar toda a sobra e um `margin-left: auto` fica
+sem espaço livre para empurrar.
+
+### Esconder do olho e manter no leitor: as duas técnicas não são intercambiáveis
+
+`position: absolute` é a técnica padrão do WordPress e tem a armadilha logo
+abaixo: dentro de contêiner estático, o elemento sobe até o viewport. A variante
+no fluxo (`width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%)`,
+sem `position`) evita isso, e tem o preço oposto — como `inline-block`, ela gera
+line box com a altura do strut do bloco. Medido: o gatilho do município ficava
+com 61px de altura para exibir uma linha de texto.
+
+Dentro de uma linha flex, a variante no fluxo não custa nada (é o caso de
+`.rc-carrinho__unidade`). Num bloco de texto, só o absoluto zera a altura — e aí
+confira que existe ancestral posicionado.
+
+### `overflow-x: auto` não clipa absoluto solto — e foi assim que a barra sumiu
+
+Um scroll container só clipa descendente **cujo containing block seja ele**. Se
+o elemento é `position: static`, um descendente `position: absolute` sobe até o
+primeiro ancestral posicionado — e, não havendo nenhum, até o **viewport**. Ele
+passa a ocupar coordenada de documento, fora do alcance do `overflow` que
+deveria contê-lo.
+
+Foi o que aconteceu em `.rc-carrossel__faixa`. Os cards trazem
+`span.screen-reader-text`, que o WordPress declara `position: absolute`: medido,
+um deles ficava em **x=1645 numa tela de 375**, e a área de rolagem do documento
+ia a exatamente esses 1645px. Nada aparece fora de lugar — os spans têm 1px e
+`clip-path: inset(50%)` —, o carrossel rola certo, e a página parece correta.
+
+O preço aparece longe da causa: a **barra inferior some no celular**. Com o
+documento rolando na horizontal sob o `overflow-x: hidden` que o Storefront
+propaga do `<body>` para o viewport, `position: fixed` deixa de acompanhar a
+tela. Sintoma seletivo por página — só onde há carrossel —, o que manda a
+investigação para o componente errado: gastou-se uma rodada inteira
+reposicionando a barra no `footer.php`, que não era o defeito.
+
+O diagnóstico que fecha é de uma linha:
+
+```js
+window.scrollTo( 600, 0 ); window.scrollX   // 0 = são; > 0 = documento rola na horizontal
+```
+
+`document.documentElement.scrollWidth` maior que o `clientWidth` também acusa, e
+`body.scrollWidth` **não** — o `hidden` do corpo mascara. Todo scroll container
+horizontal do projeto declara `position: relative` por isso.
+
+### Renomear meta ou capacidade exige migração versionada
+
+Uma chave de meta ou capacidade renomeada **não migra sozinha**: o valor
+continua gravado no banco sob o nome velho, e o código novo lê vazio. O sintoma
+não é erro — é dado que some. `user_can()` com capacidade inexistente devolve
+`false` em silêncio, e a loja desativada volta a parecer ativa.
+
+`Reconectar_Migracoes` (`init`, prioridade **5** — antes das capacidades, que
+rodam em 10) guarda esses passos, com opção própria `reconectar_migracoes_versao`
+no molde de `Reconectar_Permissoes::VERSAO_CAPACIDADES`. Duas assimetrias que
+custam tempo se descobertas depois:
+
+- **`remove_role()`/`add_role()` cobre o `company_admin`, não o `administrator`.**
+  `sincronizar_papel_do_admin_de_empresas()` recria o papel do zero, então a
+  capacidade velha sai junto. O `administrator` recebe as dele por `add_cap()` e
+  **só perde o que for explicitamente removido** — daí a lista `CAPS_LEGADAS` e
+  o `remove_cap` sobre todos os papéis, que fica lá permanentemente: é o que faz
+  uma instalação provisionada há meses migrar sozinha.
+- **`UPDATE` direto em `meta_key` não invalida o cache.** O WordPress guarda a
+  usermeta em cache de objeto, e a leitura seguinte entrega o estado antigo por
+  toda a requisição. Colha os `user_id` **antes** do `UPDATE` — depois dele a
+  consulta pela chave velha volta vazia — e chame `clean_user_cache()` em cada
+  um. Antes do `UPDATE`, apague as linhas legadas de quem já tem a chave nova:
+  sem isso a renomeação cria duplicata, e `get_user_meta( …, true )` passa a
+  devolver uma das duas arbitrariamente.
+
 ### O diretório do plugin é `includes/`, não `inc/`
 
 `inc/` é a convenção do **tema**. Confundir os dois leva a criar arquivo em
@@ -212,6 +392,59 @@ O segundo não existe e o erro só aparece em tempo de execução, como fatal.
 ### `--ssl=0` só vale em `wp db *`
 
 Qualquer outro comando do WP-CLI rejeita a flag.
+
+### `wp config set` não enxerga constante cujo valor é expressão
+
+O `wp-config-transformer`, por baixo do comando, reconhece literais. Uma linha
+como `define( 'WP_SITEURL', 'http://' . RECONECTAR_HOST );` é **invisível** para
+ele: medido, `wp config delete WP_SITEURL --type=constant` responde "is not
+defined" com a linha bem ali no arquivo.
+
+O sintoma não aparece na primeira execução, e é por isso que custa caro. Como o
+comando nunca encontra a definição anterior, ele **acrescenta outra** a cada
+provisionamento. Depois de duas rodadas o PHP começa a avisar "Constant already
+defined" — e aviso impresso antes de um redirect cancela a ação, a armadilha
+registrada mais acima. Um provisionamento idempotente passa a quebrar o site
+devagar, uma linha por execução.
+
+Constante com valor de expressão se escreve por bloco delimitado, no molde do
+`# BEGIN WordPress` do `.htaccess`: reescrever é apagar o trecho entre os
+marcadores e pôr o novo, sem depender de localizar cada `define`. Veja
+`scripts/configurar-url-dinamica.php`.
+
+### URL gravada no banco não acompanha `WP_HOME` dinâmico
+
+`WP_HOME` e `WP_SITEURL` saem do `Host` da requisição, para que a mesma
+instalação atenda `localhost:8090` e o IP da máquina na rede. Isso resolve tudo
+que o WordPress monta na hora — asset, permalink, miniatura — e **não alcança o
+que já está gravado como texto**: o `_menu_item_url` dos itens `custom` do menu
+e o HTML dos widgets `custom_html`. Um item nascido com `http://localhost:8090/`
+manda o celular para o próprio celular. Os itens `add-post` são imunes: guardam
+o ID e resolvem o permalink na hora.
+
+Vale também para **cache**. Qualquer transient que guarde URL absoluta precisa
+do host na chave — sem isso o valor gravado num acesso serve links do outro, e o
+sintoma é dos piores de diagnosticar: intermitente, porque some sozinho quando o
+transient expira. Veja `reconectar_lojas_*` e `reconectar_sugestoes_*`.
+
+Escrever caminho relativo resolve daqui para frente; a instalação antiga passa
+pelas guardas de idempotência do `provision.sh` — menu já atribuído, coluna de
+rodapé já preenchida — e **nunca seria reescrita**. Quem a alcança é
+`scripts/normalizar-urls.php`.
+
+### O filtro de `Host` é uma allowlist, não o cabeçalho cru
+
+Cabeçalho de requisição é dado do cliente. A plataforma **envia link de
+definição de senha** no cadastro de loja (`network_site_url()`, em
+`class-reconectar-lojas.php`), e um `Host` forjado sairia dentro desse link.
+Passam `localhost`, o loopback e os três blocos privados — o alcance de um
+ambiente de desenvolvimento em rede local, e nada além.
+
+Ao conferir, lembre que um `Host` desconhecido **sem porta** ainda recebe 301
+para ele mesmo: é `redirect_canonical()` do núcleo, que monta a URL requisitada
+a partir de `$_SERVER['HTTP_HOST']` independentemente de `WP_HOME`. Não é a
+allowlist falhando — o corpo da resposta não reflete nada. O teste que vale é
+contar quantas URLs do HTML trazem o host forjado: tem de ser zero.
 
 ### UID divergente entre as imagens
 

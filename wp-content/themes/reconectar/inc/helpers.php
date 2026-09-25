@@ -76,3 +76,28 @@ function reconectar_url_das_lojas() {
 
 	return reconectar_url_loja();
 }
+
+/**
+ * URL da listagem de categorias, com fallback para a página da loja.
+ *
+ * A página é criada pelo `provision.sh` com o slug `categorias` e o shortcode
+ * `[reconectar_categorias]`. A busca é por slug, e não por título, porque o
+ * título é do administrador: renomear a página no painel não pode quebrar o
+ * "Ver todos" do carrossel da home.
+ *
+ * O fallback existe para a instalação em que a página ainda não foi criada — um
+ * `home_url( '/categorias/' )` chumbado levaria ao 404, que é pior do que
+ * chegar ao catálogo. Continua sendo fallback, não destino: o link certo só
+ * aparece quando a página existe.
+ *
+ * @return string
+ */
+function reconectar_url_das_categorias() {
+	$pagina = get_page_by_path( 'categorias' );
+
+	if ( $pagina && 'publish' === $pagina->post_status ) {
+		return get_permalink( $pagina );
+	}
+
+	return reconectar_url_loja();
+}

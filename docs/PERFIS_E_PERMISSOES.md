@@ -9,8 +9,16 @@ código a regra é aplicada**. Implementação em
 | Ator | Papel WP | Onde trabalha |
 | --- | --- | --- |
 | **Administrador** | `administrator` | `/wp-admin` |
+| **Administrador de Empresas** | `company_admin` | `/painel-empresas/` |
 | **Vendedor** | `seller` | painel do Dokan, no front-end |
 | **Usuário Comum** | `customer` | loja e "Minha conta" |
+
+**Duas palavras para a mesma conta.** No painel de empresas a plataforma chama
+essas contas de **Loja** — a empresa é a Reconectar Incubadora Digital, e cada
+loja é um negócio cadastrado por ela. Este documento continua dizendo
+"Vendedor" porque descreve o papel `seller`, que é do **Dokan**: o nome vem de
+fora e mudá-lo quebraria o plugin. Onde se lê "vendedor" aqui, entenda "a conta
+que o painel de empresas lista como loja".
 
 **Administrador.** Gestão técnica e operacional da plataforma inteira. É o único
 que instala, ativa, atualiza, configura ou remove plugins, e o único que
@@ -172,9 +180,9 @@ capacidade concedida direto ao usuário ou por outro plugin via `user_has_cap`.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 16 casos por HTTP: faz login como cliente, vendedor e administrador e
-bate em cada URL restrita, conferindo o código de resposta. Sai com status 1 se
-algum falhar.
+Verifica 59 casos por HTTP: faz login como cliente, vendedor, administrador e
+administrador de empresas e bate em cada URL restrita, conferindo o código de
+resposta. Sai com status 1 se algum falhar.
 
 É por HTTP de propósito. A autorização precisa valer para a URL digitada à mão,
 que é o caminho que uma auditoria vai tentar; um teste que apenas consulta
@@ -183,12 +191,13 @@ alguém pergunta, não que a requisição foi barrada.
 
 Respostas medidas nesta instalação:
 
-| Perfil | `/wp-admin/` | `plugins.php` | `/dashboard/` | `/comunidade/` | `/forums/` |
-| --- | --- | --- | --- | --- | --- |
-| Deslogado | — | — | — | `302` → login | `302` → login |
-| Cliente | `302` → `/my-account/` | — | `302` → home | `403` | `403` |
-| Vendedor | `302` → `/dashboard/` | `403` | `200` | `200` | `200` |
-| Administrador | `200` | `200` | — | `200` | `200` |
+| Perfil | `/wp-admin/` | `plugins.php` | `/dashboard/` | `/comunidade/` | `/forums/` | `/painel-empresas/` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Deslogado | — | — | — | `302` → login | `302` → login | `302` → login |
+| Cliente | `302` → `/my-account/` | — | `302` → home | `403` | `403` | `403` |
+| Vendedor | `302` → `/dashboard/` | `403` | `200` | `200` | `200` | `403` |
+| Admin de Empresas | `302` → `/painel-empresas/` | — | — | `200` | `200` | `200` |
+| Administrador | `200` | `200` | — | `200` | `200` | `200` |
 
 Note a diferença entre as duas colunas do vendedor: `/wp-admin/` redireciona —
 ele tem para onde ir — e `plugins.php` nega. São travas distintas, e o código

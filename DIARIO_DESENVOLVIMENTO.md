@@ -1649,3 +1649,613 @@ caso vermelho que não seria o defeito medido.
   o arquivo já cai no `*.log` do `.gitignore`.
 
 ---
+
+## 2026-09-25 — Títulos de página, grade de produtos e paginação
+
+O catálogo era a última área da plataforma servida pelo layout do Storefront sem
+nenhuma camada autoral por cima, e as três partes do pedido tinham essa mesma
+raiz. O medido em `/shop/` a 1280×900, antes: `<h1>` "Shop" de 50,84px repetindo
+a trilha "Início / Shop" logo acima; `ul.products` em `display: block`, com
+`li.product` flutuando; alturas de 469/513/469 na primeira linha, o botão
+"Adicionar ao carrinho" parando num lugar diferente em cada card; **duas**
+`.storefront-sorting`, com paginação impressa antes de o visitante ver um único
+produto; itens de paginação de 28×32px, `aria-label="Page 1"` em inglês e a seta
+"→" como nome acessível de link — falha do critério 2.4.4 da WCAG 2.1.
+
+**Os títulos saem da tela e ficam no documento.** É a diferença entre este caso e
+os dois que `inc/layout.php` já tratava: ali havia **dois** `<h1>` na página e um
+precisava deixar de existir; aqui há **um só**, que é o nome do documento. Tirá-lo
+do DOM deixaria quem navega por cabeçalhos sem saber onde está. Por isso
+`reconectar_marcar_pagina_sem_titulo()` põe uma classe no `<body>` e o CSS aplica
+a técnica de `.screen-reader-text` — e por isso **não** se usou o filtro
+`woocommerce_show_page_title`, que seria o caminho óbvio para o catálogo e apaga
+o `<h1>` de `loop/header.php` em vez de escondê-lo.
+
+Vale registrar o que isso não corrige: "Shop", "Cart", "Checkout" e "My account"
+continuam em inglês no `<title>`, nas trilhas e nos menus. Esconder o `<h1>` tira
+o sintoma da primeira dobra e deixa a origem de pé — o título dos posts que o
+WooCommerce cria. Fica para `scripts/i18n/`.
+
+**A listagem do fórum era o outro caso**, o de dois `<h1>`: "Fóruns", do tema pai,
+e "Todas as perguntas", da camada autoral. Sai o do tema pai. O gancho é
+`storefront_page`, e não `storefront_archive`, embora o `<body>` receba
+`post-type-archive-forum`: o bbPress serve a listagem pela camada de
+compatibilidade de tema, que injeta o conteúdo num post falso (`post-0`). Medido
+no DOM antes de escrever o `remove_action` — presumir custaria uma remoção que não
+remove nada.
+
+**A grade é CSS sobre o markup do WooCommerce**, sem template novo. Foi a decisão,
+e ela preserva a avaliação em estrelas, os badges de plugins e o "Adicionar ao
+carrinho" com AJAX. O que iguala as alturas é `flex: 1` no link que envolve
+imagem, título e preço: o botão encosta no rodapé do card independentemente de o
+título ter uma ou duas linhas.
+
+**O clearfix do tema pai virou grid item.** Esta foi a surpresa. Com quatro
+colunas de 280px declaradas e aplicadas, o primeiro produto nascia em
+`left: 345px` e cada linha entregava três cartões. A célula 1 estava ocupada pelo
+`::before` do tema pai: pseudo-elemento com `content` gera caixa, e caixa dentro
+de grade é grid item. `content: none` apaga a caixa — `display: none` deixaria o
+item na contagem.
+
+**As duas barras perdem coisas diferentes.** De cima sai só a paginação, porque
+ordenação e contagem dizem o que a lista logo abaixo contém e paginar antes de
+existir lista, não. De baixo sai a barra inteira: ali elas eram repetição do que
+já está no topo, e repetição custa mais a quem navega por teclado do que a quem
+rola a página. A paginação passa de prioridade 30 para 40, para fora do
+`storefront_sorting_wrapper_close`: dentro da barra ela herdava o `float: right`,
+e era isso que a jogava contra a margem direita.
+
+**A página atual da paginação é roxa, não verde.** `#31BEB1` com branco dá 2,0:1 —
+a mesma cor que já reprova AA nos links do projeto. `#663191` com branco dá
+8,70:1, medido antes de escrever a regra. Não existe `--rc-texto-sobre-primaria`
+no `:root`, e a ausência é informação: o par de cores sobre o primário nunca
+passou por medição.
+
+**A especificidade foi medida, não presumida.** A regra concorrente mais forte é
+`.storefront-full-width-content .site-main ul.products.columns-3 li.product`, de
+(0,5,2). As classes repetidas no seletor levam a (0,6,2) — não é estilo, é a
+medida necessária. `marketplace.css` é a folha 22 e `woocommerce.css` a 18, então
+o empate bastaria; a folga é para o dia em que essa ordem mudar.
+
+**Verificado**
+
+- `<h1>` presente no DOM e com retângulo de 1×1 em `/shop/`, `/cart/`,
+  `/checkout/`, `/my-account/` (logado), `/store-listing/` e numa categoria de
+  produto. A home e o fórum seguem com o título visível.
+- `/forums/`: exatamente um `<h1>`, "Todas as perguntas".
+- Grade real: `display: grid`, quatro colunas de 280px, primeiro cartão alinhado
+  à borda esquerda do contêiner (49px, igual à do `<ul>`).
+- Alturas iguais dentro de cada linha: 348/348/348/348, depois 375×4 e 375×4.
+- Uma `.storefront-sorting`, uma `.woocommerce-pagination`, uma ordenação e uma
+  contagem na página.
+- Paginação: itens de 44×44px medidos, `aria-current="page"` na atual, `<nav>`
+  com rótulo "Paginação de produtos" e a seta com nome acessível "Próxima página"
+  (a seta é `aria-hidden`).
+- Contraste: página atual 8,70:1; selo "Oferta!" 8,70:1; título, preço e links de
+  página 4,88:1. Nenhum par abaixo de 4,5:1.
+- 1280×900 e 375×812: `scrollWidth - clientWidth === 0` e a varredura por
+  elementos além da borda voltou vazia. Em 375px a grade vira coluna única de
+  343px e os alvos de toque seguem em 44×44.
+- "Adicionar ao carrinho" pelo botão do card: classe `added` aplicada, link "Ver
+  carrinho" impresso e o produto no `/cart/`. É o que a decisão de reestilizar por
+  CSS se propôs a preservar. O checkout não foi fechado: criar pedido na base de
+  demonstração não prova nada que o carrinho já não tenha provado.
+- `./scripts/verificar-acessos.sh`: **57 casos, nenhuma falha.**
+
+---
+
+## 2026-09-25 — Os selects
+
+O pedido veio com o `select` de ordenação do catálogo selecionado na tela. O
+levantamento encontrou **dois** `<select>` no site inteiro, e nenhum terceiro:
+
+| Onde | Classe | Estado medido |
+| --- | --- | --- |
+| `/shop/` e categorias | `.orderby`, do WooCommerce | 288×24px, fundo `#efefef`, borda `#767676` — aparência nativa do sistema |
+| `/forums/` | `.rc-forum__select`, autoral | 44px, tokens do projeto, seta nativa |
+
+O do catálogo estava a 24px de altura onde o projeto adota 44px de alvo de
+toque, e fora da tipografia da plataforma: o Storefront declara
+`select { color: initial; font-family: "Source Sans Pro", … }`, que substitui a
+Poppins herdada do corpo. Não era o select estar sem enfeite — era ele nunca ter
+passado por nenhuma camada autoral.
+
+A cascata foi medida antes de escrever. Ao contrário do laço de produtos, aqui
+não há disputa: a regra mais específica que alcança o controle é
+`button, input, optgroup, select, textarea`, de especificidade (0,0,1). Uma
+classe basta, e nenhuma repetição de seletor foi necessária.
+
+**O checkout ficou de fora, de propósito.** Aquela tela é bloco do WooCommerce
+(`.wc-block-checkout`) e seus campos — `billing-country`, `billing-state` — já
+medem 50px, usam 16px de fonte e trazem rótulo flutuante próprio. Sobrescrever
+não corrigiria defeito nenhum; só desalinharia um sistema coerente consigo
+mesmo. Foi decisão do usuário, e a medição a sustenta.
+
+**A seta é desenhada pelo tema.** `appearance: none` apaga a seta junto com o
+resto do controle nativo, e alguma precisa voltar — sem ela nada distingue o
+campo de uma caixa de texto. Ela entra como `background-image` em `data:` URI,
+não como pseudo-elemento: `select` não hospeda `::after` de forma confiável
+entre navegadores, e o wrapper que o receberia é markup de terceiro nos dois
+casos. Sem build e sem CDN, como o projeto exige.
+
+O traço fica em `#717171` literal porque `url()` não interpola custom property.
+É a única duplicação de token do arquivo, e está anotada no CSS: some no dia em
+que a seta virar elemento.
+
+### O campo de busca do fórum, que o select denunciou
+
+Ao medir o select do fórum, o input ao lado apareceu com fundo `#f2f2f2` — cinza,
+ao lado de um select branco, no mesmo formulário. A regra autoral declarava
+`background: var(--rc-superficie)` e perdia na cascata: o Storefront pinta com
+`input[type="text"], … input[type="search"], …`, de especificidade (0,1,1),
+maior que a classe sozinha (0,1,0).
+
+Defeito pré-existente, não regressão — mas ficou lado a lado com o select
+corrigido, então foi corrigido junto. `.rc-forum__busca.rc-forum__busca` leva a
+(0,2,0) e encerra a disputa sem depender da ordem das folhas. O campo ganhou
+também o mesmo `:hover` e o mesmo `:focus-visible` do select, para os dois
+controles do mesmo formulário não responderem ao teclado de formas diferentes.
+
+O desenho do select saiu do bloco do fórum para uma seção própria, `Selects`,
+que os dois compartilham. Antes eram dois blocos que por acaso coincidiam.
+
+**Verificado**
+
+- `/shop/`: de 288×24px para **320×44px**; `appearance: none`; fundo `#ffffff`;
+  borda `#e4e4e7` (o token, não o `#767676` do sistema); raio 8px; **Poppins** no
+  lugar de Source Sans Pro; `padding-right` de 40px reservado para a seta.
+- `/forums/`: select em 243×44 e busca em 44 de altura, **ambos com fundo
+  `rgb(255,255,255)`** — antes o segundo saía `rgb(242,242,242)`.
+- Foco: `outline` de 2px em `rgb(49,190,177)` nos dois controles, sob
+  `:focus-visible`, a mesma forma já usada na paginação.
+- Contraste da seta: `#717171` sobre `#ffffff` = 4,88:1, acima dos 3:1 que a WCAG
+  2.1 pede a elemento gráfico (critério 1.4.11).
+- 375×812: select do catálogo em 343×44 e, no fórum, select e busca em 343×44
+  empilhados. `scrollWidth - clientWidth === 0` e a varredura por elementos além
+  da borda voltou vazia nas duas telas.
+- `./scripts/verificar-acessos.sh`: **57 casos, nenhuma falha.**
+
+---
+
+## 2026-09-25 — O "Ver todos" das categorias
+
+O relato foi curto: o "Ver todos" do carrossel *Explore por categoria* não levava
+à listagem de categorias. A causa estava numa linha de
+`inc/home/secao-categorias.php` — `'link' => reconectar_url_loja()`, isto é, a
+faixa de **categorias** oferecia um atalho para o catálogo de **produtos**. O
+link existia, era clicável e abria uma página plausível; só não era a que ele
+prometia.
+
+É a segunda vez que esse defeito aparece na home. O carrossel de lojas em
+destaque teve o mesmo problema em outra forma: `reconectar_url_base_da_vitrine()`
+devolvia a própria home, e o "Ver todos" recarregava a página em que o visitante
+já estava. O comentário daquela correção continua no arquivo, e agora tem um
+irmão.
+
+**O destino não existia.** Esta é a parte que a leitura do relato não antecipa: o
+projeto não tinha nenhuma página que listasse as categorias. `/shop/` lista
+produtos, `/store-listing/` lista lojas, e `get_term_link()` leva a **uma**
+categoria. Corrigir só a linha do link não teria para onde apontar — por isso a
+entrega inclui a listagem.
+
+### A página
+
+`inc/marketplace/categorias.php` traz a consulta e o shortcode
+`[reconectar_categorias]`, e o `provision.sh` cria a página `categorias` com o
+mesmo padrão idempotente das demais (`[buddypress]`, `[reconectar_painel_empresas]`).
+`reconectar_url_das_categorias()` resolve a URL pelo **slug**, não pelo título:
+renomear a página no painel não pode quebrar o link da home — a mesma razão
+registrada em `reconectar_url_das_lojas()`.
+
+As categorias aparecem agrupadas por categoria-mãe, em ordem alfabética. A
+ordenação difere de propósito da usada em `reconectar_obter_categorias()`, que é
+por quantidade de produtos: a faixa da home mostra 14 e precisa colocar as mais
+movimentadas à frente, porque o resto fica de fora; aqui está tudo, e o que uma
+listagem completa deve ao visitante é previsibilidade.
+
+Dois casos foram tratados porque acontecem em catálogo real, não por precaução
+genérica: a subcategoria com produtos cuja **mãe** está vazia — `hide_empty`
+derruba a mãe e a filha ficaria órfã, fora de todos os grupos e portanto
+invisível —, e o `get_term_link()` que devolve `WP_Error`, que chegaria a
+`esc_url()` como objeto.
+
+### O que a página denunciou
+
+Ao medir a cor do nome da categoria, ele saiu em `#31BEB1` — **2,30:1** sobre o
+branco do cartão, reprovando o critério 1.4.3 da WCAG 2.1. A regra que deveria
+pintá-lo era `.rc-card-categoria a`, e **não casa com nada**:
+`reconectar_card_categoria()` imprime `<a class="rc-card-categoria">` com dois
+`<span>` dentro, sem link descendente. A declaração era escrita, ignorada, e o
+texto caía no link padrão do tema.
+
+O defeito não era da página nova: vinha da faixa da home, onde o mesmo componente
+é usado desde o começo. Uma página que multiplica o cartão por quinze foi o que
+tornou visível o que uma faixa de catorze escondia. Corrigido no seletor, os dois
+lugares passaram juntos.
+
+**Verificado**
+
+- Os três carrosséis da home apontam cada um para a listagem do seu tipo:
+  categorias → `/categorias/`, lojas → `/store-listing/`, produtos → `/shop/`.
+- `/categorias/`: 5 grupos, 15 subcategorias, **um único `<h1>`** ("Categorias"),
+  `aria-labelledby` de cada seção resolvendo para um `id` existente, e nenhum
+  shortcode cru no corpo.
+- Nome da categoria: de `rgb(49,190,177)` (2,30:1) para `rgb(113,113,113)` —
+  **4,88:1**, na home e na listagem. "Ver todos os produtos de X" em
+  `rgb(39,39,42)`, **14,89:1**, sublinhado para não depender da cor (critério
+  1.4.1).
+- Cartão em 153×114px, bem acima do alvo de toque de 44px, com `outline` de 2px
+  no foco.
+- 375×812: grade em duas colunas de 163px, `scrollWidth - clientWidth === 0` e
+  varredura por elementos além da borda vazia.
+- Fallback do helper medido nos três estados: com a página, `/categorias/`;
+  despublicada, `/shop/`; republicada, `/categorias/` — `get_page_by_path()`
+  devolve rascunho, e é por isso que a guarda de `post_status` existe.
+- Idempotência do bloco novo do `provision.sh`: com a página já criada, a guarda
+  cai no ramo "já existe".
+- `./scripts/verificar-acessos.sh`: **57 casos, nenhuma falha.**
+
+**Anotado, fora de escopo:** a página não foi acrescentada ao menu nem ao rodapé —
+o caminho até ela é o "Ver todos" da home, que era o pedido. E a home acusa
+`scrollWidth - clientWidth` de 413px em 1280: medido com e sem a mudança deste
+dia, o número é **idêntico**, então é anterior e vem dos carrosséis.
+
+---
+
+## 2026-09-25 — "Vendedor" vira "Loja", e o painel de empresas vira dashboard
+
+O pedido veio em quatro frases, e a primeira era a menor delas: *trocar a palavra
+vendedores por lojas no fluxo de cadastro de empresa*. As outras três definem o
+modelo mental — a **empresa** é a Reconectar Incubadora Digital, e o que o
+código chamava de "Vendedor" é uma **Loja** cadastrada por ela.
+
+A incoerência já estava na tela: o formulário se chamava "Cadastrar vendedor" e
+pedia "Nome da loja", "Descrição da loja". Duas palavras para a mesma coisa, no
+mesmo campo de visão.
+
+Duas decisões do usuário fixaram o escopo: a troca chega **até o código**
+(rotas e identificadores, não só textos), e o painel ganha **cara de dashboard**
+mantendo a rota própria.
+
+### A fronteira
+
+"Renomear vendedor" num projeto que roda sobre o Dokan é um convite a mexer no
+que não é nosso. A regra adotada: renomeia-se onde "vendedor" designa a
+**entidade**; preserva-se onde o nome é do **plugin**.
+
+Ficam intocados `Reconectar_Lojas::PAPEL = 'seller'` — que é, além do nome do
+papel, a trava contra escalada de privilégio, já que `wp_insert_user()` não
+verifica capacidade nenhuma —, a capacidade `dokandar`, as metas `dokan_*` e o
+`'seller_id'` dos argumentos de `dokan()->order->all()`.
+
+Ficaram também, por decisão registrada, `Reconectar_Permissoes::eh_vendedor()`,
+`restringir_por_vendedor()` e `restringir_listagens_do_vendedor()`: os três falam
+do papel e do isolamento geral da plataforma, não do cadastro de empresa.
+Renomeá-los produziria o maior diff do trabalho justamente na camada de RBAC —
+cujo único teste é o `verificar-acessos.sh` — em troca de nada além do nome. O
+PHPDoc de cada um passou a registrar a distinção.
+
+### As duas migrações, que são o que separa isto de um "localizar e substituir"
+
+`Reconectar_Migracoes` é classe nova, com opção própria
+`reconectar_migracoes_versao`, pendurada em `init` na **prioridade 5** — antes
+das capacidades, que rodam em 10.
+
+**A meta.** `_reconectar_vendedor_ativo` → `_reconectar_loja_ativa`, em três
+passos cuja ordem importa. Primeiro o `DELETE` das linhas legadas de quem já tem
+a chave nova: sem ele, o `UPDATE` seguinte criaria duplicata e
+`get_user_meta( …, true )` passaria a devolver uma das duas arbitrariamente —
+uma loja desativada voltando a vender conforme a ordem de leitura do MySQL.
+Depois o `UPDATE`. Por fim o `clean_user_cache()` em cada usuário afetado, com
+os IDs colhidos **antes** do `UPDATE`, porque depois dele a consulta pela chave
+velha volta vazia. Um `UPDATE` por baixo do `update_user_meta()` não invalida
+cache nenhum.
+
+**A capacidade.** `reconectar_gerir_vendedores` → `reconectar_gerir_lojas`.
+Metade do caminho já existia: `sincronizar_papel_do_admin_de_empresas()` faz
+`remove_role()` **antes** de `add_role()`, então o `company_admin` renasce com a
+capacidade nova assim que `VERSAO_CAPACIDADES` muda. A outra metade não existia
+— o `administrator` recebe as dele por `add_cap()` e só perde o que for
+explicitamente removido, então a capacidade velha ficaria gravada nele para
+sempre. Entrou a constante `CAPS_LEGADAS` e um `remove_cap` sobre todos os
+papéis, que fica lá permanentemente: é o que faz uma instalação provisionada há
+meses migrar sozinha.
+
+### O consumidor silencioso
+
+`Reconectar_Forum::pode_marcar_melhor_resposta()` usa essa capacidade como
+atalho para "quem administra a operação". Sem acompanhar a renomeação, o fórum
+perderia o caminho de moderação **sem erro visível**: `user_can()` com
+capacidade inexistente devolve `false` e pronto.
+
+### A rota
+
+`ENDPOINT_VENDEDOR` virou `ENDPOINT_LOJA`, e `/painel-empresas/vendedor/12/`
+virou `/painel-empresas/loja/12/`. Exige `wp rewrite flush`, que o
+`provision.sh` já executa no fim.
+
+### Cara de dashboard
+
+A leitura literal do pedido — "esse painel pode ficar dentro do Dashboard" —
+apontaria para o `/dashboard/` do Dokan, e essa porta continua fechada pela
+razão já registrada no cabeçalho da classe: `Shortcodes/Dashboard.php:31` barra
+quem não passa em `dokan_is_user_seller()`, literalmente
+`user_can( $id, 'dokandar' )`, e conceder `dokandar` faria do Administrador de
+Empresas **um vendedor para todo o plugin**. O que mudou foi a aparência, não a
+fronteira.
+
+`renderizar()` passou a envolver a tela em duas colunas: um `<aside>` com o menu
+e o "Sair" no rodapé, e a área de conteúdo. O menu marca a seção corrente com
+`aria-current="page"` — nunca `aria-pressed`, que é proibido em `<a>` — e em
+tela estreita vira faixa horizontal rolável, não um `<details open>` que abriria
+sozinho no celular.
+
+**A tela que faltava.** Um dashboard com um item só não é um dashboard, e o dado
+do segundo já existia e estava morto: `lojas_no_escopo()` era definida e não
+tinha uma única chamada. Virou `painel-empresas/lista-lojas.php`, sem endpoint
+novo — `/painel-empresas/loja/` com o valor **vazio** caía antes em tela de
+ficha com id 0, terminando em 403. Em `contexto()` o ramo do valor vazio vem
+**antes** do teste de id, porque `(int) 'nova'` é 0 tanto quanto `(int) ''`.
+
+Três contagens no topo da listagem de empresas: empresas no escopo, lojas no
+escopo, lojas em operação. Todas de consulta real. Faturamento agregado ficou de
+fora de propósito — exigiria somar os ganhos de cada loja a cada carregamento, e
+um número estimado para preencher o espaço é pior que espaço nenhum.
+
+### O defeito que a medição encontrou
+
+Os campos do formulário saíam **398px numa coluna de 375px**. A causa não estava
+no CSS do painel: estava na sua ausência. O `box-sizing: border-box` vinha do
+reset que o Storefront aplica a `*`, e o painel é **plugin** — não pode exigir
+tema nenhum, pela mesma razão que os tokens `--rc-pe-*` trazem fallback literal.
+Funcionava por acidente. Declarado no próprio componente, o estouro foi a zero.
+
+**Verificado**
+
+- Lint de todo o PHP do plugin e da carga, no container. Nenhuma falha.
+- Varredura por `vendedor` no plugin: sobram apenas as ocorrências declaradas
+  fora de escopo e as referências à chave legada dentro da própria migração.
+- `./scripts/verificar-acessos.sh`: **59 casos, nenhuma falha** — com os dois
+  novos, `/painel-empresas/loja/` respondendo `403` a quem toca uma loja e `200`
+  ao Administrador de Empresas.
+- Capacidade migrada, conferida no banco: o `company_admin` e o `administrator`
+  têm `reconectar_gerir_lojas` e **não** têm a legada. Totais por papel
+  inalterados (`company_admin` segue com seis capacidades).
+- Meta migrada, conferida por consulta: nenhuma linha
+  `_reconectar_vendedor_ativo` sobrou, e o ciclo desativar/reativar pela tela
+  prova que o valor migrado continua sendo lido e escrito pelo mesmo caminho.
+- `Reconectar_Lojas::criar()` exercitada ponta a ponta — papel `seller`, metas
+  do Dokan, vínculo com a empresa, link de senha gerado, e recusa de login
+  duplicado com `reconectar_login_em_uso`. A conta de teste foi removida.
+- Fórum: `pode_marcar_melhor_resposta()` devolve verdadeiro para o administrador
+  e para o Administrador de Empresas — a capacidade renomeada é reconhecida.
+- `aria-current="page"` presente e **único** em cada uma das três telas, com o
+  item certo por tela; nenhum `<details open>`; foco visível percorrendo o menu
+  inteiro pelo teclado (medido com Tab real — `.focus()` programático não dispara
+  `:focus-visible` e reporta ausência de contorno que não existe).
+- Contraste do item ativo do menu e do texto de apoio conferido, nada abaixo de
+  4,5:1 — o `--rc-pe-texto-suave` é o mais apertado da casca, em 4,88:1 sobre o
+  branco. Nenhum `font-size` literal nos componentes novos: todos saem dos
+  degraus `--rc-pe-*`, que trazem fallback porque o painel é plugin.
+- 1280×900: `scrollWidth - clientWidth === 0` nas três telas.
+
+**Anotado, não silenciado:** em 375px as duas telas com tabela estouram (35px e
+154px), e a varredura mostra que o excedente é **inteiramente** da `.rc-tabela` —
+nenhum elemento fora dela ultrapassa a borda. É defeito pré-existente da tabela,
+não da casca nova. A tela de cadastro, que estourava 24px, passou a zero.
+
+---
+
+## 2026-09-25 — Acesso pelo IP da máquina e ordem das seções da home
+
+**O que foi feito**
+- Reordenadas as seis seções da home pela prioridade da action `reconectar_home`
+  (categorias 10, lojas em destaque 20, produtos em destaque 30, vitrine 40,
+  hero 50, comunidade/transparência 60).
+- `WP_HOME` e `WP_SITEURL` passaram a ser resolvidas a partir do `Host` da
+  requisição, num bloco delimitado do `wp-config.php` escrito por
+  `scripts/configurar-url-dinamica.php`.
+- Criado `scripts/normalizar-urls.php`, que converte em caminho as URLs
+  absolutas já gravadas no banco (itens `custom` de menu e widgets
+  `custom_html`) e descarta os transients de catálogo antigos.
+- O host entrou na chave dos transients `reconectar_lojas_*` e
+  `reconectar_sugestoes_*`.
+
+**O problema**
+Aberto pelo celular em `192.168.1.5:8090`, o site vinha **sem CSS nenhum** —
+HTML cru, links roxos, imagens quebradas. `wp core install --url` gravara
+`home` e `siteurl` como `http://localhost:8090`: o HTML saía do servidor, mas
+todo asset vinha carimbado com `localhost`, que no celular é o próprio celular.
+
+O segundo sintoma relatado — a barra inferior não aparecer no rodapé — era
+**consequência** deste: sem CSS, `position: fixed` não existe. Medida a barra
+com emulação de dispositivo, `antes: 3191, depois: 3191` após rolar, ou seja, o
+`fixed` funciona; o que engana é o navegador embutido, que aplica a media query
+no tamanho emulado (`clientWidth: 375`) mas ancora o `fixed` no viewport real da
+janela (`innerHeight: 3248`).
+
+**Decisões técnicas**
+- **Constante, não filtro.** `wp-settings.php` congela `WP_CONTENT_URL` e
+  `WP_PLUGIN_URL` em `wp_plugin_directory_constants()`, que roda antes de
+  incluir os mu-plugins. Um filtro `option_siteurl` chegaria tarde e deixaria
+  justamente o CSS do tema e o do plugin presos ao host antigo.
+- **Allowlist, não `Host` cru.** A plataforma envia link de definição de senha
+  no cadastro de loja; um `Host` forjado sairia dentro dele. Passam `localhost`,
+  o loopback e os três blocos privados.
+- **Bloco delimitado, não `wp config set`.** O `wp-config-transformer` não
+  enxerga definição cujo valor é expressão: `wp config delete WP_SITEURL`
+  responde "is not defined" com a linha no arquivo. O comando então acrescentava
+  uma linha nova a cada provisionamento, até o PHP avisar "Constant already
+  defined" — e aviso antes de redirect cancela a ação. Descoberto na segunda
+  execução, não na primeira.
+- **Caminho relativo nas gravações novas**, mais um script de reparo para a
+  instalação antiga, que passa pelas guardas de idempotência e nunca seria
+  reescrita.
+
+**Verificação**
+- Pelos dois hosts, 228 URLs cada, todas do host da requisição; zero vazamento
+  entre eles. 14 arquivos CSS testados pelo IP, todos 200.
+- `Host: evil.example.com:8090` → **zero** ocorrências do host forjado no corpo;
+  as 228 URLs saem no padrão. (Um `Host` desconhecido sem porta ainda recebe 301
+  de `redirect_canonical()`, do núcleo — não reflete nada no corpo.)
+- `./scripts/verificar-acessos.sh`: 59 casos, nenhuma falha.
+- `docker compose run --rm demo` rodado de novo: "bloco já estava em dia",
+  "0 item(ns) de menu, 0 widget(s)", tudo "já existia".
+
+- Menu principal conferido item a item: os seis continuam gravados (`Início`,
+  `Lojas`, `Comunidade`, `Transparência`, `Minha Conta`, `Fórum`). Os dois que
+  não saem no HTML para visitante deslogado são `Comunidade` e `Fórum`, que
+  `ocultar_itens_da_comunidade()` esconde por permissão. `Início` e `Fórum`
+  passaram a guardar caminho (`/` e `/forums/`); os demais são `post_type` e
+  resolvem o permalink na hora, acompanhando o host sozinhos.
+
+---
+
+## 2026-09-25 — A barra inferior sumia só na home
+
+**O relato**
+
+A barra de navegação do celular aparecia em todas as páginas menos numa: a
+home. O usuário fechou o cerco sozinho — **removendo as `<section>` com
+`data-rc-carrossel`, a barra voltava**. Foi esse teste que deu a causa; as duas
+hipóteses anteriores, minhas, estavam erradas.
+
+**A causa**
+
+Um scroll container só clipa descendente **cujo containing block seja ele**.
+`.rc-carrossel__faixa` tem `overflow-x: auto`, mas era `position: static` — e os
+cards trazem `span.screen-reader-text`, que o WordPress declara
+`position: absolute`. Sem nenhum ancestral posicionado no caminho, o containing
+block desses spans era o **viewport**: eles ficavam em coordenada de documento,
+fora do alcance do `overflow` que deveria contê-los.
+
+Medido, um deles em **x=1645 numa tela de 375**, e a área de rolagem do
+documento em exatamente esses 1645px. Nada aparecia fora de lugar — os spans
+têm 1px e `clip-path: inset(50%)` — e o carrossel rolava certo. O que quebrava
+era outra coisa, três seções abaixo: com o documento rolando na horizontal sob
+o `overflow-x: hidden` que o Storefront propaga do `<body>` para o viewport,
+`position: fixed` deixa de acompanhar a tela.
+
+**A correção**
+
+`position: relative` em `.rc-carrossel__faixa` e em `.rc-filtros__lista`, os
+dois scroll containers horizontais do tema. Não posiciona nada: faz deles o
+containing block do que carregam.
+
+**O caminho errado, registrado porque custou uma rodada**
+
+Antes disto a barra foi movida para fora de `#page`, com a justificativa de que
+`.site { overflow-x: hidden }` do Storefront a transformava em scroll container
+(`overflow` computado `hidden auto`, o que é verdade) e de que `fixed` dentro
+dele seria o defeito. Não era: o Chrome de mesa não reproduzia nada, e um
+`fixed` dentro e outro fora do `#page` paravam no mesmo pixel. A chamada ficou
+onde está — é a posição defensável de um componente fixo, e o lugar no DOM
+decide a ordem de tabulação —, mas o comentário no `footer.php` foi reescrito
+para não creditar a ela uma correção que não é dela.
+
+O diagnóstico que teria fechado o caso na primeira rodada é de uma linha:
+
+```js
+window.scrollTo( 600, 0 ); window.scrollX   // 0 = são; > 0 = documento rola na horizontal
+```
+
+`body.scrollWidth` **não** acusa — o `hidden` do corpo mascara, e foi por isso
+que a medição inicial passou batido. Quem acusa é o `documentElement`.
+
+**Verificação**
+
+- Home a 375px: `documentElement.scrollWidth` de 1645 para **375**, igual ao
+  `clientWidth`; `scrollTo( 600, 0 )` deixa `scrollX` em **0** (era 132).
+- Os três carrosséis continuam rolando: `scrollWidth` 568, 1348 e 1908 contra
+  343 de `clientWidth`, e `scrollLeft = 400` de fato move.
+- `/transparencia/`, `/store-listing/` e `/shop/` a 375px: sem transbordo, sem
+  rolagem horizontal, barra com quatro itens e pai `BODY`. Na listagem de lojas
+  a faixa de filtros segue rolando (832 contra 343).
+- Varredura por absoluto órfão fora da tela em `/shop/`: vazia.
+- 1280×900: `scrollWidth` igual ao `clientWidth`, barra `display: none`,
+  `padding-bottom` do corpo zerado, dois carrosséis com setas (o de categorias
+  cabe inteiro e corretamente não as recebe).
+
+---
+
+## 2026-09-25 — O cabeçalho do celular em uma linha a menos
+
+### O pedido
+
+Três ajustes, todos de celular: o carrinho não precisa do valor, só da
+contagem; a logo deve ficar na mesma linha em vez de estourar para cima; e o
+ícone de perfil é redundante, já que a barra inferior tem o mesmo destino.
+
+### O que estava acontecendo
+
+O `.rc-cabecalho__interno` media **224px de altura em 375px de largura**: a
+marca ocupava uma linha inteira sozinha, as ações outra, e a busca a terceira.
+
+A causa não era a largura da logo. Num contêiner `flex-wrap: wrap` a quebra de
+linha é decidida pelas **`flex-basis`, antes de qualquer flexão** — e as ações
+tinham base `auto`, isto é, a largura do próprio conteúdo: 285px. Somados aos
+145px da marca e aos 16px de gap, davam 446 contra 343 de largura útil, e a
+marca era empurrada para fora da linha. O `flex-shrink: 1` e o `min-width: 0`
+que já existiam no município não tinham chance de agir: a decisão de quebrar
+já estava tomada.
+
+`flex: 1 1 0` nas ações resolve — zerada a base, a linha nunca transborda e o
+encolhimento volta a acontecer onde estava previsto. Com ele veio
+`justify-content: flex-end`, porque o item passa a ocupar toda a sobra e o
+`margin-left: auto` da regra geral fica sem espaço livre para empurrar.
+
+### O efeito colateral, e o que ele custou
+
+Com os três na mesma linha, o município ficou com **42px de texto visível** —
+"Entre…" e "Todos…". Trocar um desperdício de altura por um rótulo ilegível não
+é correção.
+
+Os 135px que faltavam vieram de duas palavras que saíram do olho e ficaram no
+leitor de tela: o "itens" do carrinho (34px) e o "Entregando em" do município
+(101px). É o oposto do que se fez com o subtotal, que sumiu para todo mundo —
+e a diferença é que o subtotal continua a um toque, num link que leva ao
+carrinho, enquanto estas duas não têm para onde levar: sem a unidade, o nome
+acessível do link do carrinho seria "3"; sem o rótulo, o pin seria a única
+pista de que aquele nome é um município.
+
+A unidade exigiu separar número e palavra em dois `<span>` no PHP, no lugar do
+`_n( '%s itens' )` montado numa string só. O preço é a ordem fixa: um idioma
+que ponha a unidade antes do número não tem como invertê-la pela tradução.
+Fica registrado no comentário, para quem traduzir reabrir a decisão.
+
+### As duas técnicas de esconder, e por que não são a mesma
+
+A unidade do carrinho fica **no fluxo**, com 1px recortado por `clip-path`. A
+técnica padrão do WordPress usa `position: absolute`, e um absoluto dentro de
+contêiner estático sobe até o viewport, onde estica a área de rolagem do
+documento — foi exatamente assim que a barra inferior sumiu na home, na entrega
+anterior. O carrinho não tem ancestral posicionado.
+
+O rótulo do município sai do fluxo **porque precisa**: no fluxo, um inline-block
+de 1px gera line box com a altura do strut do bloco, e medido o gatilho
+continuava com 61px para exibir uma linha de texto. Ali o absoluto é seguro —
+`.rc-municipio` é `position: relative` desde que ganhou a lista suspensa.
+
+### Verificação
+
+| Largura | Resultado |
+| --- | --- |
+| 375 | marca, município e carrinho na mesma linha; `interno` 224 → **152px**; carrinho 88 → 55px; texto do município 42 → **91px**; `scrollWidth` = `clientWidth` = 375; `scrollX` 0 após `scrollTo(600,0)` |
+| 320 | nada transborda (320 = 320); município com 36px de texto; barra inferior visível |
+| 768 | atalho de conta e subtotal de volta; unidade visível (31px); rótulo `static` |
+| 1280 | `interno` 88px; município sem truncar; `carrinho` = "R$ 0,00 0 itens"; barra `display: none` |
+
+O `innerText` do gatilho continua trazendo "Entregando em" e o do link do
+carrinho, "0 itens": as duas palavras estão escondidas do olho e presentes na
+árvore de acessibilidade, que é o ponto.
+
+### O que fica truncado, e é honesto dizer
+
+"Todos os municípios" mede 145px e a caixa tem 91px a 375px — sai "Todos os
+mun…". Nomes de cidade reais cabem inteiros ("Arapiraca" mede 68px); os
+compostos, como "Marechal Deodoro", não. Não há como evitar sem encolher a
+logo, que já foi motivo de reclamação quando estava em 44px. A alternativa
+seria devolver o município a uma linha própria — o que anula justamente o
+ganho que o pedido pedia.
+
+---

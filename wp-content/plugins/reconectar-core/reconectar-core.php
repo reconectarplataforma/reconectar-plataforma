@@ -31,10 +31,14 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-status-pedido.php
 
 // O Administrador de Empresas opera por uma interface própria da aplicação, e
 // não pelo `/wp-admin`. Os três arquivos abaixo são essa camada: a entidade que
-// agrupa vendedores, a API que os cadastra e a rota que dá a tela.
+// agrupa lojas, a API que as cadastra e a rota que dá a tela.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-empresa.php';
-require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-vendedores.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-lojas.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-empresas.php';
+
+// Depois de `class-reconectar-empresa.php`: a migração lê as constantes de meta
+// de lá, e é a entidade que define a chave, não a migração.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-migracoes.php';
 
 // A contrapartida do arquivo acima: enquanto o Dokan deixar qualquer visitante
 // abrir uma loja por conta própria, o cadastro controlado por empresa é só uma
@@ -62,6 +66,10 @@ function reconectar_core_init() {
 	Reconectar_Proposta_Votacao::init();
 	Reconectar_Painel_Transparencia::init();
 	Reconectar_Aviso_Demo::init();
+	// Antes de `Reconectar_Permissoes`: as duas se penduram em `init`, e a
+	// migração de dados roda em prioridade menor — ver o PHPDoc de
+	// `Reconectar_Migracoes::init()`.
+	Reconectar_Migracoes::init();
 	Reconectar_Permissoes::init();
 	Reconectar_Status_Pedido::init();
 	Reconectar_Avatar_Local::init();

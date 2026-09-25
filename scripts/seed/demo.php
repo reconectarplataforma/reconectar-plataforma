@@ -38,7 +38,7 @@ defined( 'ABSPATH' ) || exit;
 
 // wp_generate_attachment_metadata() e wp_delete_user() não são carregadas em
 // contexto de CLI; sem estes require, as imagens ficam sem miniaturas e a
-// remoção de vendedores dá erro fatal.
+// remoção de lojas dá erro fatal.
 require_once ABSPATH . 'wp-admin/includes/image.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
 
@@ -76,11 +76,11 @@ const RECONECTAR_DEMO_OPCAO = 'reconectar_demo_ativo';
 const RECONECTAR_DEMO_CHAVE = '_reconectar_demo_chave';
 
 /**
- * Senha das contas de demonstração (vendedores e clientes).
+ * Senha das contas de demonstração (lojas e clientes).
  *
- * Antes desta constante os vendedores recebiam `wp_generate_password()` e a
+ * Antes desta constante as lojas recebiam `wp_generate_password()` e a
  * senha era descartada na mesma linha em que nascia: ninguém conseguia entrar
- * como vendedor, o que deixava dois dos três perfis da plataforma impossíveis
+ * como loja, o que deixava dois dos três perfis da plataforma impossíveis
  * de demonstrar. Uma senha previsível é o preço de um roteiro que qualquer
  * pessoa consiga percorrer sem pedir acesso a ninguém.
  *
@@ -497,7 +497,7 @@ function reconectar_demo_criar_subcategorias( $subcategorias, $pai_id ) {
  *
  * Os sete dias são sempre gravados, inclusive os fechados com `status` `close`.
  * Dia ausente e dia fechado dão no mesmo para `dokan_is_store_open()`, mas só o
- * dia presente aparece na tela de configuração do vendedor — e um dia que some
+ * dia presente aparece na tela de configuração da loja — e um dia que some
  * da tela parece campo perdido, não decisão da loja.
  *
  * Loja sem a chave `horario` devolve array vazio: a página não imprime linha de
@@ -594,7 +594,7 @@ function reconectar_demo_criar_empresas( $empresas ) {
 /**
  * Cria um Administrador de Empresas (papel `company_admin`).
  *
- * O papel é literal aqui, como em `Reconectar_Vendedores::criar()`: nada no
+ * O papel é literal aqui, como em `Reconectar_Lojas::criar()`: nada no
  * catálogo diz qual papel criar, e é assim que tem de ser — um campo de papel
  * em arquivo de dados é uma escalada de privilégio esperando por um descuido
  * de revisão.
@@ -661,7 +661,7 @@ function reconectar_demo_criar_admin_de_empresa( $admin, $empresas ) {
 }
 
 /**
- * Acerta o vínculo de um vendedor que já existia com a empresa do catálogo.
+ * Acerta o vínculo de uma loja que já existia com a empresa do catálogo.
  *
  * Idempotência aqui não é só "não duplicar": é convergir para o estado
  * declarado. Sem esta função, uma instalação carregada antes de as empresas
@@ -674,10 +674,10 @@ function reconectar_demo_criar_admin_de_empresa( $admin, $empresas ) {
  * catálogo apaga a meta em vez de deixar um vínculo que ninguém mais declara.
  *
  * A permissão de venda é recalculada no fim porque ela é derivada da empresa:
- * mudar o vínculo sem recalcular deixaria o vendedor vendendo sob uma empresa
+ * mudar o vínculo sem recalcular deixaria a loja vendendo sob uma empresa
  * desativada.
  *
- * @param int $usuario_id ID do vendedor.
+ * @param int $usuario_id ID da loja.
  * @param int $empresa_id Empresa declarada no catálogo; 0 para loja sem vínculo.
  * @return void
  */
@@ -700,7 +700,7 @@ function reconectar_demo_reconciliar_vinculo( $usuario_id, $empresa_id ) {
 /**
  * Grava o horário de funcionamento declarado numa loja que já existe.
  *
- * `reconectar_demo_criar_vendedor()` retorna cedo quando encontra o login, e o
+ * `reconectar_demo_criar_loja()` retorna cedo quando encontra o login, e o
  * perfil inteiro — horário incluído — só é escrito na criação. Sem esta
  * reconciliação, uma instalação já carregada nunca receberia o horário: a linha
  * "Aberta agora" simplesmente não apareceria, e o único jeito de vê-la seria
@@ -714,7 +714,7 @@ function reconectar_demo_reconciliar_vinculo( $usuario_id, $empresa_id ) {
  * regravá-lo a cada execução da carga sujaria o histórico de revisões sem
  * mudar nada.
  *
- * @param int   $usuario_id ID do vendedor.
+ * @param int   $usuario_id ID da loja.
  * @param array $horario    Horário declarado no catálogo, no formato do Dokan.
  * @return void
  */
@@ -737,11 +737,11 @@ function reconectar_demo_reconciliar_horario( $usuario_id, $horario ) {
 }
 
 /**
- * Cria um vendedor do Dokan.
+ * Cria uma loja, como usuário do papel de vendedor do Dokan.
  *
- * O cadastro em si é delegado a `Reconectar_Vendedores::criar()`, que é o
+ * O cadastro em si é delegado a `Reconectar_Lojas::criar()`, que é o
  * caminho usado pelo painel do Administrador de Empresas. A delegação é o
- * ponto: duas implementações de "criar vendedor" divergiriam em silêncio, e a
+ * ponto: duas implementações de "criar loja" divergiriam em silêncio, e a
  * carga deixaria de provar qualquer coisa sobre o código de produção. Aqui a
  * carga passa a exercitá-lo — inclusive o vínculo com a empresa e o cálculo da
  * permissão de venda.
@@ -749,18 +749,18 @@ function reconectar_demo_reconciliar_horario( $usuario_id, $horario ) {
  * Deliberadamente não usa `dokan()->vendor->create()`. Aquele método dispara
  * `wp_send_new_user_notifications( $id, 'admin' )` de forma incondicional — o
  * seed mandaria um e-mail ao administrador por loja criada — e não grava
- * `dokan_enable_selling`, sem o qual o vendedor é filtrado para fora de
+ * `dokan_enable_selling`, sem o qual a loja é filtrada para fora de
  * `get_vendors()` (`Vendor/Manager.php:170`) e nunca aparece na vitrine.
  *
  * O que sobra nesta função é o que é específico da demonstração: banner,
  * avatar, endereço, categoria da loja e as metas de entrega — nada disso existe
- * no cadastro real, onde o próprio vendedor preenche depois.
+ * no cadastro real, onde a própria loja preenche depois.
  *
  * @param array $loja       Definição da loja.
  * @param int   $empresa_id Empresa a que a loja pertence; 0 para loja sem vínculo.
  * @return int ID do usuário, ou 0 em caso de falha.
  */
-function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
+function reconectar_demo_criar_loja( $loja, $empresa_id = 0 ) {
 	$existente = get_user_by( 'login', $loja['login'] );
 
 	$horario = reconectar_demo_horario_do_dokan( isset( $loja['horario'] ) ? $loja['horario'] : array() );
@@ -773,7 +773,7 @@ function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
 		return (int) $existente->ID;
 	}
 
-	$resultado = Reconectar_Vendedores::criar(
+	$resultado = Reconectar_Lojas::criar(
 		array(
 			'login'      => $loja['login'],
 			'email'      => $loja['email'],
@@ -822,7 +822,7 @@ function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
 	);
 
 	/*
-	 * Completa o perfil que `Reconectar_Vendedores::criar()` já deixou gravado.
+	 * Completa o perfil que `Reconectar_Lojas::criar()` já deixou gravado.
 	 * As chaves abaixo repetem de propósito as que vieram de lá: o array é
 	 * gravado inteiro em uma meta só, e montá-lo por diferença tornaria este
 	 * trecho dependente da ordem interna daquela função.
@@ -864,9 +864,9 @@ function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
 	update_user_meta( $usuario_id, RECONECTAR_DEMO_META, 1 );
 
 	// `dokan_enable_selling` não é gravado aqui de propósito. Ele é resultado da
-	// conjunção entre o estado da empresa e o do vendedor, e quem o calcula é
+	// conjunção entre o estado da empresa e o da loja, e quem o calcula é
 	// `Reconectar_Empresa::aplicar_permissao_de_venda()`, já chamada no cadastro.
-	// Escrever 'yes' à mão neste ponto faria a carga criar em operação um vendedor
+	// Escrever 'yes' à mão neste ponto faria a carga criar em operação uma loja
 	// de empresa desativada — e o defeito só apareceria no dia em que o catálogo
 	// tivesse uma empresa inativa.
 
@@ -890,7 +890,7 @@ function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
 }
 
 /**
- * Cria um produto atribuído a um vendedor.
+ * Cria um produto atribuído a uma loja.
  *
  * Usa a CRUD do WooCommerce em vez de `wp_insert_post()` direto porque é ela
  * que popula as lookup tables (`wc_product_meta_lookup`) das quais dependem a
@@ -905,12 +905,12 @@ function reconectar_demo_criar_vendedor( $loja, $empresa_id = 0 ) {
  * subcategoria mudaria em silêncio a categoria exibida no card da loja.
  *
  * @param array $produto    Definição do produto.
- * @param int   $vendedor   ID do usuário vendedor.
+ * @param int   $loja_id    ID do usuário da loja.
  * @param array $categorias term_ids a atribuir ao produto.
  * @param array $loja       Definição da loja (para cor e nome).
  * @return int ID do produto, ou 0 em caso de falha.
  */
-function reconectar_demo_criar_produto( $produto, $vendedor, $categorias, $loja ) {
+function reconectar_demo_criar_produto( $produto, $loja_id, $categorias, $loja ) {
 	$slug      = sanitize_title( $produto['nome'] );
 	$existente = get_page_by_path( $slug, OBJECT, 'product' );
 
@@ -972,7 +972,7 @@ function reconectar_demo_criar_produto( $produto, $vendedor, $categorias, $loja 
 	wp_update_post(
 		array(
 			'ID'          => $produto_id,
-			'post_author' => $vendedor,
+			'post_author' => $loja_id,
 		)
 	);
 
@@ -1005,7 +1005,7 @@ function reconectar_demo_criar_produto( $produto, $vendedor, $categorias, $loja 
 /**
  * Cria uma avaliação aprovada em um produto.
  *
- * A nota exibida no card da loja não é um campo do vendedor: o Dokan a calcula
+ * A nota exibida no card da loja não é um campo da loja: o Dokan a calcula
  * em `Vendor::get_rating()` com um AVG sobre a meta `rating` dos comentários
  * aprovados dos produtos daquele autor. Sem avaliações, `get_rating()` devolve
  * count 0 e o card imprime "No ratings found yet!" em vez da nota.
@@ -1209,7 +1209,7 @@ function reconectar_demo_localizar_pedido( $chave, $cliente_id ) {
  * O efeito não aparece em lugar nenhum da carga, e sim nos painéis:
  * `Vendor::get_earnings()` soma apenas as linhas cujo status está entre os de
  * saque (`dokan_withdraw_get_active_order_status_in_comma()`). Status vazio não
- * casa com nenhum, então o faturamento de todo vendedor era R$ 0,00 — no painel
+ * casa com nenhum, então o faturamento de toda loja era R$ 0,00 — no painel
  * do vendedor e no painel de empresas, que lê da mesma fonte. Oito pedidos pagos
  * no banco, zero em toda tela que os resume.
  *
@@ -1869,8 +1869,8 @@ function reconectar_demo_instalar( $dados ) {
 	reconectar_demo_log( 'Criando categorias...' );
 	$categorias = reconectar_demo_criar_categorias( $dados['categorias'] );
 
-	// As empresas vêm antes das lojas porque o vínculo é gravado no cadastro do
-	// vendedor, e não depois: é `Reconectar_Vendedores::criar()` que o grava, e
+	// As empresas vêm antes das lojas porque o vínculo é gravado no cadastro da
+	// loja, e não depois: é `Reconectar_Lojas::criar()` que o grava, e
 	// ele precisa do ID da empresa já existente.
 	reconectar_demo_log( 'Criando empresas...' );
 	$empresas = reconectar_demo_criar_empresas( $dados['empresas'] );
@@ -1896,9 +1896,9 @@ function reconectar_demo_instalar( $dados ) {
 			? $empresas[ $loja['empresa'] ]
 			: 0;
 
-		$vendedor_id = reconectar_demo_criar_vendedor( $loja, $empresa_id );
+		$loja_id = reconectar_demo_criar_loja( $loja, $empresa_id );
 
-		if ( ! $vendedor_id ) {
+		if ( ! $loja_id ) {
 			continue;
 		}
 
@@ -1922,7 +1922,7 @@ function reconectar_demo_instalar( $dados ) {
 
 			$produto_id = reconectar_demo_criar_produto(
 				$produto,
-				$vendedor_id,
+				$loja_id,
 				array( $categoria_id, $subcategoria_id ),
 				$loja
 			);
@@ -1997,7 +1997,7 @@ function reconectar_demo_instalar( $dados ) {
 		}
 	}
 
-	// O fórum vem por último porque depende dos usuários: vendedores e
+	// O fórum vem por último porque depende dos usuários: lojas e
 	// administradores de empresa assinam as perguntas e são os votantes.
 	reconectar_demo_log( 'Criando fórum...' );
 	$forum = reconectar_demo_criar_forum( $dados['forum'] );
@@ -2031,7 +2031,7 @@ function reconectar_demo_instalar( $dados ) {
 		)
 	);
 	reconectar_demo_log( 'A faixa de aviso de dados de demonstração está ativa no site.' );
-	reconectar_demo_log( 'Senha de vendedores, clientes e administradores de empresas: ' . RECONECTAR_DEMO_SENHA );
+	reconectar_demo_log( 'Senha de lojas, clientes e administradores de empresas: ' . RECONECTAR_DEMO_SENHA );
 	reconectar_demo_log( 'Para remover: wp eval-file scripts/seed/demo.php remover' );
 }
 
@@ -2128,7 +2128,7 @@ function reconectar_demo_limpar_tabelas_dokan() {
  * Remove tudo que o seed criou.
  *
  * A ordem importa. Os IDs de banner e avatar ficam guardados dentro do array
- * `dokan_profile_settings` de cada vendedor; se os anexos forem apagados antes
+ * `dokan_profile_settings` de cada loja; se os anexos forem apagados antes
  * que essas chaves sejam limpas, o perfil fica apontando para anexos
  * inexistentes — e como o usuário é apagado logo depois, o problema sumiria
  * aqui, mas não numa remoção parcial interrompida no meio. Limpar primeiro
@@ -2145,7 +2145,7 @@ function reconectar_demo_remover() {
 	// notificação, e ninguém precisa ser avisado de que a demonstração acabou.
 	add_filter( 'pre_wp_mail', '__return_false' );
 
-	// A consulta alcança vendedores e clientes: ambos recebem a mesma meta na
+	// A consulta alcança lojas e clientes: ambos recebem a mesma meta na
 	// criação, e ambos precisam sair juntos.
 	$usuarios = get_users(
 		array(
@@ -2320,15 +2320,15 @@ function reconectar_demo_remover() {
 	}
 
 	// Limpa as referências a anexos guardadas no perfil de cada loja. Clientes
-	// entram no laço e saem sem alteração: não têm perfil de vendedor, e o
+	// entram no laço e saem sem alteração: não têm perfil de loja, e o
 	// `is_array()` abaixo dá conta disso sem precisar separar as duas listas.
-	foreach ( $usuarios as $vendedor_id ) {
-		$perfil = get_user_meta( $vendedor_id, 'dokan_profile_settings', true );
+	foreach ( $usuarios as $loja_id ) {
+		$perfil = get_user_meta( $loja_id, 'dokan_profile_settings', true );
 
 		if ( is_array( $perfil ) ) {
 			$perfil['banner']   = 0;
 			$perfil['gravatar'] = 0;
-			update_user_meta( $vendedor_id, 'dokan_profile_settings', $perfil );
+			update_user_meta( $loja_id, 'dokan_profile_settings', $perfil );
 		}
 	}
 
@@ -2354,9 +2354,9 @@ function reconectar_demo_remover() {
 	reconectar_demo_log( sprintf( '- %d usuários removidos (lojas, clientes e administradores de empresas).', count( $usuarios ) ) );
 
 	/*
-	 * Empresas depois dos usuários, e não antes: o vínculo mora no vendedor e
+	 * Empresas depois dos usuários, e não antes: o vínculo mora na loja e
 	 * aponta para a empresa. Invertendo a ordem, existiria uma janela — toda a
-	 * duração da remoção — em que vendedores apontariam para um post apagado, e
+	 * duração da remoção — em que lojas apontariam para um post apagado, e
 	 * uma interrupção no meio deixaria esse estado gravado.
 	 *
 	 * O recorte é a marcação da carga, como em todo o resto: uma empresa
@@ -2430,12 +2430,12 @@ if ( ! class_exists( 'WooCommerce' ) ) {
 	reconectar_demo_abortar( 'O WooCommerce precisa estar ativo para rodar o seed.' );
 }
 
-// A carga delega o cadastro de vendedores e de empresas ao Reconectar Core.
-// Sem ele não há caminho de produção a exercitar, e uma carga que criasse os
-// vendedores por conta própria voltaria a divergir do código real — que é o
+// A carga delega o cadastro de lojas e de empresas ao Reconectar Core.
+// Sem ele não há caminho de produção a exercitar, e uma carga que criasse as
+// lojas por conta própria voltaria a divergir do código real — que é o
 // defeito que a delegação existe para impedir. Abortar cedo, com a causa dita,
 // é melhor que um fatal de classe inexistente no meio da criação das lojas.
-if ( ! class_exists( 'Reconectar_Empresa' ) || ! class_exists( 'Reconectar_Vendedores' ) ) {
+if ( ! class_exists( 'Reconectar_Empresa' ) || ! class_exists( 'Reconectar_Lojas' ) ) {
 	reconectar_demo_abortar( 'O plugin Reconectar Core precisa estar ativo para rodar o seed.' );
 }
 

@@ -35,7 +35,11 @@ function reconectar_home_categorias() {
 		array(
 			'id'     => 'rc-categorias',
 			'titulo' => __( 'Explore por categoria', 'reconectar' ),
-			'link'   => reconectar_url_loja(),
+			// `reconectar_url_loja()` estava aqui e levava ao catálogo de
+			// produtos: o "Ver todos" de uma faixa de **categorias** entregava
+			// uma lista de itens à venda. A faixa mostra 14 de primeiro nível, e
+			// quem clica quer justamente as que não couberam nela.
+			'link'   => reconectar_url_das_categorias(),
 			'classe' => 'rc-carrossel__faixa--categorias',
 		)
 	);
@@ -46,4 +50,4 @@ function reconectar_home_categorias() {
 
 	reconectar_fechar_carrossel();
 }
-add_action( 'reconectar_home', 'reconectar_home_categorias', 20 );
+add_action( 'reconectar_home', 'reconectar_home_categorias', 10 );

@@ -41,14 +41,18 @@ numa demonstração.
 | Admin. de Empresas — Nosso Chão | `demo-admin-nosso-chao` | `reconectar-demo` |
 | Admin. de Empresas — Bem Viver | `demo-admin-bem-viver` | `reconectar-demo` |
 | Admin. de Empresas — as duas | `demo-admin-rede` | `reconectar-demo` |
-| Vendedor — Sabor da Terra | `demo-sabor-da-terra` | `reconectar-demo` |
-| Vendedor — Ateliê Raízes | `demo-atelie-raizes` | `reconectar-demo` |
-| Vendedor — Moda Reconecta | `demo-moda-reconecta` | `reconectar-demo` |
-| Vendedor — Casa Viva | `demo-casa-viva` | `reconectar-demo` |
-| Vendedor — Bem Viver Natural | `demo-bem-viver` | `reconectar-demo` |
+| Loja — Sabor da Terra | `demo-sabor-da-terra` | `reconectar-demo` |
+| Loja — Ateliê Raízes | `demo-atelie-raizes` | `reconectar-demo` |
+| Loja — Moda Reconecta | `demo-moda-reconecta` | `reconectar-demo` |
+| Loja — Casa Viva | `demo-casa-viva` | `reconectar-demo` |
+| Loja — Bem Viver Natural | `demo-bem-viver` | `reconectar-demo` |
 | Cliente — Ana | `demo-cliente-ana` | `reconectar-demo` |
 | Cliente — João | `demo-cliente-joao` | `reconectar-demo` |
 | Cliente — Marina | `demo-cliente-marina` | `reconectar-demo` |
+
+As cinco contas de loja têm o papel `seller` do Dokan — é por isso que o
+Roteiro 2, que demonstra o painel do plugin, continua se chamando "Vendedor". No
+painel de empresas as mesmas contas aparecem como **Lojas**.
 
 Cinco lojas, três produtos cada. Três clientes, seis pedidos cobrindo o fluxo
 inteiro. As cinco lojas estão distribuídas em duas empresas:
@@ -290,8 +294,14 @@ plugins.
 **Duração:** ~10 min
 
 Quem administra a operação não necessariamente administra a tecnologia. Este
-perfil cadastra empresas e vendedores, acompanha a operação das lojas sob sua
+perfil cadastra empresas e lojas, acompanha a operação das lojas sob sua
 gestão — e **não tem acesso ao `/wp-admin`**.
+
+> **Duas palavras para a mesma conta.** Deste roteiro em diante, o painel de
+> empresas chama de **Loja** a conta que o WordPress registra com o papel
+> `seller`: a empresa é a Reconectar Incubadora Digital, e cada loja é um
+> negócio que ela cadastra. O Roteiro 2 continua dizendo "Vendedor" porque
+> descreve o painel do **Dokan**, onde o nome vem de fora.
 
 ### 3.1 O painel
 
@@ -306,22 +316,44 @@ quem é vendedor: concedê-la ao Administrador de Empresas o transformaria em
 lojista aos olhos do Dokan e o faria herdar em silêncio tudo que o plugin
 liberar no futuro. Por isso a rota é nossa.
 
+À esquerda há um **menu de duas seções** — Empresas e Lojas —, com o "Sair" no
+rodapé dele. O menu marca a seção corrente com `aria-current="page"`, e em tela
+estreita vira faixa horizontal rolável acima do conteúdo: não é um `<details>`
+que abriria sozinho no celular.
+
 Na listagem, Teresa vê **uma empresa**: a Cooperativa Nosso Chão. A Rede Bem
 Viver existe, tem lojas e pedidos, e não aparece.
+
+No topo, três contagens: **Empresas**, **Lojas** e **Lojas em operação**. As
+três saem de consulta ao escopo dela, no carregamento. Não há faturamento
+agregado ali de propósito — somá-lo exigiria percorrer os ganhos de cada loja a
+cada abertura da tela, e um número estimado para preencher o espaço seria pior
+que espaço nenhum.
+
+### 3.1.1 A listagem de lojas
+
+**Menu → Lojas**, ou `/painel-empresas/loja/`. Todas as lojas no escopo, de
+todas as empresas que Teresa administra, com a empresa de cada uma, os produtos
+publicados, os ganhos liberados e a situação. É o mesmo recorte da ficha da
+empresa, visto pelo outro eixo: por loja em vez de por empresa.
+
+Não há botão de cadastrar nesta tela, e a ausência é deliberada: uma loja nasce
+vinculada a uma empresa, e o caminho de criação passa pela ficha dela — que é
+onde o vínculo é conhecido.
 
 ### 3.2 A ficha da empresa
 
 Abra a Cooperativa Nosso Chão. A tela reúne:
 
 - os dados cadastrais — CNPJ, razão social, contato, município, responsável;
-- os **três vendedores** da empresa, com produtos publicados, ganhos liberados
+- as **três lojas** da empresa, com produtos publicados, ganhos liberados
   e situação;
 - o botão de desativar a empresa inteira.
 
 > A coluna chama-se **"Ganhos liberados"**, e não "Faturamento", porque é isso
 > que o número é: o Dokan só soma os pedidos concluídos, descontadas as
 > devoluções. Pedido em preparação ou a caminho ainda não entra na conta. É o
-> mesmo número que o vendedor vê no painel dele — os dois painéis leem a mesma
+> mesmo número que a loja vê no painel do Dokan — os dois painéis leem a mesma
 > fonte, e um rótulo que prometesse o total vendido estaria mentindo sobre um
 > dado correto.
 
@@ -329,14 +361,14 @@ Na carga de demonstração, só a Sabor da Terra tem pedido concluído: **R$
 79,80**. Os outros dois mostram R$ 0,00, com pedidos em andamento visíveis logo
 abaixo. A diferença entre as duas colunas é a demonstração.
 
-### 3.3 A ficha do vendedor
+### 3.3 A ficha da loja
 
 Clique em **Sabor da Terra**. A ficha mostra dados de contato, os produtos com
 preço e estoque, os pedidos recentes e os ganhos liberados.
 
 Tente editar um produto: **não há como**. Não é botão escondido — o alcance
-decidido para este ator é **consulta**. Ele acompanha a operação, o vendedor a
-conduz.
+decidido para este ator é **consulta**. Ele acompanha a operação, quem conduz a
+loja é ela mesma, pelo painel do Dokan.
 
 ### 3.4 Cadastrar uma empresa
 
@@ -347,44 +379,47 @@ A empresa nova aparece na listagem **dele** — quem cria entra no próprio
 escopo. Sem isso, o administrador cadastraria uma empresa e perderia o acesso a
 ela no mesmo clique.
 
-### 3.5 Cadastrar um vendedor
+### 3.5 Cadastrar uma loja
 
-Na ficha da empresa, **Novo vendedor**. Preencha nome da loja, login, e-mail e
+Na ficha da empresa, **Nova loja**. Preencha nome da loja, login, e-mail e
 contato. Salve.
 
 A tela devolve um **link de definição de senha**, com o aviso de que ele aparece
 uma única vez:
 
-> Repasse este link ao vendedor. Ele aparece uma única vez e expira como
-> qualquer link de redefinição de senha do WordPress.
+> Repasse este link à pessoa responsável pela loja. Ele aparece uma única vez e
+> expira como qualquer link de redefinição de senha do WordPress.
+
+O link define a senha de **uma pessoa**, e é por isso que a frase não diz
+"repasse à loja": loja não recebe link nenhum.
 
 Nenhum e-mail é enviado — os endereços da demonstração são `@exemplo.invalid` e
 não há SMTP nesta instalação. A interface diz o que de fato aconteceu; anunciar
 "e-mail enviado" quando nada saiu é o tipo de mentira que só se descobre quando
-o vendedor liga perguntando pela senha.
+a pessoa liga perguntando pela senha.
 
-O vendedor criado é um `seller` comum, com loja Dokan própria. O papel é
+A conta criada é um `seller` comum, com loja Dokan própria. O papel é
 **literal no código**, nunca lido do formulário: é essa linha que impede um POST
 forjado de criar um administrador.
 
 ### 3.6 A cascata da desativação
 
-O teste que separa uma trava correta de uma plausível. Na ficha de um vendedor
-— digamos o Ateliê Raízes — clique em **desativar**. Ele sai de operação; os
-outros dois continuam vendendo.
+O teste que separa uma trava correta de uma plausível. Na ficha de uma loja
+— digamos o Ateliê Raízes — clique em **desativar**. Ela sai de operação; as
+outras duas continuam vendendo.
 
 Agora desative a **empresa inteira**. Os três saem de operação.
 
 Reative a empresa. E confira:
 
-| Vendedor | Estado individual | Depois de reativar a empresa |
+| Loja | Estado individual | Depois de reativar a empresa |
 | --- | --- | --- |
 | Sabor da Terra | ativo | **voltou a vender** |
 | Ateliê Raízes | desativado no passo anterior | **continua fora de operação** |
 | Moda Reconecta | ativo | **voltou a vender** |
 
-Reativar a empresa **não liga todo mundo**: cada vendedor volta ao estado que
-era dele. O estado individual e o estado da empresa são duas informações
+Reativar a empresa **não liga todo mundo**: cada loja volta ao estado que
+era dela. O estado individual e o estado da empresa são duas informações
 distintas, e o que vale na loja é a conjunção das duas.
 
 ### 3.7 O isolamento entre empresas
@@ -408,6 +443,7 @@ sessões é uma capacidade, não uma tela.
 | URL | Resultado medido |
 | --- | --- |
 | `/painel-empresas/` | `200` |
+| `/painel-empresas/loja/` | `200` |
 | `/painel-empresas/empresa/<Nosso Chão>/` | `200` |
 | `/painel-empresas/empresa/<Bem Viver>/` | `403` |
 | `/comunidade/` | `200` |
@@ -416,8 +452,9 @@ sessões é uma capacidade, não uma tela.
 | `/wp-admin/users.php` | `302` |
 | `/dashboard/` | `302` — não é vendedor |
 
-E o `/painel-empresas/` responde **403** para o cliente e para o vendedor:
-vender não é administrar a empresa.
+E o `/painel-empresas/` responde **403** para o cliente e para quem toca uma
+loja: vender não é administrar a empresa. Vale também para a listagem de lojas —
+`/painel-empresas/loja/` é do painel gerencial, e uma loja não lista as outras.
 
 As capacidades por trás disso, sem passar por URL nenhuma:
 
@@ -449,10 +486,10 @@ Entre em http://localhost:8090/wp-admin/.
 | Onde | O que confirmar |
 | --- | --- |
 | **Produtos** | os 15 da plataforma, de todas as lojas |
-| **WooCommerce → Pedidos** | todos os pedidos, de todos os vendedores |
-| **Dokan → Vendedores** | as 5 lojas |
-| **Empresas** | as 2 empresas, com seus vendedores vinculados |
-| **Usuários** | admin, 3 administradores de empresa, 5 vendedores, 3 clientes |
+| **WooCommerce → Pedidos** | todos os pedidos, de todas as lojas |
+| **Dokan → Vendedores** | as 5 lojas — o menu é do plugin, e o nome vem com ele |
+| **Empresas** | as 2 empresas, com suas lojas vinculadas |
+| **Usuários** | admin, 3 administradores de empresa, 5 contas de loja, 3 clientes |
 
 O contraste com os roteiros 2 e 3 é o ponto: o vendedor via 3 produtos, Teresa
 via as 3 lojas de uma empresa, o administrador vê os 15 produtos e as duas
@@ -502,7 +539,7 @@ novo conceder essa capacidade ao vendedor, tudo cai — sem erro e sem aviso.
 
 O `company_admin` tem **seis** capacidades: `read`, as quatro do painel de
 empresas e a da comunidade. O número pequeno é a demonstração — ele administra
-empresas e vendedores sem uma única capacidade nativa de administração do
+empresas e lojas sem uma única capacidade nativa de administração do
 WordPress. `reconectar_gerir_todas_as_empresas` fica **fora** do papel de
 propósito: é concedida usuário a usuário, como acontece com a Clara. Alcance
 múltiplo é decisão de quem administra, não característica do cargo.
@@ -552,8 +589,8 @@ As travas de acesso têm verificação automática:
 ```
 
 Faz login de verdade nos quatro perfis, bate em cada URL restrita e compara o
-código HTTP com o esperado — incluindo o isolamento entre vendedores e entre
-empresas, nas duas direções, e a escrita no fórum. São 54 casos; o script sai
+código HTTP com o esperado — incluindo o isolamento entre lojas e entre
+empresas, nas duas direções, e a escrita no fórum. São 59 casos; o script sai
 com status 1 se algum falhar. Rode antes de apresentar.
 
 Isso cobre os itens 3, 4, 7, 8, 9, 12, 15, 16, 17 e 20 da tabela abaixo. O
@@ -577,8 +614,8 @@ restante é visual e precisa de olho humano:
 | 14 | Admin de Empresas opera fora do `/wp-admin` | `/painel-empresas/` no visual do tema |
 | 15 | Admin de Empresas isolado por empresa | 403 na empresa alheia |
 | 16 | Alcance múltiplo é capacidade, não papel | `demo-admin-rede` vê as duas |
-| 17 | Vendedor e cliente fora do painel de empresas | 403 em `/painel-empresas/` |
-| 18 | Cadastro de vendedor com link de senha | link exibido uma única vez |
+| 17 | Vendedor e cliente fora do painel de empresas | 403 em `/painel-empresas/` e em `/painel-empresas/loja/` |
+| 18 | Cadastro de loja com link de senha | link exibido uma única vez |
 | 19 | Cascata de desativação preserva o individual | seção 3.6 |
 | 20 | Cliente não escreve no fórum | `publish_topics` negada, seção 2.7 |
 | 21 | Fórum ordena de verdade pelas três abas | Votos põe a de saldo 5 no topo |
@@ -612,9 +649,11 @@ em janela anônima, ou faça logout de verdade.
 **Um pedido ou produto some.** Os IDs mudam a cada recarga. Identifique pelo
 cliente, status e valor.
 
-**`/painel-empresas/empresa/<id>/` dá 404.** As subrotas são endpoints de
-rewrite e só existem depois que as regras são regravadas. O provisionamento faz
-isso no fim; fora dele:
+**`/painel-empresas/empresa/<id>/` ou `/painel-empresas/loja/` dá 404.** As
+subrotas são endpoints de rewrite e só existem depois que as regras são
+regravadas. Vale também para quem atualizou o código de uma versão anterior: o
+endpoint chamava-se `vendedor` e passou a ser `loja`. O provisionamento regrava
+no fim; fora dele:
 
 ```bash
 docker compose run --rm wpcli wp rewrite flush

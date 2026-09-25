@@ -28,4 +28,4 @@ function reconectar_home_lojas() {
 		)
 	);
 }
-add_action( 'reconectar_home', 'reconectar_home_lojas', 45 );
+add_action( 'reconectar_home', 'reconectar_home_lojas', 40 );

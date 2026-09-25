@@ -100,8 +100,14 @@ function reconectar_responder_sugestoes( WP_REST_Request $requisicao ) {
 	 * produto esgotado ou loja desativada precisam sumir da sugestão sem
 	 * esperar. Cinco minutos cobrem a rajada de teclas de uma mesma busca, que
 	 * é o caso que realmente pesa.
+	 *
+	 * O host entra na chave porque a resposta carrega URL absoluta de produto,
+	 * de loja e de miniatura, e a mesma instalação responde por `localhost:8090`
+	 * e pelo IP da máquina na rede — `WP_HOME` é calculada a partir do `Host` da
+	 * requisição. Sem isso, quem abrisse pelo celular receberia sugestões
+	 * apontando para `localhost`, que no celular é o próprio celular.
 	 */
-	$chave = 'reconectar_sugestoes_' . md5( mb_strtolower( $termo ) );
+	$chave = 'reconectar_sugestoes_' . md5( mb_strtolower( $termo ) . home_url() );
 	$cache = get_transient( $chave );
 
 	if ( is_array( $cache ) ) {

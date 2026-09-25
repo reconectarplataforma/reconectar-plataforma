@@ -68,9 +68,9 @@ return array(
 	/*
 	 * Empresas (CPT `reconectar_empresa`).
 	 *
-	 * Cada empresa agrupa vendedores. A distribuição reproduz de propósito o
-	 * exemplo da especificação — uma empresa com três vendedores e outra com
-	 * dois —, porque é dela que o roteiro de demonstração precisa: sem duas
+	 * Cada empresa agrupa lojas. A distribuição reproduz de propósito o
+	 * exemplo da especificação — uma empresa com três lojas e outra com
+	 * duas —, porque é dela que o roteiro de demonstração precisa: sem duas
 	 * empresas povoadas não há como mostrar o isolamento, que é a regra de
 	 * negócio central deste ator.
 	 *
@@ -152,7 +152,7 @@ return array(
 	 *
 	 * `empresa` casa com o slug de uma das empresas acima e é o que coloca a
 	 * loja sob a gestão de um Administrador de Empresas. Uma loja sem este
-	 * campo continua funcionando como vendedor independente — o vínculo é
+	 * campo continua funcionando como loja independente — o vínculo é
 	 * opcional na plataforma, e a carga não o inventa onde não foi declarado.
 	 *
 	 * `categoria` casa com o slug de uma das categorias acima: é usada tanto
@@ -847,7 +847,7 @@ return array(
 	 *
 	 * As `categorias` viram fóruns do bbPress; as `perguntas`, tópicos; e cada
 	 * `respostas`, uma resposta. O `autor` é o login de um usuário que a própria
-	 * carga cria — sempre vendedor ou administrador de empresa, nunca cliente:
+	 * carga cria — sempre loja ou administrador de empresa, nunca cliente:
 	 * o fórum é restrito aos papéis da comunidade, e um cliente perguntando aqui
 	 * contradiria a regra que a demonstração existe para mostrar.
 	 *
@@ -888,7 +888,7 @@ return array(
 			),
 			array(
 				'nome'      => 'A plataforma',
-				'descricao' => 'Dúvidas sobre o painel do vendedor, cadastro de produto e pedidos.',
+				'descricao' => 'Dúvidas sobre o painel da loja, cadastro de produto e pedidos.',
 			),
 		),
 
@@ -947,7 +947,7 @@ return array(
 				'titulo'         => 'Dá para vender por peso na plataforma?',
 				'categoria'      => 'A plataforma',
 				'autor'          => 'demo-sabor-da-terra',
-				'tags'           => array( 'painel do vendedor', 'produtos' ),
+				'tags'           => array( 'painel da loja', 'produtos' ),
 				'dias'           => 12,
 				'votos'          => 3,
 				'visualizacoes'  => 97,

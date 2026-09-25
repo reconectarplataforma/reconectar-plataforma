@@ -20,9 +20,17 @@ get_header(); ?>
 			/**
 			 * Funções registradas na action `reconectar_home`.
 			 *
-			 * @hooked reconectar_home_hero                     - 10
-			 * @hooked reconectar_home_categorias               - 20
-			 * @hooked reconectar_home_comunidade_transparencia - 50
+			 * A prioridade é a posição na página, e as seis seções ocupam os
+			 * degraus de dez em dez: assim uma seção nova entra entre duas
+			 * existentes sem renumerar as outras — o que foi preciso fazer
+			 * quando a vitrine coube num 45 espremido.
+			 *
+			 * @hooked reconectar_home_categorias               - 10
+			 * @hooked reconectar_home_lojas_destaque           - 20
+			 * @hooked reconectar_home_ofertas                  - 30
+			 * @hooked reconectar_home_lojas                    - 40
+			 * @hooked reconectar_home_hero                     - 50
+			 * @hooked reconectar_home_comunidade_transparencia - 60
 			 */
 			do_action( 'reconectar_home' );
 			?>

@@ -75,6 +75,27 @@ for par in WP_DEBUG_LOG:true:1 WP_DEBUG_DISPLAY:false:; do
   fi
 done
 
+echo "== URL do site: o host de quem pede =="
+# `wp core install --url` grava `home` e `siteurl` com um endereço fixo. O HTML
+# continua saindo do servidor quando alguém abre pelo IP da máquina, mas todo
+# asset, link e miniatura vem carimbado com `localhost:8090` — e `localhost`, no
+# celular, é o próprio celular. O resultado é a página crua, sem CSS nenhum,
+# com as imagens quebradas. Parece defeito do tema e é a URL gravada no banco.
+#
+# Trocar as opções para o IP só inverte quem fica de fora, e ainda obrigaria a
+# reprovisionar a cada troca de rede, já que o endereço vem de DHCP. O bloco
+# escrito abaixo atende os dois acessos ao mesmo tempo. A razão de cada decisão
+# dele — precedência sobre as opções, constante em vez de filtro, allowlist em
+# vez de `Host` cru — está comentada no próprio bloco, que é onde alguém lendo
+# o `wp-config.php` vai precisar dela.
+#
+# O passo é um script PHP, e não três `wp config set`, porque o comando não
+# serve aqui: o `wp-config-transformer` não enxerga definição cujo valor é
+# expressão, nunca encontra a anterior e acrescenta uma linha nova a cada
+# execução. Veja o cabeçalho de `configurar-url-dinamica.php`.
+reconectar_host_padrao="${WP_URL#*://}"
+php /var/www/scripts/configurar-url-dinamica.php "$(wp config path)" "$reconectar_host_padrao"
+
 echo "== Idioma (pt_BR) =="
 wp language core is-installed pt_BR || wp language core install pt_BR
 wp site switch-language pt_BR || true
@@ -192,7 +213,7 @@ do
   fi
 done
 
-echo "== Autocadastro de vendedor (desligado) =="
+echo "== Autocadastro de loja (desligado) =="
 # Quem cadastra loja nesta plataforma é o Administrador ou o Administrador de
 # Empresas, pelo painel de empresas. As duas linhas abaixo NÃO são a trava — a
 # trava é `Reconectar_Cadastro_De_Lojas`, no plugin autoral, e ela existe
@@ -201,7 +222,7 @@ echo "== Autocadastro de vendedor (desligado) =="
 # O que se ganha aqui é coerência de tela: sem isto o site continuaria
 # oferecendo um caminho que o servidor recusa.
 if [ "$(wp option pluck dokan_appearance show_register_as_vendor 2>/dev/null || true)" = "off" ]; then
-  echo "Autocadastro de vendedor já desligado."
+  echo "Autocadastro de loja já desligado."
 else
   wp option patch update dokan_appearance show_register_as_vendor off
 fi
@@ -268,7 +289,7 @@ fi
 
 echo "== Página do Painel de Empresas =="
 # A página é a âncora da rota do Administrador de Empresas: a URL do painel é
-# resolvida a partir do slug dela, e os endpoints `empresa` e `vendedor` só
+# resolvida a partir do slug dela, e os endpoints `empresa` e `loja` só
 # funcionam sobre uma página existente. Sem esta página, o papel existe e não
 # tem para onde ir — o redirecionamento de saída do `/wp-admin` cai na conta.
 if ! wp post list --post_type=page --name=painel-empresas --field=ID | grep -q .; then
@@ -280,6 +301,21 @@ if ! wp post list --post_type=page --name=painel-empresas --field=ID | grep -q .
     --post_content="[reconectar_painel_empresas]"
 else
   echo "Página 'Painel de Empresas' já existe."
+fi
+
+echo "== Página de Categorias =="
+# Destino do "Ver todos" do carrossel de categorias da home, que antes apontava
+# para o catálogo de produtos. `reconectar_url_das_categorias()` procura a página
+# por este slug; sem ela o link volta a cair em /shop/.
+if ! wp post list --post_type=page --name=categorias --field=ID | grep -q .; then
+  wp post create \
+    --post_type=page \
+    --post_title="Categorias" \
+    --post_name=categorias \
+    --post_status=publish \
+    --post_content="[reconectar_categorias]"
+else
+  echo "Página 'Categorias' já existe."
 fi
 
 echo "== Fórum inicial (bbPress) =="
@@ -310,7 +346,15 @@ if wp menu list --fields=locations --format=csv | grep -q "primary"; then
   echo "Já existe um menu atribuído ao local 'primary', pulando."
 else
   wp menu create "Menu Principal"
-  wp menu item add-custom "menu-principal" "Início" "$WP_URL/" --position=1
+  # Caminho, não URL absoluta. `WP_HOME` varia por requisição para atender
+  # `localhost` e o IP da máquina, mas o que vai para `_menu_item_url` fica
+  # gravado como texto e não acompanha: um item nascido com `http://localhost:8090/`
+  # continuaria mandando o celular para o próprio celular. Os itens `add-post`
+  # não têm esse problema — guardam o ID e resolvem o permalink na hora.
+  #
+  # `Reconectar_Permissoes::ocultar_itens_da_comunidade()` compara só o
+  # `PHP_URL_PATH` do item, então continua reconhecendo o do fórum.
+  wp menu item add-custom "menu-principal" "Início" "/" --position=1
 
   loja_id=$(wp post list --post_type=page --name=shop --post_status=publish --field=ID)
   [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Loja" --position=2
@@ -332,7 +376,7 @@ else
   # Quem não participa da comunidade não vê este item: o filtro
   # `Reconectar_Permissoes::ocultar_itens_da_comunidade()` reconhece itens custom
   # pelo caminho da URL, além dos post types de bbPress.
-  wp menu item add-custom "menu-principal" "Fórum" "$WP_URL/forums/" --position=5
+  wp menu item add-custom "menu-principal" "Fórum" "/forums/" --position=5
 
   transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=6
@@ -352,7 +396,7 @@ if wp menu list --fields=slug --format=csv | grep -q "^menu-principal$" \
   && ! wp menu item list menu-principal --fields=url --format=csv 2>/dev/null | grep -q "/forums/"; then
   # Sem `--position`: o menu já tem ordem definida, e repetir a 5 empataria com
   # o item que a ocupa, deixando a ordem dos dois a cargo do banco.
-  wp menu item add-custom "menu-principal" "Fórum" "$WP_URL/forums/"
+  wp menu item add-custom "menu-principal" "Fórum" "/forums/"
   echo "Item 'Fórum' acrescentado ao menu principal."
 fi
 
@@ -371,12 +415,20 @@ echo "== Rodapé (widgets das três colunas) =="
 # Consultar em vez de concatenar o slug ao domínio importa porque as páginas do
 # WooCommerce são criadas com slugs em inglês e podem ser renomeadas no painel —
 # um link chumbado sobreviveria à renomeação apontando para lugar nenhum.
+#
+# O retorno é o caminho, não a URL absoluta, pela mesma razão do menu: o HTML do
+# widget fica gravado como texto no banco e não acompanha o `WP_HOME` que varia
+# por requisição. `wp post url` devolve absoluto, então a base sai fora — colhida
+# uma vez só, porque `wp eval` sobe o WordPress inteiro a cada chamada.
+reconectar_base_do_site="$(wp eval 'echo home_url();')"
+
 reconectar_url_da_pagina() {
-  local id
+  local id url
   id=$(wp post list --post_type=page --name="$1" --post_status=publish --field=ID)
 
   if [ -n "$id" ]; then
-    wp post url "$id"
+    url=$(wp post url "$id")
+    printf '%s' "${url#"$reconectar_base_do_site"}"
   fi
 }
 
@@ -424,23 +476,31 @@ fi
 if [ -n "$(wp widget list reconectar-rodape-3 --format=ids)" ]; then
   echo "Coluna 3 do rodapé já tem conteúdo."
 else
-  vendedor="$(reconectar_item_de_rodape vendor-onboarding 'Quero vender')"
-  vendedor+="$(reconectar_item_de_rodape dashboard 'Painel do vendedor')"
-  vendedor+="$(reconectar_item_de_rodape my-account 'Minha conta')"
-  vendedor+="$(reconectar_item_de_rodape my-orders 'Meus pedidos')"
+  loja="$(reconectar_item_de_rodape vendor-onboarding 'Quero vender')"
+  loja+="$(reconectar_item_de_rodape dashboard 'Painel da loja')"
+  loja+="$(reconectar_item_de_rodape my-account 'Minha conta')"
+  loja+="$(reconectar_item_de_rodape my-orders 'Meus pedidos')"
 
-  if [ -n "$vendedor" ]; then
+  if [ -n "$loja" ]; then
     wp widget add custom_html reconectar-rodape-3 \
       --title="Sua conta" \
-      --content="<ul>$vendedor</ul>"
+      --content="<ul>$loja</ul>"
   else
     echo "Nenhuma página de conta encontrada, coluna 3 fica vazia."
   fi
 fi
 
+echo "== URLs gravadas no banco =="
+# Os blocos de menu e de rodapé acima só escrevem quando encontram o lugar vazio,
+# e é isso que os torna idempotentes. O efeito colateral é que uma instalação
+# provisionada antes desta entrega nunca recebe a correção: ela já tem menu
+# atribuído e colunas preenchidas, com as URLs absolutas de `localhost:8090` que
+# o script gravava na época. Este passo alcança essas.
+wp eval-file /var/www/scripts/normalizar-urls.php
+
 echo "== Permalinks =="
 # O WordPress instala com a estrutura "plain" (?p=123), em que as URLs por
-# slug não resolvem. Isso não é cosmético: o dashboard do vendedor (Dokan) e
+# slug não resolvem. Isso não é cosmético: o dashboard da loja (Dokan) e
 # as telas do BuddyPress são servidos por rewrite rules, e sem elas caem na
 # home. O flush precisa rodar DEPOIS da ativação dos plugins e da criação das
 # páginas/fóruns, para que os CPTs de Dokan/BuddyPress/bbPress já estejam

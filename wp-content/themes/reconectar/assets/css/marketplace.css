@@ -38,6 +38,14 @@
   --rc-largura: 1200px;
   --rc-espaco: 16px;
 
+  /* Recuo lateral de quem ocupa a faixa inteira e por isso não tem o
+     `margin: auto` de `--rc-largura` para afastá-lo da borda — hoje o
+     cabeçalho e a barra inferior. É fluido porque os 16px de `--rc-espaco`
+     bastam num celular e colariam o logotipo na moldura de um monitor de
+     1920px; o teto de 40px existe para o caminho inverso, já que cada pixel de
+     recuo sai da busca, que é o item mais usado da barra. */
+  --rc-recuo-lateral: clamp(16px, 3vw, 40px);
+
   /* Escala de razão 1,125 sobre a base de 16px do documento. Os componentes
      vinham de dezesseis valores avulsos entre 0.65rem e 2rem, cada um escolhido
      na hora: o que sobrava era selo de 10,4px dentro de linha de produto de
@@ -130,13 +138,23 @@
   margin-bottom: var(--rc-espaco);
 }
 
+/* O cabeçalho saiu da régua de `--rc-largura` que divide com o conteúdo: é
+   barra de aplicativo, e barra de aplicativo ocupa a faixa inteira. O que a
+   mantém legível numa tela larga não é mais o `max-width`, é o recuo lateral.
+
+   A consequência é conhecida e aceita: acima de 1200px o logotipo passa a
+   nascer à esquerda da coluna onde o primeiro produto começa. É o desalinho
+   próprio de cabeçalho full-bleed — o mesmo dos marketplaces que servem de
+   referência aqui —, e não um resto de regra esquecida. Alinhar os dois de novo
+   significaria soltar `--rc-largura` também no conteúdo. */
 .rc-cabecalho__interno {
   align-items: center;
   display: flex;
   gap: var(--rc-espaco);
-  margin: 0 auto;
-  max-width: var(--rc-largura);
-  padding: 12px var(--rc-espaco);
+  margin: 0;
+  max-width: none;
+  padding: 12px var(--rc-recuo-lateral);
+  width: 100%;
 }
 
 .rc-cabecalho__topo {
@@ -463,6 +481,9 @@
   white-space: nowrap;
 }
 
+/* O `max-width` é rede de segurança para telas abaixo das que o edital exige:
+   não tem efeito de 320px para cima, onde os 220px do `min-width` sempre cabem
+   entre as bordas. */
 .rc-municipio__lista {
   background: var(--rc-superficie);
   border: 1px solid var(--rc-borda);
@@ -471,6 +492,7 @@
   list-style: none;
   margin: 0;
   max-height: 320px;
+  max-width: calc(100vw - 2 * var(--rc-espaco));
   min-width: 220px;
   overflow-y: auto;
   padding: 8px 0;
@@ -633,40 +655,95 @@
     max-width: none;
     order: 3;
   }
-}
 
-/* Abaixo de 560px não existe faixa que comporte marca e ações lado a lado: as
-   ações pedem 370px e a marca 100, contra 288 de largura útil em um aparelho de
-   320px. Encolher não bastaria — o município teria de sumir por inteiro. Então
-   as ações passam a ocupar uma linha própria, distribuídas nas pontas, e só ali
-   o município cede espaço com reticências.
+  /* `flex-basis: 0` é o que mantém a marca e as ações na mesma linha. Num
+     contêiner `flex-wrap: wrap` a quebra é decidida pelas **bases**, antes de
+     qualquer flexão: com base `auto`, as ações mediam 285px de conteúdo, os
+     145px da marca somavam 446 contra 343 de largura útil, e a marca era
+     empurrada para uma linha só dela. Zerada a base, a linha nunca transborda e
+     o encolhimento volta a acontecer onde já estava previsto — no município, que
+     tem `min-width: 0` e reticências.
 
-   O corte é 559px, e não os 767px do bloco acima, porque entre 560 e 767 os dois
-   blocos cabem na mesma linha com folga; aplicar a quebra em toda a faixa mobile
-   acrescentaria uma terceira linha de cabeçalho sem necessidade. */
-@media (max-width: 559px) {
+     `justify-content: flex-end` porque o item agora ocupa toda a sobra da linha:
+     o `margin-left: auto` da regra geral deixa de ter espaço livre para empurrar
+     e o carrinho descolaria da borda direita. */
   .rc-cabecalho__acoes {
-    flex: 1 1 100%;
-    justify-content: space-between;
-    margin-left: 0;
-    order: 2;
+    flex: 1 1 0;
+    justify-content: flex-end;
   }
 
-  /* Sem o recuo à esquerda o ícone do município encosta na mesma vertical do
-     logotipo, que é onde a coluna de leitura começa. */
-  .rc-municipio__gatilho {
-    padding-left: 0;
+  /* O atalho de conta sai inteiro do cabeçalho do celular, e não só do olho: a
+     barra inferior tem o mesmo destino — `reconectar_itens_da_barra_inferior()`
+     repete a regra de `reconectar_atalho_de_conta()` de propósito, para que o
+     mesmo ícone nunca leve a lugares diferentes. Dois links idênticos na mesma
+     tela é redundância para quem vê e ruído a mais para quem navega por lista de
+     links; a barra é a porta que o polegar alcança.
+
+     Os 68px que ele devolve à linha são o que permite marca e ações lado a lado
+     abaixo de 560px, onde antes as ações ocupavam uma linha própria. */
+  .rc-conta {
+    display: none;
   }
 
-  /* O rótulo da conta sai da tela mas continua na árvore de acessibilidade: é o
-     único nome acessível do link, e um `display: none` deixaria um `<a>` sem
-     nome — falha nos critérios 2.4.4 e 4.1.2 da WCAG.
-     A razão de escondê-lo é aritmética: em 320px sobram 288px úteis, e o rótulo
-     custa 48px com "Entrar" ou 83px com "Minha conta", espaço que o município
-     precisa para exibir o nome da cidade inteiro em vez de "Todos o…". Ícone sem
-     rótulo é convenção estabelecida em cabeçalho de celular; nome de cidade
-     truncado não informa nada. */
-  .rc-conta__rotulo {
+  /* Só a contagem no celular. O subtotal é o item mais largo do carrinho e o
+     menos acionável dali — quem quer o valor toca no carrinho, que é exatamente
+     para onde este link leva. Some para todo mundo, e não pela técnica de
+     `screen-reader-text`: a informação continua a um toque de distância, e
+     esconder do olho o que fica no leitor de tela cria uma assimetria que custa
+     mais do que o dado economiza. */
+  .rc-carrinho__total {
+    display: none;
+  }
+
+  /* O carrinho perde o texto de duas linhas e vira ícone com contagem ao lado:
+     empilhados, os 12px da contagem sozinha deixavam a linha de base torta em
+     relação ao município. */
+  .rc-carrinho__texto {
+    display: flex;
+    align-items: center;
+  }
+
+  .rc-carrinho__itens {
+    font-size: var(--rc-fonte-sm);
+  }
+
+  /* Duas palavras saem do olho e ficam no leitor de tela, porque o que elas
+     custam é largura de uma linha disputada por três itens: "itens" vale 34px e
+     "Entregando em" vale 101px, e são esses 135px que separam o nome do
+     município de ser legível ou virar "Todos…".
+
+     Sair do olho, aqui, é diferente do que se fez com `.rc-carrinho__total`
+     logo acima — aquele sumiu para todo mundo porque o valor continua a um
+     toque, num link que leva ao carrinho. Estes dois não têm para onde levar:
+     sem a unidade, o nome do link do carrinho seria "3"; sem o rótulo, o pin
+     seria a única pista de que aquele nome é um município. É o caso em que a
+     assimetria se paga.
+
+     As duas saem por técnicas diferentes, e a diferença não é estilo:
+
+     A unidade do carrinho fica **no fluxo**, com 1px recortado. A técnica padrão
+     do WordPress usa `position: absolute`, e um absoluto dentro de contêiner
+     estático sobe até o viewport, onde passa a esticar a área de rolagem do
+     documento — foi exatamente assim que a barra inferior sumiu na home. O
+     carrinho não tem ancestral posicionado, então 1px de caixa no fluxo custa
+     menos que a armadilha: dentro de uma linha flex ele não gera linha nenhuma.
+
+     O rótulo do município sai do fluxo **porque precisa**: no fluxo, o 1px é um
+     inline-block, e um inline-block gera line box com a altura do strut do
+     bloco — medido, o gatilho continuava com 61px de altura para exibir uma
+     linha de texto. Aqui o absoluto é seguro porque o ancestral posicionado
+     existe: `.rc-municipio` é `position: relative` desde que ganhou a lista
+     suspensa. */
+  .rc-carrinho__unidade {
+    clip-path: inset(50%);
+    display: inline-block;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .rc-municipio__rotulo {
     clip-path: inset(50%);
     height: 1px;
     overflow: hidden;
@@ -675,18 +752,130 @@
     width: 1px;
   }
 
-  /* A lista ancora pela esquerda aqui porque o gatilho mudou de lado: o
-     `space-between` acima joga o município para a extrema esquerda da linha, e
-     um menu de 220px preso pela direita passava a nascer em `left: -57px` — um
-     terço dele fora da tela, cortado pelo `overflow-x: hidden` do tema pai, sem
-     rolagem que alcançasse. O menu precisa crescer para o lado em que há
-     espaço, e do gatilho até a borda direita há 288px em 320px de viewport.
-     O `max-width` é rede de segurança para telas abaixo das que o edital exige:
-     não tem efeito de 320px para cima, onde 220px sempre cabem. */
-  .rc-municipio__lista {
+  /* Com o rótulo fora, o gatilho vira uma linha só e o padding lateral deixa de
+     ser folga para virar desconto no texto: os 16px que ele tomava são metade do
+     que a cidade ganha aqui. */
+  .rc-municipio__gatilho {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ==========================================================================
+   Barra inferior (celular)
+   ==========================================================================
+   Existe só abaixo de 768px, e o padrão é o estado escondido: uma barra fixa
+   que vazasse para o desktop cobriria o rodapé de quem nunca precisou dela.
+
+   O componente é impresso em toda página — a decisão de mostrá-lo é da folha de
+   estilo, não do PHP. Fazer o contrário significaria descobrir a largura da tela
+   no servidor, onde ela não existe, e qualquer cache de página serviria a
+   escolha errada para metade dos visitantes. */
+
+.rc-barra-inferior {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  :root {
+    /* Altura e recuo do aparelho declarados uma vez, porque dois lugares
+       precisam do mesmo número: a barra, para se desenhar, e o `<body>`, para
+       reservar o espaço que ela ocupa por cima do conteúdo. Separados, o sintoma
+       de os dois divergirem é a última linha do rodapé sumindo atrás da barra —
+       visível apenas no fim de uma página longa, que é onde ninguém testa. */
+    --rc-barra-altura: 56px;
+    --rc-barra-refugio: env(safe-area-inset-bottom, 0px);
+  }
+
+  .rc-barra-inferior {
+    background: var(--rc-superficie);
+    border-top: 1px solid var(--rc-borda);
+    bottom: 0;
+    display: block;
     left: 0;
-    max-width: calc(100vw - 2 * var(--rc-espaco));
-    right: auto;
+    padding-bottom: var(--rc-barra-refugio);
+    position: fixed;
+    right: 0;
+    /* Acima dos 20 do seletor de município e do painel de sugestões, que são o
+       teto atual deste arquivo. A barra é moldura do aplicativo: nada da página
+       deveria passar por cima dela. */
+    z-index: 30;
+  }
+
+  /* Sem isto a barra cobre o fim da página, e não há rolagem que alcance o que
+     ficou embaixo — é conteúdo perdido, não conteúdo escondido. */
+  body {
+    padding-bottom: calc(var(--rc-barra-altura) + var(--rc-barra-refugio));
+  }
+
+  /* Colunas iguais por `grid`, e não por `flex: 1`: com quatro rótulos de
+     larguras diferentes ("Início" contra "Pedidos"), o flex distribui a sobra e
+     não o total, e os ícones deixam de ficar equidistantes. */
+  .rc-barra-inferior__lista {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .rc-barra-inferior__item {
+    margin: 0;
+  }
+
+  /* A altura mínima é alvo de toque, não estética: 56px passa com folga dos
+     44px que o critério 2.5.5 da WCAG 2.1 pede, e o item inteiro é clicável —
+     não só o ícone. */
+  .rc-barra-inferior__link {
+    align-items: center;
+    color: var(--rc-texto);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    justify-content: center;
+    min-height: var(--rc-barra-altura);
+    padding: 6px 4px;
+    text-decoration: none;
+  }
+
+  /* `line-height: 0` porque o `<svg>` é inline e arrasta o espaço de descida da
+     linha junto: sem isto o ícone ganha 4px de ar embaixo e o par ícone/rótulo
+     deixa de ficar centrado na altura da barra. */
+  .rc-barra-inferior__icone {
+    display: block;
+    line-height: 0;
+  }
+
+  .rc-barra-inferior__rotulo {
+    font-size: var(--rc-fonte-2xs);
+    line-height: var(--rc-entrelinha-justa);
+  }
+
+  /* O item atual se distingue por cor **e** por peso. Só a cor reprovaria o
+     critério 1.4.1 da WCAG 2.1, que proíbe usá-la como único portador de
+     informação — e aqui a informação é em que página a pessoa está.
+
+     A cor é a institucional, não a primária. A tentação é usar o verde da marca,
+     como faz o vermelho do aplicativo que serviu de referência; mas
+     `--reconectar-cor-primaria` (#31BEB1) rende **2,30:1** sobre o branco e já
+     reprovou o critério 1.4.3 uma vez neste projeto, na faixa de categorias da
+     home. O roxo #663191 mede 8,70:1, e num rótulo de 12px — o piso da escala —
+     não há margem para arriscar. */
+  .rc-barra-inferior__link[aria-current] {
+    color: var(--reconectar-cor-institucional);
+    font-weight: 600;
+  }
+
+  /* Contorno em `--reconectar-cor-secundaria` para não se confundir com o roxo
+     do item ativo: são dois estados independentes, e o teclado pode pousar em
+     qualquer um dos quatro. O laranja mede 3,55:1 sobre o branco, acima dos 3:1
+     que o critério 1.4.11 pede de indicador não textual. O `outline-offset`
+     negativo puxa o contorno para dentro, porque a barra é a última faixa da
+     tela e um contorno externo seria cortado pela borda do aparelho. */
+  .rc-barra-inferior__link:focus-visible {
+    border-radius: var(--rc-raio);
+    outline: 2px solid var(--reconectar-cor-secundaria);
+    outline-offset: -2px;
   }
 }
 
@@ -816,6 +1005,20 @@
   line-height: 1;
 }
 
+/* `position: relative` não posiciona nada aqui: existe para fazer da faixa o
+   containing block do que está dentro dela. `overflow-x: auto` só clipa
+   descendente cujo containing block seja este elemento — e os cards trazem
+   `span.screen-reader-text`, que o WordPress declara `position: absolute`. Com
+   a faixa `static`, esses spans subiam até o viewport e ficavam nas coordenadas
+   do documento: medido, um deles em x=1645 numa tela de 375, esticando a área
+   de rolagem do documento para exatamente 1645px. O carrossel parecia certo,
+   porque o que rola é o conteúdo visível, e nenhum elemento aparecia fora de
+   lugar — os spans têm 1px e `clip-path: inset(50%)`.
+
+   O preço era a barra inferior sumir no celular. Com o documento rolando na
+   horizontal sob o `overflow-x: hidden` que o Storefront propaga do `<body>`
+   para o viewport, `position: fixed` deixa de acompanhar a tela. Medido:
+   `scrollTo(600, 0)` levava `window.scrollX` a 132 antes, e a 0 depois. */
 .rc-carrossel__faixa {
   display: grid;
   grid-auto-columns: minmax(150px, 1fr);
@@ -823,6 +1026,7 @@
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 8px;
+  position: relative;
   scroll-snap-type: x proximity;
   /* `scrollbar-width` em vez de esconder a barra por completo: em desktop sem o
      script, ela é a única pista de que a faixa rola. */
@@ -929,14 +1133,17 @@
 /* Categoria
    -------------------------------------------------------------------------- */
 
+/* O seletor era `.rc-card-categoria a`, e não casava com nada: o card **é** o
+   `<a>` — `reconectar_card_categoria()` imprime `<a class="rc-card-categoria">`
+   com dois `<span>` dentro, sem link descendente. A regra era escrita e ignorada,
+   e o nome da categoria caía no link padrão do tema, `#31BEB1`: medido, 2,30:1
+   sobre o branco do cartão, abaixo dos 4,5:1 que a WCAG 2.1 exige no critério
+   1.4.3 — em toda a faixa da home e agora também na página de categorias. */
 .rc-card-categoria {
   border: 0;
-  text-align: center;
-}
-
-.rc-card-categoria a {
   color: var(--rc-texto);
   display: block;
+  text-align: center;
   text-decoration: none;
 }
 
@@ -965,6 +1172,75 @@
   line-height: var(--rc-entrelinha-compacta);
   font-weight: 500;
   margin: 0;
+}
+
+/* Listagem completa de categorias (página `/categorias/`)
+   --------------------------------------------------------------------------
+   Os cartões são os mesmos da faixa da home, mas aqui em grade e não em fita:
+   a página existe justamente para mostrar de uma vez o que o carrossel só
+   revela rolando. A grade é `auto-fill` para que o número de colunas siga a
+   largura disponível sem media query própria — o cartão de categoria tem 80px
+   de círculo e nome curto, e 140px de trilho já o acomodam. */
+.rc-categorias__grupo {
+  margin: 0 0 32px;
+}
+
+.rc-categorias__titulo {
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 16px;
+}
+
+.rc-categorias__titulo a {
+  color: var(--rc-texto-sobre-destaque);
+  text-decoration: none;
+}
+
+.rc-categorias__titulo a:hover,
+.rc-categorias__titulo a:focus-visible {
+  text-decoration: underline;
+}
+
+.rc-categorias__grade {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* O grupo de uma categoria-mãe sem subcategorias traz um único cartão, e sem
+   este limite ele se esticaria por todo o trilho da grade. */
+.rc-categorias__grade > li {
+  margin: 0;
+  max-width: 200px;
+}
+
+/* O título já leva ao arquivo da categoria, mas um `<h2>` clicável não se
+   anuncia como caminho. Este link repete o destino em texto explícito, que é o
+   que o critério 2.4.4 da WCAG 2.1 pede de um link fora de contexto. */
+.rc-categorias__todos {
+  font-size: var(--rc-fonte-sm);
+  margin: 12px 0 0;
+}
+
+/* O link de texto sai da cor padrão do tema de propósito: `#31BEB1` mede 2,30:1
+   sobre o branco e reprovaria o critério 1.4.3 da WCAG 2.1. O sublinhado é o que
+   mantém o link distinguível sem depender da cor — critério 1.4.1. */
+.rc-categorias__todos a {
+  color: var(--rc-texto-sobre-destaque);
+  text-decoration: underline;
+}
+
+.rc-categorias__todos a:hover,
+.rc-categorias__todos a:focus-visible {
+  color: var(--reconectar-cor-institucional);
+}
+
+.rc-categorias__vazio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
 }
 
 /* Loja
@@ -1174,6 +1450,10 @@
   margin: 0;
   overflow-x: auto;
   padding: 4px 0;
+  /* Mesma razão de `.rc-carrossel__faixa`: scroll container horizontal precisa
+     ser containing block, senão um descendente absoluto escapa do clipping e
+     estica a área de rolagem do documento. */
+  position: relative;
   scrollbar-width: none;
 }
 
@@ -2263,8 +2543,16 @@
   line-height: var(--rc-entrelinha-justa);
 }
 
-.rc-forum__select,
-.rc-forum__busca {
+/* O select que estava aqui saiu para a seção "Selects", onde divide o desenho
+   com o de ordenação do catálogo. Ficaram só as declarações do campo de texto —
+   iguais às de lá menos a seta, que um `<input>` não tem. */
+/* A classe é repetida porque o Storefront pinta o campo com
+   `input[type="text"], … input[type="search"], …`, de especificidade (0,1,1) —
+   maior que a classe sozinha. O fundo declarado aqui era escrito e perdido na
+   cascata: medido, o campo saía em `#f2f2f2` enquanto o select ao lado saía
+   branco, no mesmo formulário. Repetir leva a (0,2,0) e encerra a disputa sem
+   depender da ordem das folhas. */
+.rc-forum__busca.rc-forum__busca {
   min-height: 44px;
   max-width: 100%;
   padding: 0 12px;
@@ -2273,6 +2561,17 @@
   background: var(--rc-superficie);
   font-size: var(--rc-fonte-sm);
   color: var(--rc-texto-sobre-destaque);
+}
+
+/* O select ao lado passou a ter anel de foco próprio; sem esta regra os dois
+   campos do mesmo formulário responderiam ao teclado de formas diferentes. */
+.rc-forum__busca:hover {
+  border-color: var(--reconectar-cor-primaria);
+}
+
+.rc-forum__busca:focus-visible {
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
 }
 
 .rc-forum__aplicar {
@@ -2918,6 +3217,359 @@
   max-width: 100%;
 }
 
+/* ==========================================================================
+   Títulos de página ocultos
+   ========================================================================== */
+
+/* Nas páginas marcadas por `reconectar_marcar_pagina_sem_titulo()` o `<h1>` diz
+   o mesmo que a trilha de navegação logo acima — "Início / Shop" seguido de
+   "Shop" — e ocupava 50,84px medidos da primeira dobra para não informar nada.
+
+   Ele sai da tela e fica no documento. As declarações são as mesmas de
+   `.screen-reader-text` do tema pai, copiadas em vez de referenciadas porque é
+   o `<h1>` que precisa recebê-las, e ele não tem como ganhar a classe sem um
+   override de template para cada uma das seis páginas.
+
+   O `>` em `.entry-header > .entry-title` não é enfeite: `.entry-title` também
+   nomeia título de card e de post único, e só o filho direto de `.entry-header`
+   é o cabeçalho da página. */
+.rc-sem-titulo-de-pagina .woocommerce-products-header__title,
+.rc-sem-titulo-de-pagina .entry-header > .entry-title {
+  border: 0;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  word-wrap: normal;
+}
+
+/* ==========================================================================
+   Catálogo de produtos
+   ========================================================================== */
+
+/* O laço de produtos é a última área da plataforma servida pelo layout do
+   Storefront sem camada autoral. O medido em 1280×900 antes destas regras:
+   `ul.products` em `display: block`, com `li.product` em `float: left` de
+   355,469px, gutter de 50,78px e `clear: both` a cada três; alturas de
+   469/513/469 na primeira linha, com o botão "Adicionar ao carrinho" flutuando
+   num lugar diferente em cada card.
+
+   A escolha foi reestilizar o markup do WooCommerce em vez de escrever um
+   template próprio, e ela tem custo: as regras do plugin para o laço são longas,
+   e a mais forte é
+   `.storefront-full-width-content .site-main ul.products.columns-3 li.product`,
+   de especificidade (0,5,2). As classes repetidas abaixo levam a (0,6,2) — não
+   é estilo, é a medida necessária para vencer. `marketplace.css` é a folha 22 e
+   `woocommerce.css` a 18, então o empate também bastaria; a folga é para o dia
+   em que essa ordem mudar.
+
+   O escopo `.site-main` deixa de fora os widgets de barra lateral, que continuam
+   com o laço do tema pai. O catálogo da página de loja não passa por aqui: usa
+   `reconectar_card_produto_linha()`. */
+.woocommerce .site-main ul.products.products,
+.woocommerce-page .site-main ul.products.products {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* O clearfix do tema pai (`content: ""` em `::before` e `::after`) existia para
+   fechar a linha de floats. Num contêiner de grade ele deixa de ser invisível:
+   pseudo-elemento com `content` gera caixa, e caixa dentro de grade é grid item.
+   Media: com quatro colunas de 280px declaradas, o primeiro produto nascia em
+   `left: 345px` — a célula 1 estava ocupada pelo `::before`, e cada linha
+   entregava três cartões em vez de quatro. `content: none` é o que apaga a
+   caixa; `display: none` deixaria o item na contagem. */
+.woocommerce .site-main ul.products.products::before,
+.woocommerce .site-main ul.products.products::after,
+.woocommerce-page .site-main ul.products.products::before,
+.woocommerce-page .site-main ul.products.products::after {
+  content: none;
+}
+
+/* `float` e `clear` não precisam ser desfeitos: um grid item os ignora por
+   definição. A largura em porcentagem, não — ela continuaria valendo dentro da
+   coluna e a estreitaria a 29,41% dela. */
+.woocommerce .site-main ul.products.products li.product.product,
+.woocommerce-page .site-main ul.products.products li.product.product {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--rc-fonte-base);
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  text-align: left;
+  width: auto;
+}
+
+/* O link envolve imagem, título e preço; o botão é irmão dele. Fazer o link
+   crescer é o que encosta o botão no rodapé do card e iguala as alturas —
+   um título de duas linhas deixa de empurrar o botão para baixo do vizinho. */
+.woocommerce .site-main ul.products.products li.product .woocommerce-loop-product__link,
+.woocommerce-page .site-main ul.products.products li.product .woocommerce-loop-product__link {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 0;
+}
+
+.woocommerce .site-main ul.products.products li.product img,
+.woocommerce-page .site-main ul.products.products li.product img {
+  aspect-ratio: 4 / 3;
+  background: var(--rc-fundo);
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
+  height: auto;
+  margin: 0 0 12px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.woocommerce .site-main ul.products.products li.product .woocommerce-loop-product__title,
+.woocommerce-page .site-main ul.products.products li.product .woocommerce-loop-product__title {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 6px;
+  padding: 0 12px;
+}
+
+.woocommerce .site-main ul.products.products li.product .price,
+.woocommerce-page .site-main ul.products.products li.product .price {
+  color: var(--rc-texto);
+  display: block;
+  font-size: var(--rc-fonte-md);
+  font-weight: 600;
+  margin: 0 0 12px;
+  padding: 0 12px;
+}
+
+.woocommerce .site-main ul.products.products li.product .star-rating,
+.woocommerce-page .site-main ul.products.products li.product .star-rating {
+  font-size: var(--rc-fonte-2xs);
+  margin: 0 12px 8px;
+}
+
+/* O Storefront já move o selo para depois do título
+   (`woocommerce_show_product_loop_sale_flash` em `woocommerce_after_shop_loop_item_title`,
+   prioridade 6), então ele existe no markup — só estava no meio do texto. O
+   `li.product` recebe `position: relative` do próprio WooCommerce. */
+.woocommerce .site-main ul.products.products li.product .onsale,
+.woocommerce-page .site-main ul.products.products li.product .onsale {
+  background: var(--reconectar-cor-destaque);
+  border-radius: 999px;
+  color: var(--rc-texto-sobre-destaque);
+  font-size: var(--rc-fonte-2xs);
+  font-weight: 600;
+  left: 12px;
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 4px 10px;
+  position: absolute;
+  right: auto;
+  top: 12px;
+}
+
+/* 44px é o alvo de toque que o projeto adota. O `auto` na margem superior é
+   redundante com o `flex: 1` do link acima, e fica: se um plugin injetar
+   qualquer coisa entre os dois, é ele que mantém o botão no rodapé. */
+.woocommerce .site-main ul.products.products li.product .button,
+.woocommerce-page .site-main ul.products.products li.product .button {
+  align-items: center;
+  border-radius: var(--rc-raio);
+  display: flex;
+  font-size: var(--rc-fonte-sm);
+  justify-content: center;
+  margin: auto 12px 12px;
+  min-height: 44px;
+  text-align: center;
+  width: calc(100% - 24px);
+}
+
+/* ==========================================================================
+   Paginação do catálogo
+   ========================================================================== */
+
+/* A paginação saiu de dentro de `.storefront-sorting`
+   (`reconectar_reposicionar_paginacao_do_catalogo()`), e com ela o `float: right`
+   que era herdado da barra. Sem herança, centralizar é uma declaração. */
+.rc-paginacao {
+  float: none;
+  margin: 32px 0 0;
+  width: 100%;
+}
+
+.woocommerce .rc-paginacao ul.page-numbers,
+.woocommerce-page .rc-paginacao ul.page-numbers {
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce .rc-paginacao ul.page-numbers li,
+.woocommerce-page .rc-paginacao ul.page-numbers li {
+  border: 0;
+  margin: 0;
+  overflow: visible;
+}
+
+/* O alvo de toque é o elemento inteiro, e não um texto de 28×32px dentro dele —
+   que era o medido antes, abaixo dos 44px em ambas as dimensões. */
+.woocommerce .rc-paginacao ul.page-numbers li .page-numbers,
+.woocommerce-page .rc-paginacao ul.page-numbers li .page-numbers {
+  align-items: center;
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  display: flex;
+  font-size: var(--rc-fonte-sm);
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.woocommerce .rc-paginacao ul.page-numbers li a.page-numbers:hover,
+.woocommerce-page .rc-paginacao ul.page-numbers li a.page-numbers:hover {
+  background: var(--rc-fundo);
+  color: var(--rc-texto);
+}
+
+/* A página atual é marcada por fundo, peso e borda — três sinais, porque cor
+   sozinha não comunica nada a quem não a enxerga (WCAG 2.1, critério 1.4.1).
+
+   O roxo institucional, e não o primário: `#31BEB1` com branco dá 2,0:1, e a
+   mesma cor já reprova AA nos links do projeto. `#663191` com branco dá 8,7:1,
+   medido antes de escrever. */
+.woocommerce .rc-paginacao ul.page-numbers li span.current,
+.woocommerce-page .rc-paginacao ul.page-numbers li span.current {
+  background: var(--reconectar-cor-institucional);
+  border-color: var(--reconectar-cor-institucional);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.woocommerce .rc-paginacao ul.page-numbers li .page-numbers:focus-visible,
+.woocommerce-page .rc-paginacao ul.page-numbers li .page-numbers:focus-visible {
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Selects
+   ========================================================================== */
+
+/* Dois `<select>` existem no site, e até aqui eram dois desenhos diferentes: o
+   de ordenação do catálogo e o de categoria do fórum. O do catálogo estava com
+   a aparência nativa do sistema — medido em 288×24px, fundo `#efefef`, borda
+   `#767676` —, isto é, 24px de altura onde o projeto adota 44px de alvo de
+   toque, e fora da tipografia da plataforma: o Storefront declara
+   `select { color: initial; font-family: "Source Sans Pro", … }`, que substitui
+   a Poppins herdada do corpo.
+
+   Nenhuma regra concorrente é forte — a mais específica que alcança o controle
+   é `button, input, optgroup, select, textarea`, de especificidade (0,0,1) —,
+   então uma classe basta e não há necessidade de repetição de seletor como no
+   laço de produtos.
+
+   Os selects do checkout ficam de fora de propósito: aquela tela é bloco do
+   WooCommerce (`.wc-block-checkout`), e seus campos já medem 50px, usam 16px de
+   fonte e trazem rótulo flutuante próprio. Sobrescrevê-los não corrigiria um
+   defeito, só desalinharia um sistema que é coerente consigo mesmo. */
+.rc-forum__select,
+.woocommerce .woocommerce-ordering select.orderby,
+.woocommerce-page .woocommerce-ordering select.orderby {
+  appearance: none;
+  background-color: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto-sobre-destaque);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-justa);
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 40px 0 12px;
+}
+
+/* `appearance: none` apaga a seta junto com o resto do controle nativo, e uma
+   seta precisa voltar: sem ela nada distingue o campo de uma caixa de texto.
+
+   Ela vem como `background-image` porque `select` não hospeda pseudo-elemento
+   de forma confiável entre navegadores, e o wrapper que receberia um `::after`
+   é markup de terceiro nos dois casos.
+
+   O `#717171` do traço é o valor de `--rc-texto`, escrito por extenso porque
+   `url()` não interpola custom property — a única duplicação de token no
+   arquivo, e ela some se a seta um dia virar elemento. Sobre a superfície
+   branca dá 4,88:1, acima dos 3:1 que a WCAG 2.1 pede a elemento gráfico
+   (critério 1.4.11).
+
+   O `padding-right` de 40px acima reserva o espaço: sem ele um rótulo longo
+   passa por baixo da seta. */
+.rc-forum__select,
+.woocommerce .woocommerce-ordering select.orderby,
+.woocommerce-page .woocommerce-ordering select.orderby {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23717171' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 14px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
+}
+
+.rc-forum__select:hover,
+.woocommerce .woocommerce-ordering select.orderby:hover,
+.woocommerce-page .woocommerce-ordering select.orderby:hover {
+  border-color: var(--reconectar-cor-primaria);
+}
+
+/* `:focus-visible`, e não `:focus`: o anel precisa aparecer para quem chega pelo
+   teclado sem emoldurar o controle a cada clique de mouse. Mesmo par de
+   declarações da paginação, para o foco ter uma forma só no site inteiro. */
+.rc-forum__select:focus-visible,
+.woocommerce .woocommerce-ordering select.orderby:focus-visible,
+.woocommerce-page .woocommerce-ordering select.orderby:focus-visible {
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
+}
+
+.rc-forum__select:disabled,
+.woocommerce .woocommerce-ordering select.orderby:disabled,
+.woocommerce-page .woocommerce-ordering select.orderby:disabled {
+  background-color: var(--rc-fundo);
+  color: var(--rc-texto);
+  cursor: not-allowed;
+}
+
+/* A barra de ordenação do catálogo é `float: right` no Storefront e encostava o
+   controle na margem sem nenhum respiro abaixo. */
+.woocommerce .woocommerce-ordering,
+.woocommerce-page .woocommerce-ordering {
+  margin: 0 0 8px;
+}
+
 /* Responsivo -------------------------------------------------------------- */
 
 @media (max-width: 1024px) {
@@ -2977,8 +3629,19 @@
     flex: 1 1 100%;
   }
 
+  /* O de ordenação entra aqui pelo mesmo motivo dos dois de cima: no estreito a
+     barra do catálogo deixa de ter espaço lateral para negociar, e um controle
+     de 288px fixos passaria da borda. */
   .rc-forum__select,
-  .rc-forum__busca {
+  .rc-forum__busca,
+  .woocommerce .woocommerce-ordering select.orderby,
+  .woocommerce-page .woocommerce-ordering select.orderby {
+    width: 100%;
+  }
+
+  .woocommerce .woocommerce-ordering,
+  .woocommerce-page .woocommerce-ordering {
+    float: none;
     width: 100%;
   }
 }

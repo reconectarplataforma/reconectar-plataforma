@@ -2,12 +2,12 @@
 /**
  * A entidade Empresa e os vínculos que ela governa.
  *
- * O Dokan modela vendedores, não empresas: cada loja é um usuário isolado, e
- * nada acima dela agrupa várias. A especificação do Administrador de Empresas
- * pede exatamente esse nível que falta — "Empresa A (Vendedores A1, A2, A3)",
- * "Empresa B (Vendedores B1, B2)" — e é ele que esta classe acrescenta.
+ * O Dokan modela lojas isoladas, não empresas: cada loja é um usuário, e nada
+ * acima dela agrupa várias. A especificação do Administrador de Empresas pede
+ * exatamente esse nível que falta — "Empresa A (Lojas A1, A2, A3)", "Empresa B
+ * (Lojas B1, B2)" — e é ele que esta classe acrescenta.
  *
- * O agrupamento não altera a natureza do vendedor: cada um segue sendo uma loja
+ * O agrupamento não altera a natureza da loja: cada uma segue sendo uma loja
  * Dokan independente, com seus produtos, seus pedidos e seu faturamento. A
  * empresa é a camada de *gestão* por cima, e é dela que sai o isolamento entre
  * administradores de empresas distintas.
@@ -16,7 +16,7 @@
  *
  *   - quais empresas este usuário administra?  `empresas_no_escopo()`
  *   - ele pode administrar esta empresa?       `pode_gerir_empresa()`
- *   - ele pode administrar este vendedor?      `pode_gerir_vendedor()`
+ *   - ele pode administrar esta loja?          `pode_gerir_loja()`
  *
  * @package reconectar-core
  */
@@ -41,9 +41,9 @@ class Reconectar_Empresa {
 	const META_ATIVA = '_reconectar_empresa_ativa';
 
 	/**
-	 * User meta do vendedor: a empresa a que ele pertence.
+	 * User meta da loja: a empresa a que ela pertence.
 	 *
-	 * Um vendedor pertence a no máximo uma empresa — é o que a especificação
+	 * Uma loja pertence a no máximo uma empresa — é o que a especificação
 	 * descreve, e é o que mantém "de quem é este pedido" com uma resposta só.
 	 */
 	const META_VINCULO = '_reconectar_empresa_id';
@@ -59,11 +59,24 @@ class Reconectar_Empresa {
 	const META_ESCOPO = '_reconectar_empresas_geridas';
 
 	/**
-	 * User meta do vendedor: o estado de atividade dele, próprio.
+	 * User meta da loja: o estado de atividade dela, próprio.
 	 *
 	 * Distinto do estado da empresa de propósito — ver `aplicar_permissao_de_venda()`.
+	 *
+	 * A chave já se chamou `_reconectar_vendedor_ativo`, e a renomeação **não**
+	 * migra sozinha: quem faz a troca nas linhas já gravadas é
+	 * `Reconectar_Migracoes::renomear_meta_de_loja_ativa()`.
 	 */
-	const META_VENDEDOR_ATIVO = '_reconectar_vendedor_ativo';
+	const META_LOJA_ATIVA = '_reconectar_loja_ativa';
+
+	/**
+	 * Nome anterior da meta acima, consumido apenas pela migração.
+	 *
+	 * Fica aqui, e não na classe de migração, porque é a entidade que define a
+	 * chave: se um dia ela mudar de novo, as duas pontas da história estarão na
+	 * mesma tela.
+	 */
+	const META_LOJA_ATIVA_LEGADA = '_reconectar_vendedor_ativo';
 
 	/**
 	 * Siglas válidas de unidade federativa.
@@ -553,24 +566,27 @@ class Reconectar_Empresa {
 	}
 
 	/**
-	 * Este usuário pode administrar este vendedor?
+	 * Este usuário pode administrar esta loja?
 	 *
 	 * A resposta passa pela empresa: quem não está vinculado a empresa nenhuma
 	 * não é administrável por ninguém a não ser pela administração técnica —
-	 * inclusive os vendedores que existiam antes deste módulo.
+	 * inclusive as lojas que existiam antes deste módulo.
 	 *
-	 * @param int $vendedor_id ID do vendedor.
-	 * @param int $usuario_id  Usuário a avaliar; 0 usa o usuário atual.
+	 * `eh_vendedor()` continua com esse nome porque testa o papel `seller`, que é
+	 * do Dokan — ver o bloco de isolamento em `Reconectar_Permissoes`.
+	 *
+	 * @param int $loja_id    ID da loja.
+	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
 	 * @return bool
 	 */
-	public static function pode_gerir_vendedor( $vendedor_id, $usuario_id = 0 ) {
+	public static function pode_gerir_loja( $loja_id, $usuario_id = 0 ) {
 		$usuario_id = $usuario_id ? (int) $usuario_id : get_current_user_id();
 
-		if ( ! Reconectar_Permissoes::eh_vendedor( (int) $vendedor_id ) ) {
+		if ( ! Reconectar_Permissoes::eh_vendedor( (int) $loja_id ) ) {
 			return false;
 		}
 
-		$empresa_id = self::empresa_do_vendedor( $vendedor_id );
+		$empresa_id = self::empresa_da_loja( $loja_id );
 
 		if ( ! $empresa_id ) {
 			return user_can( $usuario_id, Reconectar_Permissoes::CAP_TODAS_AS_EMPRESAS );
@@ -615,25 +631,28 @@ class Reconectar_Empresa {
 	}
 
 	/**
-	 * A qual empresa este vendedor pertence?
+	 * A qual empresa esta loja pertence?
 	 *
-	 * @param int $vendedor_id ID do vendedor.
+	 * @param int $loja_id ID da loja.
 	 * @return int ID da empresa, ou 0 se não houver vínculo.
 	 */
-	public static function empresa_do_vendedor( $vendedor_id ) {
-		return (int) get_user_meta( (int) $vendedor_id, self::META_VINCULO, true );
+	public static function empresa_da_loja( $loja_id ) {
+		return (int) get_user_meta( (int) $loja_id, self::META_VINCULO, true );
 	}
 
 	/**
-	 * Quais vendedores pertencem a esta empresa?
+	 * Quais lojas pertencem a esta empresa?
 	 *
 	 * @param int $empresa_id ID da empresa.
-	 * @return int[] IDs dos vendedores.
+	 * @return int[] IDs das lojas.
 	 */
-	public static function vendedores_da_empresa( $empresa_id ) {
+	public static function lojas_da_empresa( $empresa_id ) {
 		// `WP_User_Query` honra `meta_key`/`meta_value` de verdade, ao contrário
 		// de `wc_get_orders()` — ver a armadilha registrada no CLAUDE.md.
-		$vendedores = get_users(
+		//
+		// `'seller'` é o papel do Dokan, não o nosso vocabulário: a entidade se
+		// chama Loja, o papel continua sendo o que o plugin criou.
+		$lojas = get_users(
 			array(
 				'role'       => 'seller',
 				'meta_key'   => self::META_VINCULO,
@@ -644,23 +663,23 @@ class Reconectar_Empresa {
 			)
 		);
 
-		return array_map( 'intval', $vendedores );
+		return array_map( 'intval', $lojas );
 	}
 
 	/**
-	 * Todos os vendedores das empresas que o usuário administra.
+	 * Todas as lojas das empresas que o usuário administra.
 	 *
 	 * @param int $usuario_id Usuário; 0 usa o atual.
-	 * @return int[] IDs dos vendedores.
+	 * @return int[] IDs das lojas.
 	 */
-	public static function vendedores_no_escopo( $usuario_id = 0 ) {
-		$vendedores = array();
+	public static function lojas_no_escopo( $usuario_id = 0 ) {
+		$lojas = array();
 
 		foreach ( self::listar( $usuario_id ) as $empresa ) {
-			$vendedores = array_merge( $vendedores, self::vendedores_da_empresa( $empresa->ID ) );
+			$lojas = array_merge( $lojas, self::lojas_da_empresa( $empresa->ID ) );
 		}
 
-		return array_values( array_unique( $vendedores ) );
+		return array_values( array_unique( $lojas ) );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -784,7 +803,7 @@ class Reconectar_Empresa {
 	}
 
 	/**
-	 * Ativa ou desativa a empresa, propagando a decisão aos vendedores dela.
+	 * Ativa ou desativa a empresa, propagando a decisão às lojas dela.
 	 *
 	 * @param int  $empresa_id ID da empresa.
 	 * @param bool $ativa      Novo estado.
@@ -795,45 +814,49 @@ class Reconectar_Empresa {
 
 		update_post_meta( $empresa_id, self::META_ATIVA, $ativa ? 'sim' : 'nao' );
 
-		foreach ( self::vendedores_da_empresa( $empresa_id ) as $vendedor_id ) {
-			self::aplicar_permissao_de_venda( $vendedor_id );
+		foreach ( self::lojas_da_empresa( $empresa_id ) as $loja_id ) {
+			self::aplicar_permissao_de_venda( $loja_id );
 		}
 	}
 
 	/**
-	 * Recalcula se o vendedor pode vender, a partir dos dois estados.
+	 * Recalcula se a loja pode vender, a partir dos dois estados.
 	 *
-	 * A permissão efetiva é a conjunção: a empresa precisa estar ativa **e** o
-	 * vendedor também. Guardar os dois separados não é preciosismo de modelagem —
+	 * A permissão efetiva é a conjunção: a empresa precisa estar ativa **e** a
+	 * loja também. Guardar os dois separados não é preciosismo de modelagem —
 	 * é o que faz a reativação da empresa ser correta. Se a desativação apenas
 	 * escrevesse `dokan_enable_selling = no` em todo mundo, o estado individual se
-	 * perderia, e reativar a empresa colocaria de volta em operação justamente o
-	 * vendedor que havia sido desativado à parte.
+	 * perderia, e reativar a empresa colocaria de volta em operação justamente a
+	 * loja que havia sido desativada à parte.
 	 *
-	 * @param int $vendedor_id ID do vendedor.
+	 * O nome do método não mudou na renomeação de Vendedor para Loja porque já
+	 * era neutro — e porque `dokan_enable_selling`, que é o que ele escreve,
+	 * continua sendo do Dokan.
+	 *
+	 * @param int $loja_id ID da loja.
 	 * @return void
 	 */
-	public static function aplicar_permissao_de_venda( $vendedor_id ) {
-		$vendedor_id = (int) $vendedor_id;
-		$empresa_id  = self::empresa_do_vendedor( $vendedor_id );
+	public static function aplicar_permissao_de_venda( $loja_id ) {
+		$loja_id    = (int) $loja_id;
+		$empresa_id = self::empresa_da_loja( $loja_id );
 
-		$empresa_permite  = ! $empresa_id || self::esta_ativa( $empresa_id );
-		$vendedor_permite = 'nao' !== get_user_meta( $vendedor_id, self::META_VENDEDOR_ATIVO, true );
+		$empresa_permite = ! $empresa_id || self::esta_ativa( $empresa_id );
+		$loja_permite    = 'nao' !== get_user_meta( $loja_id, self::META_LOJA_ATIVA, true );
 
 		update_user_meta(
-			$vendedor_id,
+			$loja_id,
 			'dokan_enable_selling',
-			( $empresa_permite && $vendedor_permite ) ? 'yes' : 'no'
+			( $empresa_permite && $loja_permite ) ? 'yes' : 'no'
 		);
 	}
 
 	/**
-	 * O vendedor está ativo, considerando também a empresa dele?
+	 * A loja está ativa, considerando também a empresa dela?
 	 *
-	 * @param int $vendedor_id ID do vendedor.
+	 * @param int $loja_id ID da loja.
 	 * @return bool
 	 */
-	public static function vendedor_esta_ativo( $vendedor_id ) {
-		return 'yes' === get_user_meta( (int) $vendedor_id, 'dokan_enable_selling', true );
+	public static function loja_esta_ativa( $loja_id ) {
+		return 'yes' === get_user_meta( (int) $loja_id, 'dokan_enable_selling', true );
 	}
 }

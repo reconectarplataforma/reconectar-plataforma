@@ -50,4 +50,4 @@ function reconectar_home_lojas_destaque() {
 
 	reconectar_fechar_carrossel();
 }
-add_action( 'reconectar_home', 'reconectar_home_lojas_destaque', 30 );
+add_action( 'reconectar_home', 'reconectar_home_lojas_destaque', 20 );

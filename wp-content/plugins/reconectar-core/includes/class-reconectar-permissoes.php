@@ -50,7 +50,7 @@ class Reconectar_Permissoes {
 	 * Papel do Administrador de Empresas.
 	 *
 	 * Quarto ator da plataforma: administra a *operação* — cadastra empresas e
-	 * vendedores, consulta produtos e pedidos de quem gere — sem administrar a
+	 * lojas, consulta produtos e pedidos de quem gere — sem administrar a
 	 * *tecnologia*. É o princípio que a especificação enuncia, e a razão de este
 	 * papel não receber nenhuma capacidade nativa do WordPress para isso.
 	 */
@@ -67,9 +67,9 @@ class Reconectar_Permissoes {
 	const CAP_GERIR_EMPRESAS = 'reconectar_gerir_empresas';
 
 	/**
-	 * Criar, editar, ativar e desativar vendedores.
+	 * Criar, editar, ativar e desativar lojas.
 	 */
-	const CAP_GERIR_VENDEDORES = 'reconectar_gerir_vendedores';
+	const CAP_GERIR_LOJAS = 'reconectar_gerir_lojas';
 
 	/**
 	 * Ler produtos, pedidos, estoque e faturamento das empresas sob gestão.
@@ -96,7 +96,7 @@ class Reconectar_Permissoes {
 	const CAPS_DE_EMPRESA = array(
 		self::CAP_PAINEL_EMPRESAS,
 		self::CAP_GERIR_EMPRESAS,
-		self::CAP_GERIR_VENDEDORES,
+		self::CAP_GERIR_LOJAS,
 		self::CAP_VER_OPERACAO,
 		self::CAP_TODAS_AS_EMPRESAS,
 	);
@@ -126,8 +126,29 @@ class Reconectar_Permissoes {
 		self::CAP_COMUNIDADE,
 		self::CAP_PAINEL_EMPRESAS,
 		self::CAP_GERIR_EMPRESAS,
-		self::CAP_GERIR_VENDEDORES,
+		self::CAP_GERIR_LOJAS,
 		self::CAP_VER_OPERACAO,
+	);
+
+	/**
+	 * Capacidades que já existiram e precisam sair dos papéis.
+	 *
+	 * Renomear uma capacidade não migra nada: o nome antigo continua gravado em
+	 * `wp_user_roles` até que alguém o remova. Para o `company_admin` isso não é
+	 * problema — `sincronizar_papel_do_admin_de_empresas()` recria o papel do zero
+	 * —, mas o `administrator` recebe as capacidades por `add_cap()` e só perde o
+	 * que for explicitamente removido. Sem esta lista, `reconectar_gerir_vendedores`
+	 * ficaria no banco para sempre, concedida a quem instalou a plataforma.
+	 *
+	 * A lista é permanente, não transitória: é ela que faz uma instalação
+	 * provisionada antes da renomeação migrar sozinha na próxima sincronização.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_LEGADAS = array(
+		// Renomeada para `reconectar_gerir_lojas` quando o vocabulário da
+		// plataforma passou a chamar de Loja o que o código chamava de Vendedor.
+		'reconectar_gerir_vendedores',
 	);
 
 	/**
@@ -155,7 +176,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 2;
+	const VERSAO_CAPACIDADES = 3;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -217,6 +238,12 @@ class Reconectar_Permissoes {
 
 			if ( ! $objeto ) {
 				continue;
+			}
+
+			// Antes de qualquer concessão: o que já não existe sai de todo papel,
+			// inclusive do `administrator`. Ver `CAPS_LEGADAS`.
+			foreach ( self::CAPS_LEGADAS as $capacidade ) {
+				$objeto->remove_cap( $capacidade );
 			}
 
 			if ( in_array( $papel, self::PAPEIS_DA_COMUNIDADE, true ) ) {
@@ -407,10 +434,17 @@ class Reconectar_Permissoes {
 
 	/* ---------------------------------------------------------------------
 	 * Isolamento entre vendedores
+	 *
+	 * "Vendedor" aqui é o papel `seller`, que é do Dokan — e é por isso que este
+	 * bloco não acompanhou a renomeação de Vendedor para Loja no restante do
+	 * plugin. Na camada de empresa a entidade se chama Loja (`Reconectar_Lojas`,
+	 * `CAP_GERIR_LOJAS`); nesta, o nome é o do papel que o Dokan cria e cujo
+	 * isolamento estas três funções implementam. Trocá-lo daria um nome nosso a
+	 * um conceito de terceiro.
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * O usuário tem o papel de vendedor?
+	 * O usuário tem o papel `seller`, do Dokan?
 	 *
 	 * @param int $usuario_id ID do usuário.
 	 * @return bool

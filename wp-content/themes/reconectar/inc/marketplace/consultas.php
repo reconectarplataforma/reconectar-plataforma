@@ -63,7 +63,15 @@ function reconectar_obter_lojas( $args = array() ) {
 	 * evita refazer o trabalho a cada visita. Se um dia forem milhares de lojas,
 	 * o caminho é uma tabela de índice própria — não remendar esta função.
 	 */
-	$chave_cache = 'reconectar_lojas_' . md5( wp_json_encode( $args ) );
+	/*
+	 * O host entra na chave porque cada item da lista carrega a URL absoluta da
+	 * loja, e a mesma instalação responde por `localhost:8090` e pelo IP da
+	 * máquina na rede — `WP_HOME` é calculada a partir do `Host` da requisição.
+	 * Sem o host aqui, o cache gravado num acesso serviria links do outro, e o
+	 * sintoma seria dos piores de diagnosticar: intermitente, porque desaparece
+	 * sozinho quando o transient de um minuto expira.
+	 */
+	$chave_cache = 'reconectar_lojas_' . md5( wp_json_encode( $args ) . home_url() );
 	$cache       = get_transient( $chave_cache );
 
 	if ( is_array( $cache ) ) {

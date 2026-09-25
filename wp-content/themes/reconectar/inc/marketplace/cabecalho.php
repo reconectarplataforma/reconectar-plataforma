@@ -71,12 +71,21 @@ function reconectar_resumo_do_carrinho() {
 				<span class="rc-carrinho__total"><?php echo wp_kses_post( $total ); ?></span>
 				<span class="rc-carrinho__itens">
 					<?php
-					printf(
-						/* translators: %s: quantidade de itens no carrinho. */
-						esc_html( _n( '%s item', '%s itens', $itens, 'reconectar' ) ),
-						esc_html( number_format_i18n( $itens ) )
-					);
+					/*
+					 * Número e unidade em elementos separados, e não um `_n( '%s
+					 * itens' )` montado numa string só, porque o cabeçalho do celular
+					 * exibe apenas a contagem: a palavra é escondida por CSS e
+					 * continua na árvore de acessibilidade, já que "3" sozinho não é
+					 * nome de link.
+					 *
+					 * O preço é a ordem fixa — um idioma que ponha a unidade antes do
+					 * número não tem como invertê-la pela tradução. É o que a
+					 * separação custa, e cabe a quem traduzir para um desses idiomas
+					 * reabrir a decisão.
+					 */
 					?>
+					<span class="rc-carrinho__quantidade"><?php echo esc_html( number_format_i18n( $itens ) ); ?></span>
+					<span class="rc-carrinho__unidade"><?php echo esc_html( _n( 'item', 'itens', $itens, 'reconectar' ) ); ?></span>
 				</span>
 			</span>
 		</a>

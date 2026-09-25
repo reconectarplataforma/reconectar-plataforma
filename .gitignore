@@ -2,6 +2,15 @@
 .env
 *.env.local
 
+# Chaves e certificados de desenvolvimento (o dev.pem do HTTPS local já esteve
+# na raiz como arquivo não rastreado, a um `git add -A` de distância do
+# repositório público)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
 # WordPress core (baixado via imagem Docker, não versionado)
 wp-content/uploads/
 wp-content/upgrade/

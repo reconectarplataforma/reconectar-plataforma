@@ -3,11 +3,11 @@
  * Fechamento do autocadastro de lojas.
  *
  * Quem cadastra loja nesta plataforma é o Administrador e o Administrador de
- * Empresas, pelo caminho que já existe: `Reconectar_Vendedores::criar()`, que
+ * Empresas, pelo caminho que já existe: `Reconectar_Lojas::criar()`, que
  * confere capacidade, vincula a loja a uma empresa e fixa o papel numa
  * constante. Esta classe não acrescenta nenhum caminho novo — ela fecha os
- * quatro atalhos do Dokan que contornavam aquele, e por isso
- * `class-reconectar-vendedores.php` não muda uma linha.
+ * quatro atalhos do Dokan que contornavam aquele, sem tocar em uma linha
+ * daquele arquivo.
  *
  * São quatro portas independentes, e a opção `show_register_as_vendor` do Dokan
  * fecha apenas a primeira — e mesmo essa pela metade, como registra o comentário
@@ -222,11 +222,11 @@ class Reconectar_Cadastro_De_Lojas {
 	}
 
 	/**
-	 * Diz se quem está agindo pode cadastrar vendedores.
+	 * Diz se quem está agindo pode cadastrar lojas.
 	 *
-	 * Espelha `Reconectar_Vendedores::pode_gerir()`, inclusive a saída antecipada
+	 * Espelha `Reconectar_Lojas::pode_gerir()`, inclusive a saída antecipada
 	 * para a linha de comando: sem ela a carga de demonstração pararia de criar
-	 * vendedores, porque `wp_insert_user()` dispara `set_user_role` e não há
+	 * lojas, porque `wp_insert_user()` dispara `set_user_role` e não há
 	 * usuário logado num processo de CLI.
 	 *
 	 * @return bool
@@ -240,7 +240,7 @@ class Reconectar_Cadastro_De_Lojas {
 			return false;
 		}
 
-		return current_user_can( Reconectar_Permissoes::CAP_GERIR_VENDEDORES );
+		return current_user_can( Reconectar_Permissoes::CAP_GERIR_LOJAS );
 	}
 
 	/**

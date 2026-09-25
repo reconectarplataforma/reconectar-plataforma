@@ -458,7 +458,11 @@ class Reconectar_Forum {
 			return false;
 		}
 
-		if ( user_can( $usuario_id, Reconectar_Permissoes::CAP_GERIR_VENDEDORES ) ) {
+		// A capacidade de gerir lojas serve aqui como "administra a operação". Se
+		// ela mudar de nome de novo, esta linha precisa acompanhar: `user_can()`
+		// com capacidade inexistente devolve `false` em silêncio, e o fórum
+		// perderia o caminho de moderação sem nenhum erro na tela.
+		if ( user_can( $usuario_id, Reconectar_Permissoes::CAP_GERIR_LOJAS ) ) {
 			return true;
 		}
 
