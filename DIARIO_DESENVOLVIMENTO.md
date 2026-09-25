@@ -2259,3 +2259,86 @@ seria devolver o município a uma linha própria — o que anula justamente o
 ganho que o pedido pedia.
 
 ---
+
+## 2026-09-25 — O conteúdo passa a seguir a régua do cabeçalho
+
+### O pedido
+
+> a classe class="col-full" pode ser responsiva em width de 100% com padding
+> seguindo o header
+
+### O desalinho que existia, e por que não era acidente
+
+O cabeçalho saiu da régua compartilhada quando virou barra de aplicativo: faixa
+inteira, recuado por `--rc-recuo-lateral`, que é `clamp(16px, 3vw, 40px)`. O
+`#content` e o rodapé ficaram com `max-width: 1200px` e `padding-inline: 16px`.
+
+Os dois limites são grandezas diferentes — um recuo de um lado, uma largura
+máxima do outro —, e grandezas diferentes só coincidem por acidente, numa
+largura de tela específica. Medido em 1232px de viewport: o logotipo nascia em
+36,9px e o primeiro card de categoria em 16px, os 21px que a captura do pedido
+mostra. Acima de 1200 a distância crescia sem teto.
+
+O comentário que ficava em `.rc-cabecalho__interno` registrava isso como
+"conhecido e aceito", com a saída anotada: soltar `--rc-largura` também no
+conteúdo. É o que foi feito.
+
+### O que mudou
+
+`.col-full` passa a copiar o cabeçalho, literalmente a mesma expressão:
+
+```css
+.col-full {
+  box-sizing: border-box;
+  margin-inline: auto;
+  max-width: none;
+  padding-inline: var(--rc-recuo-lateral);
+  width: 100%;
+}
+```
+
+`margin-inline` continua declarado, e não é redundante: o Storefront tem duas
+regras em `@media` (abaixo de 66.4989em e de 568px) que zeram o `padding` e
+devolvem o recuo como `margin-left`/`margin-right`. Sem o `auto` aqui, as telas
+estreitas somariam o recuo do pai ao nosso — justamente onde ele é mais caro.
+
+`--rc-largura` não sumiu: deixou de ser a régua do site e passou a ser o teto de
+**medida de leitura** de quem tem texto corrido — `.rc-forum`,
+`.rc-forum-topico`, `.rc-login`. É onde o limite pertence. No contêiner geral
+ele também governava grade de produtos, tabela de pedidos e o painel do Dokan,
+onde só desperdiçava faixa.
+
+### Verificação
+
+Logotipo do cabeçalho e primeiro card do conteúdo, coordenada `x` de cada um:
+
+| Viewport | Logotipo | Conteúdo | Recuo efetivo |
+| --- | --- | --- | --- |
+| 375 | 16 | 16 | 16px (piso do `clamp`) |
+| 560 | 16,8 | 16,8 | 16,8px |
+| 1024 | 30,7 | 30,7 | 30,7px (3vw) |
+| 1232 | 36,9 | 36,9 | 36,9px |
+| 1920 | 40 | 40 | 40px (teto do `clamp`) |
+
+Nas cinco larguras, `margin-left` computado do `.col-full` é `0px` — as regras
+do tema pai perdem na cascata, como esperado. Em `/`,
+`/product-category/alimentos-e-bebidas/`, `/store-listing/`, `/cart/` e
+`/my-account/`, `scrollWidth - clientWidth` é zero em 375 e em 1920, e o
+`scrollTo(600, 0)` da home continua devolvendo `scrollX` zero — a armadilha do
+carrossel segue fechada.
+
+O rodapé acompanha: ele também é `.col-full`, e sua primeira coluna nasce nos
+mesmos 40px em 1920.
+
+### O efeito de tabela ampla, e o que ele traz junto
+
+A grade do catálogo é `repeat(auto-fill, minmax(260px, 1fr))` e se ajusta
+sozinha: em 1920 passou de quatro colunas de 283px para **seis de 290,8px**, com
+o card mantendo o mesmo tamanho. Não foi preciso tocar nela.
+
+O preço da mudança é a medida de texto na tela muito larga. Sem teto no
+contêiner, um parágrafo de descrição de produto atravessa os 2560px de um
+monitor ultrawide. As telas de texto corrido têm teto próprio, mas as páginas do
+WooCommerce e do Dokan não — se isso incomodar, o ajuste é de uma linha
+(`max-width` generoso em `.col-full`, na casa de 1600px), e não o retorno a
+1200, que traria o desalinho de volta.
