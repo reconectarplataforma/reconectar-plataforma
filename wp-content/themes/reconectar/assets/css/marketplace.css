@@ -2822,6 +2822,29 @@
   color: #0e6259;
 }
 
+/* Trilha do bbPress ------------------------------------------------------- */
+
+/* A folha do plugin dá `float: left` à trilha (`#bbpress-forums div.bbp-breadcrumb`).
+   O card da pergunta é flex e, como todo contexto de formatação próprio, encurta
+   diante de um float em vez de passar por baixo dele: medido em 1280px, a
+   pergunta começava 286px à direita e perdia exatamente a largura da trilha — e
+   o vazio à esquerda parecia recuo de propósito, que foi o que fez o defeito
+   passar despercebido na primeira leitura da tela.
+
+   `float: none` é a correção inteira. O resto abaixo só aproxima a trilha da que
+   o tema imprime nas demais páginas, já que aqui ela substitui aquela: veja
+   `reconectar_ajustar_cabecalho_da_pergunta()`, em `inc/layout.php`. */
+#bbpress-forums .bbp-breadcrumb {
+  float: none;
+  margin: 0 0 16px;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+#bbpress-forums .bbp-breadcrumb p {
+  margin: 0;
+}
+
 /* Formulários do bbPress -------------------------------------------------- */
 
 .rc-forum__form-pergunta,
@@ -2831,6 +2854,68 @@
   border: 1px solid var(--rc-borda);
   border-radius: var(--rc-raio);
   background: var(--rc-superficie);
+}
+
+/* O bbPress monta o formulário dentro de `fieldset.bbp-form`, que traz borda,
+   margem e um `<legend>` flutuante puxado para fora por `margin-left: -24px`.
+   Dentro do card acima isso rendia caixa dentro de caixa, com o título saindo
+   pela borda esquerda. A moldura fica com o card; ao fieldset resta agrupar. O
+   `<legend>` também vem com fundo `#fbfbfb`, que dentro de um card branco vira
+   faixa cinza atrás do título sem separar nada — daí o `background: transparent`
+   abaixo.
+
+   O `#bbpress-forums` à frente não é enfeite: as regras do plugin são
+   `#bbpress-forums fieldset.bbp-form`, e um seletor de duas classes perde do id
+   por mais específico que pareça. Sem ele o `padding: 0` era escrito, aplicado
+   na cascata e vencido — o recuo de 20px seguia na tela, medido. */
+#bbpress-forums .rc-forum__form-pergunta .bbp-form,
+#bbpress-forums .rc-forum__form-resposta .bbp-form,
+.rc-forum__form-pergunta .bbp-form,
+.rc-forum__form-resposta .bbp-form {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+#bbpress-forums .rc-forum__form-pergunta .bbp-form > legend,
+#bbpress-forums .rc-forum__form-resposta .bbp-form > legend,
+.rc-forum__form-pergunta .bbp-form > legend,
+.rc-forum__form-resposta .bbp-form > legend {
+  float: none;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 0;
+  background: transparent;
+  font-size: var(--rc-fonte-lg);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+/* O botão vinha com `float: right` e nada que o limpasse, então escapava do card
+   por baixo. Alinhar por flex o mantém à direita e dentro do fluxo. */
+#bbpress-forums .rc-forum__form-pergunta .bbp-submit-wrapper,
+#bbpress-forums .rc-forum__form-resposta .bbp-submit-wrapper,
+.rc-forum__form-pergunta .bbp-submit-wrapper,
+.rc-forum__form-resposta .bbp-submit-wrapper {
+  display: flex;
+  float: none;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Os campos de texto do bbPress trazem `size="40"` no HTML e nenhuma folha lhes
+   dá largura — nem a do plugin, nem a do tema: varrendo `document.styleSheets`
+   por regras que casem com `#bbp_topic_tags`, o resultado é lista vazia. Os
+   450px medidos são a largura intrínseca de 40 caracteres, e em 375px o campo
+   ultrapassava a viewport em 108px. Não é estouro de página, porque um ancestral
+   corta: é campo cortado, em que se digita sem ver o fim do que se escreveu. */
+#bbpress-forums .rc-forum__form-pergunta input[type="text"],
+#bbpress-forums .rc-forum__form-resposta input[type="text"],
+.rc-forum__form-pergunta input[type="text"],
+.rc-forum__form-resposta input[type="text"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Responsivo -------------------------------------------------------------- */

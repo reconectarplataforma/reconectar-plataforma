@@ -89,6 +89,40 @@ function reconectar_ajustar_classes_de_layout( $classes ) {
 add_filter( 'body_class', 'reconectar_ajustar_classes_de_layout', 20 );
 
 /**
+ * Tira o título e a trilha do tema pai na tela de uma pergunta.
+ *
+ * A tela nascia com dois de cada. O `<h1 class="entry-title">` de
+ * `storefront_page_header()` imprimia "Teste de pergunta", e o card da pergunta
+ * imprime o mesmo texto no seu próprio `<h1>` — dois cabeçalhos de primeiro
+ * nível idênticos, um atrás do outro, que quem navega por cabeçalhos ouve duas
+ * vezes sem ter como saber que são a mesma coisa. Sai o do tema pai, porque o do
+ * card é o que carrega a pergunta junto de autor, data e votos.
+ *
+ * A trilha é o mesmo caso com uma diferença: as duas dizem coisas diferentes. A
+ * do WooCommerce entrega "Início / Tópico / Teste de pergunta", em que "Tópico"
+ * é o nome do post type e leva a um arquivo que a plataforma não usa; a do
+ * bbPress entrega "Início › Fóruns › Fórum Geral › Teste de pergunta", com a
+ * categoria em que a pergunta foi feita — que num Q&A é justamente o caminho de
+ * volta que interessa. Fica a segunda.
+ *
+ * Restrito ao singular de propósito: a listagem e a categoria não imprimem a
+ * trilha do bbPress, e removê-la lá as deixaria sem nenhuma.
+ *
+ * @return void
+ */
+function reconectar_ajustar_cabecalho_da_pergunta() {
+	if ( ! is_singular( array( 'topic', 'reply' ) ) ) {
+		return;
+	}
+
+	remove_action( 'storefront_page', 'storefront_page_header', 10 );
+	remove_action( 'storefront_before_content', 'woocommerce_breadcrumb', 10 );
+}
+// `wp` é o primeiro gancho em que as condicionais já respondem, e ainda falta
+// disparar tanto `storefront_before_content` quanto `storefront_page`.
+add_action( 'wp', 'reconectar_ajustar_cabecalho_da_pergunta' );
+
+/**
  * Tira o título da página na tela de acesso.
  *
  * `storefront_page_header()` imprime `<h1 class="entry-title">` com o título do

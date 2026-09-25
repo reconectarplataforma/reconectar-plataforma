@@ -21,7 +21,18 @@ $reconectar_topico    = get_post( $reconectar_topico_id );
 
 <div id="bbpress-forums" class="bbpress-wrapper rc-forum-wrapper">
 
-	<?php bbp_breadcrumb(); ?>
+	<?php
+	// "Home" e "›" vêm do bbPress sem passar por tradução — o primeiro é literal
+	// no plugin, e o separador é o dele. Aqui a trilha substitui a do tema (veja
+	// `reconectar_ajustar_cabecalho_da_pergunta()`), então precisa falar a mesma
+	// língua e usar a mesma barra das demais páginas.
+	bbp_breadcrumb(
+		array(
+			'home_text' => esc_html__( 'Início', 'reconectar' ),
+			'sep'       => '<span aria-hidden="true">/</span>',
+		)
+	);
+	?>
 
 	<?php do_action( 'bbp_template_before_single_topic' ); ?>
 
