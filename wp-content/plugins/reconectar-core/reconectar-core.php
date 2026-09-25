@@ -29,6 +29,11 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-aviso-demo.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-permissoes.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-status-pedido.php';
 
+// O avatar local também é plugin, e não tema, porque o que ele resolve é
+// proteção de dados: o Gravatar entrega a um terceiro o hash do e-mail de quem
+// avalia e o IP de quem visita. Uma troca de tema não pode reabrir isso.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avatar-local.php';
+
 /**
  * Inicializa os módulos do plugin.
  *
@@ -42,5 +47,6 @@ function reconectar_core_init() {
 	Reconectar_Aviso_Demo::init();
 	Reconectar_Permissoes::init();
 	Reconectar_Status_Pedido::init();
+	Reconectar_Avatar_Local::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );

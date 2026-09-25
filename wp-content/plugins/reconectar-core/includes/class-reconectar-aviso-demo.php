@@ -58,6 +58,19 @@ class Reconectar_Aviso_Demo {
 
 	/**
 	 * Faixa no topo de todas as páginas do site.
+	 *
+	 * O texto é mais curto que o do painel, e a diferença é a frase com o
+	 * comando de remoção. Ela é instrução de desenvolvedor: pressupõe acesso
+	 * ao terminal do servidor, que nenhum visitante tem. No painel faz
+	 * sentido — quem lê ali administra a instalação. Aqui era só ruído
+	 * dirigido a quem não pode agir sobre ele, e ruído caro: o `<code>` leva
+	 * `white-space: nowrap` e mede cerca de 204px, o que em um aparelho de
+	 * 320px monopoliza uma linha inteira. A faixa custava 209,7px nessa
+	 * largura, empilhados acima do cabeçalho.
+	 *
+	 * O aviso em si não encolhe em nada que importe: continua listrado, sem
+	 * botão de fechar e dizendo que lojas, produtos e avaliações são
+	 * fictícios. O que sai é a linha de comando, não a advertência.
 	 */
 	public static function renderizar_no_site() {
 		if ( ! self::esta_ativa() ) {
@@ -97,27 +110,11 @@ class Reconectar_Aviso_Demo {
 				text-transform: uppercase;
 				letter-spacing: 0.04em;
 			}
-
-			.reconectar-aviso-demo code {
-				background-color: rgba(255, 255, 255, 0.75);
-				border-radius: 3px;
-				color: #1f2328;
-				font-size: 0.8125em;
-				padding: 0.1em 0.35em;
-				white-space: nowrap;
-			}
 		</style>
 		<div class="reconectar-aviso-demo" role="region" aria-label="<?php esc_attr_e( 'Aviso de ambiente de demonstração', 'reconectar-core' ); ?>">
 			<p>
 				<strong><?php esc_html_e( 'Ambiente de demonstração.', 'reconectar-core' ); ?></strong>
 				<?php esc_html_e( 'As lojas, os produtos e as avaliações exibidos nesta página são fictícios e foram criados automaticamente para fins de teste. Nenhuma pessoa, empresa ou produto real está representado aqui.', 'reconectar-core' ); ?>
-				<?php
-				printf(
-					/* translators: %s: comando de terminal que remove os dados de demonstração. */
-					esc_html__( 'Para remover esses dados, rode %s na raiz do projeto.', 'reconectar-core' ),
-					'<code>./scripts/seed-demo.sh remover</code>'
-				);
-				?>
 			</p>
 		</div>
 		<?php

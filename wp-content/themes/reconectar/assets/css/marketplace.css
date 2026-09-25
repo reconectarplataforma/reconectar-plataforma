@@ -26,6 +26,34 @@
 }
 
 /* ==========================================================================
+   Régua horizontal
+   ==========================================================================
+   O site tinha duas réguas concorrentes. O cabeçalho autoral vive *fora* do
+   `.col-full` — ele é irmão do `#content`, não filho — e usa `--rc-largura`
+   em `border-box`. Tudo o que fica dentro de `#content` e do rodapé herdava a
+   régua do Storefront: `max-width: 66.4989em` em `content-box`, com recuo de
+   `2.61792em`. Em nenhuma largura as duas coincidiam — o conteúdo entrava 52px
+   mais para dentro que o cabeçalho em 1440, e 42px em 1024 e em 768.
+
+   Alinhar o cabeçalho à régua do tema pai exigiria um `max-width` de 1147,75px
+   para compensar o `content-box`: valor mágico, e o abandono de
+   `--rc-largura`. O caminho inverso deixa uma fonte de verdade só.
+
+   As três regras do tema pai estão dentro de `@media`, o que não lhes dá
+   especificidade extra — esta vence por vir depois na cascata, já que o
+   `marketplace.css` é enfileirado na prioridade 40 e o `storefront-style` na
+   10. Uma delas zera o `padding` abaixo de 66.4989em e devolve o recuo como
+   `margin-left`; por isso `margin-inline` precisa ser declarado aqui também,
+   ou o conteúdo continuaria deslocado justamente nas telas estreitas. */
+
+.col-full {
+  box-sizing: border-box;
+  margin-inline: auto;
+  max-width: var(--rc-largura);
+  padding-inline: var(--rc-espaco);
+}
+
+/* ==========================================================================
    Cabeçalho
    ========================================================================== */
 
@@ -33,6 +61,38 @@
   background: var(--rc-superficie);
   border-bottom: 1px solid var(--rc-borda);
   padding: 0;
+}
+
+/* O Storefront reserva 4.2358em — 67,77px — abaixo do cabeçalho, por
+   `.home.blog .site-header` e `.no-wc-breadcrumb .site-header`. O valor nasceu
+   do layout de blog do tema pai, onde o cabeçalho é uma faixa fina de logotipo
+   antes de uma lista de posts. Aqui é a barra de um marketplace, e o vão só
+   empurra o primeiro produto para baixo: na home de um aparelho de 320px o
+   conteúdo começava a 550px do topo, dois terços de uma tela de 800px.
+
+   O espaçamento não vira zero porque `.site-content` e `.col-full` têm
+   `padding-top: 0` — sem margem nenhuma o conteúdo encostaria na borda do
+   cabeçalho. Passa a ser `--rc-espaco`, a mesma unidade do resto da interface,
+   o que de quebra uniformiza a home com as páginas de loja: lá a margem do
+   Storefront não se aplica (o `<body>` não tem `home blog` nem
+   `no-wc-breadcrumb`) e o valor efetivo já era zero.
+
+   As três classes do seletor são o mínimo para vencer sem `!important`. A
+   regra do tema pai é `.home.blog .site-header`, especificidade (0,3,0): três
+   classes, ainda que duas venham compostas no mesmo elemento. Um seletor de
+   duas classes perde por menor especificidade mesmo vindo depois na cascata —
+   foi o que aconteceu na primeira tentativa, e a medição mostrou a margem
+   intacta. `.wp-child-theme-reconectar` é a classe que o WordPress põe no
+   `<body>` de toda instalação com child theme: empata em (0,3,0) e a ordem das
+   folhas decide, já que o `marketplace.css` é enfileirado na prioridade 40 e o
+   `storefront-style` na 10.
+
+   Que o valor é do template, e não uma escolha de design a preservar, o próprio
+   Storefront demonstra: ele o zera no seu template de homepage, em
+   `.no-wc-breadcrumb.page-template-template-homepage .site-header`. */
+
+.wp-child-theme-reconectar .site-header.rc-cabecalho {
+  margin-bottom: var(--rc-espaco);
 }
 
 .rc-cabecalho__interno {
@@ -67,29 +127,63 @@
   white-space: nowrap;
 }
 
+/* `flex: 0 1 auto` — e não `0 0 auto` — porque o bloco de ações é o item mais
+   largo do cabeçalho: município, conta e carrinho somam 370px. Proibido de
+   encolher, ele empurrava a busca para 219px no tablet e vazava 66px pela
+   direita do viewport em 320px. O `min-width: 0` é o que torna o encolhimento
+   efetivo: sem ele o mínimo automático de um item flex é o próprio conteúdo, e
+   o `flex-shrink` não passa desse piso. */
 .rc-cabecalho__acoes {
   align-items: center;
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   gap: 12px;
   margin-left: auto;
+  min-width: 0;
+}
+
+/* Conta e carrinho ficam fixos: quando falta espaço quem cede é o município,
+   que tem texto variável e degrada bem com reticências. Encolher o total do
+   carrinho esconderia um número que o usuário precisa ler. */
+.rc-conta,
+.rc-carrinho {
+  flex: 0 0 auto;
 }
 
 /* Busca
    -------------------------------------------------------------------------- */
 
+/* A base de 320px reserva à busca um tamanho utilizável antes de qualquer
+   negociação: com `auto`, a base era o conteúdo (um campo vazio, quase nada) e
+   o campo só ficava com as sobras — 219px em 768px de viewport, estreito
+   demais para ler o que se digita. Com base declarada, busca e ações dividem a
+   falta de espaço em proporção ao que cada uma pediu.
+
+   O `margin-bottom: 0` anula `form { margin-bottom: 1.618em }` do Storefront,
+   regra genérica e sem media query que custa 25,888px. Ela é mais cara do que
+   parece: a busca é item flex do cabeçalho, então a margem não abre um vão —
+   entra na altura da linha. Em 1440px o topo do cabeçalho media 95,5px quando o
+   item mais alto pede 77,4px; em 320px ela somava aos 16px de `gap` e deixava
+   37,9px de nada entre a busca e o menu. O espaçamento entre os itens do
+   cabeçalho é o `gap`, e só ele. */
 .rc-busca {
-  flex: 1 1 auto;
+  flex: 1 1 320px;
+  margin-bottom: 0;
   max-width: 520px;
+  min-width: 0;
   position: relative;
 }
 
+/* O recuo à esquerda abre lugar para a lupa e o da direita para o botão
+   "Buscar", que é texto e não ícone: ele mede cerca de 60px e fica a 8px da
+   borda. Com os 44px que havia aqui — medida de um botão só com ícone, que o
+   markup não tem — o que se digitava passava por baixo do botão. */
 .rc-busca__campo {
   background: var(--rc-fundo);
   border: 1px solid var(--rc-borda);
   border-radius: 999px;
   color: var(--rc-texto);
-  padding: 10px 44px 10px 18px;
+  padding: 10px 80px 10px 42px;
   width: 100%;
 }
 
@@ -115,16 +209,31 @@
   color: var(--reconectar-cor-primaria);
 }
 
+/* A lupa é irmã do campo, e não filha do botão: sem posicionamento ela caía no
+   fluxo do formulário e aparecia solta acima do input, como um ícone órfão. O
+   `pointer-events: none` devolve ao campo a área que ela cobre — clicar na lupa
+   precisa dar foco ao input, não engolir o clique. */
 .rc-busca__icone {
+  color: var(--rc-texto-suave);
   display: block;
   height: 20px;
+  left: 14px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   width: 20px;
 }
 
 /* Seletor de município e atalho de conta
    -------------------------------------------------------------------------- */
 
+/* `min-width: 0` repetido em toda a cadeia até o texto: o mínimo automático não
+   se herda, e basta um elo mantê-lo para o nome da cidade travar a largura do
+   cabeçalho inteiro. É este item que absorve a falta de espaço — ver a
+   observação em `.rc-cabecalho__acoes`. */
 .rc-municipio {
+  min-width: 0;
   position: relative;
 }
 
@@ -134,6 +243,7 @@
   display: flex;
   gap: 6px;
   list-style: none;
+  min-width: 0;
   padding: 6px 8px;
 }
 
@@ -149,16 +259,31 @@
   width: 18px;
 }
 
+.rc-municipio__texto {
+  min-width: 0;
+}
+
+/* "Entregando em" é frase fixa e curta; sem `nowrap` ela quebrava em duas linhas
+   no celular e o cabeçalho inteiro ganhava altura por causa de duas palavras. */
 .rc-municipio__rotulo {
   display: block;
   font-size: 0.7rem;
   color: var(--rc-texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* Reticências em vez de quebra: o nome da cidade é uma linha só, e deixá-lo
+   quebrar em duas mudaria a altura do cabeçalho conforme o município escolhido.
+   Em desktop nada é cortado — o gatilho só encolhe quando o espaço acaba. */
 .rc-municipio__valor {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rc-municipio__lista {
@@ -284,16 +409,29 @@
 }
 
 /* A partir do tablet o menu deixa de ser colapsável: o `<summary>` some e a
-   navegação é forçada a aparecer mesmo com o `<details>` fechado, sobrescrevendo
-   a regra `details:not([open]) > *:not(summary) { display: none }` do navegador.
-   Sem isso o menu só abriria com clique também no desktop. */
+   navegação é forçada a aparecer mesmo com o `<details>` fechado. O atributo
+   `open` no HTML resolveria, mas abriria o menu também no celular — que é
+   exatamente o que o colapso existe para evitar.
+
+   São dois mecanismos porque os navegadores mudaram de estratégia no meio do
+   caminho. Os antigos escondiam o conteúdo com
+   `details:not([open]) > *:not(summary) { display: none }`, uma regra sobre o
+   *filho*, que um `display: block` no `<nav>` sobrescreve. Os atuais escondem
+   com `content-visibility: hidden` no pseudo-elemento `::details-content`, que
+   é do *pai* — e nenhum `display` no filho vence isso, nem com `!important`.
+   Foi esse o defeito: a navegação principal ficou invisível em todo o desktop,
+   sem menu e sem botão, porque só a primeira regra estava aqui. */
 @media (min-width: 768px) {
   .rc-menu__gatilho {
     display: none;
   }
 
   .rc-menu__nav {
-    display: block !important;
+    display: block;
+  }
+
+  .rc-menu::details-content {
+    content-visibility: visible;
   }
 
   .rc-menu__lista {
@@ -310,26 +448,131 @@
     flex-wrap: wrap;
   }
 
+  /* `flex-basis: 100%` e não `width: 100%`: a largura declarada de um item flex
+     é ignorada quando existe base declarada, e a base aqui é os 320px da regra
+     geral. */
   .rc-busca {
+    flex: 1 1 100%;
     max-width: none;
     order: 3;
-    width: 100%;
   }
+}
+
+/* Abaixo de 560px não existe faixa que comporte marca e ações lado a lado: as
+   ações pedem 370px e a marca 100, contra 288 de largura útil em um aparelho de
+   320px. Encolher não bastaria — o município teria de sumir por inteiro. Então
+   as ações passam a ocupar uma linha própria, distribuídas nas pontas, e só ali
+   o município cede espaço com reticências.
+
+   O corte é 559px, e não os 767px do bloco acima, porque entre 560 e 767 os dois
+   blocos cabem na mesma linha com folga; aplicar a quebra em toda a faixa mobile
+   acrescentaria uma terceira linha de cabeçalho sem necessidade. */
+@media (max-width: 559px) {
+  .rc-cabecalho__acoes {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    order: 2;
+  }
+
+  /* Sem o recuo à esquerda o ícone do município encosta na mesma vertical do
+     logotipo, que é onde a coluna de leitura começa. */
+  .rc-municipio__gatilho {
+    padding-left: 0;
+  }
+
+  /* O rótulo da conta sai da tela mas continua na árvore de acessibilidade: é o
+     único nome acessível do link, e um `display: none` deixaria um `<a>` sem
+     nome — falha nos critérios 2.4.4 e 4.1.2 da WCAG.
+     A razão de escondê-lo é aritmética: em 320px sobram 288px úteis, e o rótulo
+     custa 48px com "Entrar" ou 83px com "Minha conta", espaço que o município
+     precisa para exibir o nome da cidade inteiro em vez de "Todos o…". Ícone sem
+     rótulo é convenção estabelecida em cabeçalho de celular; nome de cidade
+     truncado não informa nada. */
+  .rc-conta__rotulo {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  /* A lista ancora pela esquerda aqui porque o gatilho mudou de lado: o
+     `space-between` acima joga o município para a extrema esquerda da linha, e
+     um menu de 220px preso pela direita passava a nascer em `left: -57px` — um
+     terço dele fora da tela, cortado pelo `overflow-x: hidden` do tema pai, sem
+     rolagem que alcançasse. O menu precisa crescer para o lado em que há
+     espaço, e do gatilho até a borda direita há 288px em 320px de viewport.
+     O `max-width` é rede de segurança para telas abaixo das que o edital exige:
+     não tem efeito de 320px para cima, onde 220px sempre cabem. */
+  .rc-municipio__lista {
+    left: 0;
+    max-width: calc(100vw - 2 * var(--rc-espaco));
+    right: auto;
+  }
+}
+
+/* ==========================================================================
+   Trilha de navegação
+   ==========================================================================
+   O Storefront reserva 127,2px acima do conteúdo a partir de 768px: 67,9px de
+   caixa mais 59,3px de margem inferior, para uma trilha de uma linha —
+   "Início / Shop" mede 22,65px. São 104,5px de vão, mais que o dobro do texto
+   que emolduram.
+
+   O alcance é maior do que o nome do arquivo de origem sugere: a trilha não
+   sai só nas páginas de WooCommerce. `/transparencia/` também a recebe, e foi
+   medida com os mesmos 127,2px. Vale em toda página que não seja a home — a
+   home não tem trilha, e por isso este bloco não a afeta.
+
+   Os valores vêm da escala tipográfica do tema pai, razão áurea sobre 16px:
+   `padding: 1.41575em 0` e `margin: 0 0 3.70633em`, em
+   `assets/css/woocommerce/woocommerce.css`. Aquela escala pressupõe o
+   cabeçalho do Storefront, uma faixa fina de logotipo. Aqui o cabeçalho é a
+   barra do marketplace, com busca, ações e menu, e mede 150,7px: somados,
+   empurravam o primeiro produto para 361,5px em 1440 e para 492,2px em 320 —
+   61% de uma tela de 800px antes de qualquer produto.
+
+   A trilha não é removida. É navegação, e o critério 2.4.8 da WCAG 2.1 conta
+   com ela para situar quem chegou por busca ou por link direto. Muda só o
+   espaçamento, que passa à unidade do resto da interface.
+
+   A regra do tema pai é `.storefront-breadcrumb`, especificidade (0,1,0), e
+   esta empata: decide a ordem das folhas, e o `marketplace.css` é a 22ª contra
+   a 18ª do `woocommerce.css` do Storefront. Estar dentro de uma `@media` não
+   dá especificidade extra, então uma regra sem `@media` aqui vale nas duas
+   faixas — que é o desejado, porque a escala do sistema é uma só.
+
+   O seletor é de terceiro: se a migração para o Blocksy acontecer, o elemento
+   deixa de existir e este bloco fica inerte. Não quebra nada, mas sai de cena
+   junto com o tema que o criou. */
+
+.storefront-breadcrumb {
+  margin-bottom: var(--rc-espaco);
+  padding-block: calc(var(--rc-espaco) / 2);
 }
 
 /* ==========================================================================
    Carrossel
    ========================================================================== */
 
+/* Sem `max-width` nem `padding` lateral próprios: quem faz a régua é o
+   `.col-full` que envolve a página inteira. Enquanto estavam aqui, eram letra
+   morta — o container pai já limitava a seção a 1063,98px, bem abaixo dos
+   1200px declarados — e o `padding` somava um segundo recuo ao do pai, jogando
+   o carrossel 16px para dentro do resto da página. */
 .rc-carrossel {
-  margin: 32px auto;
-  max-width: var(--rc-largura);
-  padding: 0 var(--rc-espaco);
+  margin: 32px 0;
 }
 
+/* A quebra é rede de segurança para título longo em tela estreita: sem ela o
+   cabeçalho é uma linha só em `nowrap`, e o que não cabe some por baixo do
+   `overflow-x: hidden` do tema pai — sem rolagem, sem aviso. */
 .rc-carrossel__cabecalho {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--rc-espaco);
   justify-content: space-between;
   margin-bottom: 12px;
@@ -359,6 +602,13 @@
   display: none;
 }
 
+/* O `padding: 0` é obrigatório, não cosmético: o Storefront estiliza o seletor
+   `button` com `padding: .618em 1.416em`, e como o `box-sizing` é `border-box`
+   esses 22,6px de cada lado viram o piso da largura — os 32px declarados aqui
+   eram simplesmente ignorados. A seta media 47×32, ou seja, o `border-radius:
+   50%` desenhava uma elipse, e os dois botões somados empurravam o cabeçalho do
+   carrossel para fora da tela em 320px, onde o `overflow-x: hidden` do tema pai
+   cortava a seta da direita sem deixar rolar até ela. */
 .rc-carrossel.is-interativo .rc-carrossel__seta {
   align-items: center;
   background: var(--rc-superficie);
@@ -369,6 +619,7 @@
   display: flex;
   height: 32px;
   justify-content: center;
+  padding: 0;
   width: 32px;
 }
 
@@ -409,8 +660,29 @@
   outline-offset: 4px;
 }
 
+/* A faixa de categorias é a única que não pode esticar os cards. Um card de
+   categoria é um ícone de 80px com um rótulo embaixo; com `1fr` ele inflava até
+   224px em 1280px de tela — 144px de vazio horizontal por card, e a faixa toda
+   parecendo cinco ícones soltos, não um carrossel.
+
+   Pior que a aparência era a instabilidade: como `1fr` divide a pista pelo
+   número de itens, a largura do card dependia de quantas categorias o catálogo
+   tivesse no momento. Com as 5 da demonstração, 224px; com as 14 que
+   `reconectar_home_categorias()` pede, 104px. A mesma tela mudava de forma
+   conforme o administrador cadastrasse ou removesse um termo.
+
+   O teto veio de medição, não de gosto: o rótulo mais longo do catálogo
+   ("Alimentos e Bebidas") pede 139px numa linha e os demais ficam entre 77px e
+   128px, então 136px acomoda quase todos em uma linha e os excedentes em duas.
+   O piso de 104px é o que já existia aqui, dimensionado para o mobile. Entre os
+   dois a largura acompanha a viewport, saindo do piso por volta de 743px.
+
+   Sem `1fr` as colunas param de esticar e a faixa alinha à esquerda sozinha —
+   `justify-content` no grid já faz isso por padrão. As outras duas faixas
+   mantêm o `1fr` de propósito: cards de loja e de produto têm imagem de capa,
+   que ganha com a largura extra quando sobram poucos itens. */
 .rc-carrossel__faixa--categorias {
-  grid-auto-columns: minmax(104px, 1fr);
+  grid-auto-columns: clamp(104px, 14vw, 136px);
 }
 
 .rc-carrossel__faixa--destaque {
@@ -727,10 +999,9 @@
    Vitrine de lojas
    ========================================================================== */
 
+/* Mesma razão do `.rc-carrossel`: a régua é do `.col-full`, não da seção. */
 .rc-vitrine {
-  margin: 32px auto;
-  max-width: var(--rc-largura);
-  padding: 0 var(--rc-espaco);
+  margin: 32px 0;
 }
 
 .rc-vitrine__titulo {
@@ -755,6 +1026,39 @@
   color: var(--rc-texto-suave);
   padding: 40px var(--rc-espaco);
   text-align: center;
+}
+
+/* ==========================================================================
+   Barra de filtros do Dokan (/store-listing/)
+   ==========================================================================
+   Markup de plugin de terceiro: nada aqui edita arquivo do Dokan, a correção
+   entra pela cascata. O `marketplace.css` é enfileirado na prioridade 40 e sai
+   depois do CSS do plugin, então uma regra de especificidade idêntica à dele
+   vence sem precisar de `!important`.
+
+   O defeito: `#dokan-store-listing-filter-wrap .right` é um flex container que
+   o plugin nunca declara como quebrável, e `nowrap` é o valor inicial. Em
+   320px, os dois filhos visíveis — o botão "Filter" (98px) e o formulário de
+   ordenação (184px: rótulo de 58px mais o `<select>` de 122px) — somam 282px
+   num espaço interno de 233px. O formulário passa 49px do pai e 13px da régua
+   do `.col-full`, e o `<select>` fica com a borda direita para fora da tela.
+
+   Não há media query aqui de propósito. O ponto exato de ruptura depende do
+   comprimento do rótulo, e a interface do Dokan ainda está em inglês: com
+   "Sort by:" o estouro só aparece até 414px, mas "Ordenar por:" é bem mais
+   largo e empurraria o mesmo defeito para telas maiores no dia em que a
+   tradução entrar. Um breakpoint chumbado hoje nasceria com data de validade;
+   `flex-wrap` mede o texto real e se ajusta sozinho.
+
+   A alternativa descartada foi deixar o `<select>` encolher (`min-width: 0` no
+   formulário). Ela resolve o overflow, mas corta o nome da opção selecionada no
+   meio — trocar um defeito de layout por um de legibilidade.
+
+   O `row-gap` só tem efeito quando a linha realmente quebra: onde os dois
+   controles cabem lado a lado, esta regra não muda pixel nenhum. */
+#dokan-store-listing-filter-wrap .right {
+  flex-wrap: wrap;
+  row-gap: calc(var(--rc-espaco) / 2);
 }
 
 /* ==========================================================================
@@ -808,6 +1112,15 @@
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* Nem toda coluna é lista de links: a institucional é texto corrido, e sem esta
+   regra ela apareceria em 1rem ao lado de colunas de links em 0,87rem, com as
+   primeiras linhas desalinhadas entre si. */
+.rc-rodape__bloco p {
+  color: var(--rc-texto-suave);
+  font-size: 0.87rem;
+  margin: 0 0 8px;
 }
 
 .rc-rodape__bloco a {

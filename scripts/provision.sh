@@ -77,6 +77,119 @@ else
   echo "Plugin autoral 'reconectar-core' ainda não existe (será criado na Task 6). Pulando ativação."
 fi
 
+echo "== Idioma dos plugins e temas (pt_BR) =="
+# `wp language core install` traduz só o núcleo. Sem este bloco, o painel
+# administrativo aparecia em português enquanto a loja inteira — carrinho,
+# checkout, painel do vendedor, fóruns — continuava em inglês: "Cart",
+# "Proceed to Checkout", "Place Order", "Vendor:". Não era falta de arquivo
+# `.mo` autoral nem caso para um filtro `gettext`; era um passo de instalação
+# que nunca havia sido dado.
+#
+# O pacote do WordPress.org traz junto os `.json` que o `wp_set_script_translations()`
+# usa, então os blocos React do WooCommerce (carrinho e checkout) também
+# passam a falar português — é o que torna estas duas linhas a menor
+# alteração possível para o maior ganho.
+#
+# Precisa rodar DEPOIS da instalação dos plugins: o WP-CLI só busca pacote
+# para o que já está no disco. Roda mais de uma vez sem duplicar, e sai com
+# status 0 mesmo quando um pacote não existe no repositório — hoje é o caso
+# do Dokan Lite, que não tem tradução oficial em pt_BR. Por isso nenhum `||
+# true` aqui: um erro real ainda deve derrubar o script.
+wp language plugin install --all pt_BR
+wp language theme install --all pt_BR
+
+echo "== Vitrine pública (cortina 'Em breve' do WooCommerce) =="
+# O WooCommerce instala com "coming_soon" ligado desde a versão 9.1: loja,
+# produto, carrinho e checkout ficam atrás de uma cortina que só o
+# administrador atravessa. Num ambiente de demonstração isso é indistinguível
+# de um defeito — o visitante deslogado vê uma página de espera no lugar da
+# loja inteira, e o menu principal parece quebrado.
+#
+# A cortina existe para quem monta uma loja de verdade em produção, não para
+# um ambiente que o provisionamento acaba de montar do zero. Desligá-la aqui
+# não é decisão de negócio: é terminar a instalação.
+if [ "$(wp option get woocommerce_coming_soon 2>/dev/null || true)" = "no" ]; then
+  echo "Vitrine já pública."
+else
+  wp option update woocommerce_coming_soon no
+fi
+
+echo "== Localização da loja (moeda, país e unidades) =="
+# O WooCommerce instala com os padrões dos Estados Unidos e nunca pergunta:
+# moeda USD, país "US:CA", peso em libras, comprimento em polegadas, ponto
+# como separador decimal. Num marketplace de edital brasileiro isso aparecia
+# como "$115.00" na vitrine e um checkout abrindo no estado da Califórnia.
+#
+# Trocar a moeda não converte nenhum valor, e é por isso que cabe aqui: os
+# preços estão gravados como números puros (115.00), sem moeda intrínseca —
+# declarar BRL nomeia a moeda que o projeto sempre teve na prática, não
+# reprecifica nada. O mesmo vale para as unidades: nenhum produto tem `_weight`
+# ou `_length` gravado, então "lbs" → "kg" não reinterpreta medida alguma,
+# apenas define a unidade dos próximos cadastros. Se algum dia houver peso
+# gravado em libras, esta linha passa a exigir conversão junto — não a mova
+# para cá sem checar.
+#
+# `woocommerce_allowed_countries` fica de fora de propósito: restringir a
+# venda ao Brasil é decisão de negócio do edital, não resíduo de instalação.
+for par in \
+  "woocommerce_currency=BRL" \
+  "woocommerce_currency_pos=left_space" \
+  "woocommerce_price_decimal_sep=," \
+  "woocommerce_price_thousand_sep=." \
+  "woocommerce_default_country=BR" \
+  "woocommerce_weight_unit=kg" \
+  "woocommerce_dimension_unit=cm"
+do
+  opcao="${par%%=*}"
+  valor="${par#*=}"
+
+  if [ "$(wp option get "$opcao" 2>/dev/null || true)" = "$valor" ]; then
+    echo "Opção '$opcao' já é '$valor'."
+  else
+    wp option update "$opcao" "$valor"
+  fi
+done
+
+echo "== Resíduos da instalação padrão do WordPress =="
+# O WordPress nasce com um post "Hello world!", um comentário de "A WordPress
+# Commenter" e uma sidebar de blog. Nada disso é invisível: o post e o
+# comentário apareciam nos widgets "Posts recentes" e "Comentários recentes"
+# em cinco páginas públicas — loja, carrinho, vitrine de lojas, transparência
+# e a página de produto. A vitrine do edital exibia "Hello world!" ao lado do
+# preço do artesanato.
+#
+# A sidebar custa mais do que o constrangimento: o Storefront decide a largura
+# do conteúdo pela existência de widget na `sidebar-1` e reservava 26% da linha
+# para uma coluna de blog num site que não tem blog. Esvaziá-la devolve essa
+# largura à loja.
+#
+# Post e comentário vão para a LIXEIRA, não para o `--force`: são reversíveis
+# pelo painel se alguém quiser conferir o que saiu.
+post_exemplo="$(wp post list --post_type=post --name=hello-world --post_status=publish --field=ID)"
+if [ -n "$post_exemplo" ]; then
+  wp post delete "$post_exemplo"
+else
+  echo "Post 'Hello world!' já removido."
+fi
+
+comentario_exemplo="$(wp comment list --status=approve --search='A WordPress Commenter' --field=ID --number=1)"
+if [ -n "$comentario_exemplo" ]; then
+  wp comment delete "$comentario_exemplo"
+else
+  echo "Comentário de exemplo já removido."
+fi
+
+# A remoção dos widgets é condicionada à lista ser EXATAMENTE a de fábrica.
+# Não é preciosismo: é o que impede o provisionamento de apagar, na segunda
+# execução, a sidebar que o administrador tiver montado no meio-tempo. Mexeu
+# em qualquer um dos cinco, a lista difere e este bloco passa direto.
+if [ "$(wp widget list sidebar-1 --format=ids)" = "block-2 block-3 block-4 block-5 block-6" ]; then
+  wp widget delete block-2 block-3 block-4 block-5 block-6
+  echo "Sidebar de blog padrão esvaziada."
+else
+  echo "Sidebar-1 já foi ajustada, preservando como está."
+fi
+
 echo "== Página da Comunidade (BuddyPress) =="
 if ! wp post list --post_type=page --title="Comunidade" --field=ID | grep -q .; then
   wp post create \
@@ -118,6 +231,88 @@ else
   [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=5
 
   wp menu location assign menu-principal primary
+fi
+
+echo "== Rodapé (widgets das três colunas) =="
+# O tema registra as áreas "reconectar-rodape-1..3" e imprime apenas as que
+# tiverem widget — sem isso o rodapé nasceria com buracos na grade. O efeito
+# colateral é que um provisionamento que não popula nenhuma delas produz um
+# rodapé só com a faixa legal, o que parecia um defeito do tema e era omissão
+# daqui: as chaves sequer apareciam em "sidebars_widgets".
+#
+# Cada coluna só é preenchida se estiver vazia. Isso mantém o script idempotente
+# e, mais importante, preserva o que o administrador editar depois: rodar de
+# novo não desfaz o trabalho dele.
+
+# Devolve a URL pública de uma página pelo slug, ou nada se ela não existir.
+# Consultar em vez de concatenar o slug ao domínio importa porque as páginas do
+# WooCommerce são criadas com slugs em inglês e podem ser renomeadas no painel —
+# um link chumbado sobreviveria à renomeação apontando para lugar nenhum.
+reconectar_url_da_pagina() {
+  local id
+  id=$(wp post list --post_type=page --name="$1" --post_status=publish --field=ID)
+
+  if [ -n "$id" ]; then
+    wp post url "$id"
+  fi
+}
+
+# Monta um <li> de link, ou nada quando a página não existe. Omitir o item é
+# deliberado: um rodapé com um link a menos é melhor que um link para o 404.
+reconectar_item_de_rodape() {
+  local url
+  url=$(reconectar_url_da_pagina "$1")
+
+  if [ -n "$url" ]; then
+    printf '<li><a href="%s">%s</a></li>' "$url" "$2"
+  fi
+}
+
+# A checagem não passa por `| grep -q .` porque o script roda sob `pipefail`:
+# o grep fecha o cano assim que acha a primeira linha, o `wp` do outro lado
+# morre de SIGPIPE, e o pipeline inteiro passa a reportar falha justamente no
+# caso em que a coluna TEM widget — invertendo a condição e duplicando tudo a
+# cada execução.
+if [ -n "$(wp widget list reconectar-rodape-1 --format=ids)" ]; then
+  echo "Coluna 1 do rodapé já tem conteúdo."
+else
+  wp widget add custom_html reconectar-rodape-1 \
+    --title="Reconectar" \
+    --content="<p>Incubadora Digital para Vínculos e Negócios.</p><p>Plataforma do projeto <em>Nosso Chão, Nossa História</em>, uma iniciativa FUNDEPES/UNOPS.</p>"
+fi
+
+if [ -n "$(wp widget list reconectar-rodape-2 --format=ids)" ]; then
+  echo "Coluna 2 do rodapé já tem conteúdo."
+else
+  navegacao="$(reconectar_item_de_rodape shop 'Loja')"
+  navegacao+="$(reconectar_item_de_rodape store-listing 'Lojas parceiras')"
+  navegacao+="$(reconectar_item_de_rodape comunidade 'Comunidade')"
+  navegacao+="$(reconectar_item_de_rodape transparencia 'Transparência')"
+
+  if [ -n "$navegacao" ]; then
+    wp widget add custom_html reconectar-rodape-2 \
+      --title="Navegação" \
+      --content="<ul>$navegacao</ul>"
+  else
+    echo "Nenhuma página de navegação encontrada, coluna 2 fica vazia."
+  fi
+fi
+
+if [ -n "$(wp widget list reconectar-rodape-3 --format=ids)" ]; then
+  echo "Coluna 3 do rodapé já tem conteúdo."
+else
+  vendedor="$(reconectar_item_de_rodape vendor-onboarding 'Quero vender')"
+  vendedor+="$(reconectar_item_de_rodape dashboard 'Painel do vendedor')"
+  vendedor+="$(reconectar_item_de_rodape my-account 'Minha conta')"
+  vendedor+="$(reconectar_item_de_rodape my-orders 'Meus pedidos')"
+
+  if [ -n "$vendedor" ]; then
+    wp widget add custom_html reconectar-rodape-3 \
+      --title="Sua conta" \
+      --content="<ul>$vendedor</ul>"
+  else
+    echo "Nenhuma página de conta encontrada, coluna 3 fica vazia."
+  fi
 fi
 
 echo "== Permalinks =="

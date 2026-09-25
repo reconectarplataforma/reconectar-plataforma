@@ -93,6 +93,7 @@ class Reconectar_Permissoes {
 
 		// Interface: o que já foi negado acima também não deve ser oferecido.
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_itens_da_comunidade' ) );
+		add_filter( 'widget_custom_html_content', array( __CLASS__, 'ocultar_links_da_comunidade_em_widget' ) );
 		add_filter( 'show_admin_bar', array( __CLASS__, 'ocultar_barra_administrativa' ) );
 	}
 
@@ -356,6 +357,20 @@ class Reconectar_Permissoes {
 	}
 
 	/**
+	 * O usuário atual pode entrar na comunidade e nos fóruns?
+	 *
+	 * Existe para que as três superfícies de navegação que oferecem esse link —
+	 * o menu, o card da home e o widget do rodapé — decidam pelo mesmo critério.
+	 * Enquanto cada uma perguntava por conta própria, elas divergiram: o menu
+	 * escondia o item do visitante deslogado e as outras duas o exibiam.
+	 *
+	 * @return bool
+	 */
+	public static function pode_participar_da_comunidade() {
+		return current_user_can( self::CAP_COMUNIDADE );
+	}
+
+	/**
 	 * Remove do menu os itens que levam a áreas bloqueadas.
 	 *
 	 * O bloqueio acima já é suficiente do ponto de vista de segurança; este
@@ -366,7 +381,7 @@ class Reconectar_Permissoes {
 	 * @return array
 	 */
 	public static function ocultar_itens_da_comunidade( $itens ) {
-		if ( current_user_can( self::CAP_COMUNIDADE ) ) {
+		if ( self::pode_participar_da_comunidade() ) {
 			return $itens;
 		}
 
@@ -386,6 +401,162 @@ class Reconectar_Permissoes {
 		}
 
 		return $itens;
+	}
+
+	/**
+	 * Remove do HTML de um widget os links que levam à comunidade.
+	 *
+	 * O menu chega ao filtro acima como estrutura de dados, item a item. O widget
+	 * "Navegação" do rodapé é HTML livre, digitado no painel, e não passa por
+	 * `wp_nav_menu_objects` — por isso as duas superfícies divergiram: o visitante
+	 * deslogado não via "Comunidade" no menu e via no rodapé, e o cliente logado
+	 * que clicasse ali recebia o 403 de `bloquear_comunidade()`.
+	 *
+	 * A comparação é pelo caminho da URL, não pelo texto do link nem pelo formato
+	 * do HTML. É a única forma que sobrevive a uma edição pelo painel, e edição
+	 * pelo painel é o caso esperado num site de edital, que troca de mãos: um
+	 * `str_replace()` do trecho que o provisionamento escreve pararia de funcionar
+	 * no dia em que alguém reordenasse a lista ou trocasse o rótulo.
+	 *
+	 * @param string $conteudo HTML do widget.
+	 * @return string HTML sem os links bloqueados.
+	 */
+	public static function ocultar_links_da_comunidade_em_widget( $conteudo ) {
+		if ( ! is_string( $conteudo ) || false === stripos( $conteudo, '<a' ) ) {
+			return $conteudo;
+		}
+
+		if ( self::pode_participar_da_comunidade() ) {
+			return $conteudo;
+		}
+
+		// `DOMDocument` vem de uma extensão que pode não estar compilada. Sem ela
+		// o link volta a aparecer, que é exatamente o estado anterior a este
+		// filtro — degradar para o comportamento antigo é melhor que derrubar o
+		// rodapé inteiro com um fatal.
+		if ( ! class_exists( 'DOMDocument' ) ) {
+			return $conteudo;
+		}
+
+		$comunidade = get_page_by_path( 'comunidade' );
+
+		if ( ! $comunidade ) {
+			return $conteudo;
+		}
+
+		$alvo = self::caminho_de_url( get_permalink( $comunidade ) );
+
+		if ( '' === $alvo ) {
+			return $conteudo;
+		}
+
+		$documento = new DOMDocument();
+
+		// O `<meta charset>` não é enfeite: sem ele o `loadHTML()` assume
+		// ISO-8859-1 e "Transparência" volta da serialização como mojibake. A
+		// receita antiga para isso — `mb_convert_encoding()` com `HTML-ENTITIES` —
+		// está descontinuada desde o PHP 8.2, e o container roda 8.2.
+		//
+		// O `libxml_use_internal_errors()` silencia os avisos que o parser emite
+		// diante de tags que ele não conhece. Vale notar o limite disso: o parser
+		// também *normaliza* o que estiver mal fechado, e num HTML inválido — uma
+		// âncora sem `</a>`, por exemplo — o item seguinte pode acabar dentro do
+		// que será removido. O widget que o provisionamento escreve é bem formado;
+		// quem editar o dele à mão precisa fechar as tags.
+		$erros_internos = libxml_use_internal_errors( true );
+
+		$carregou = $documento->loadHTML(
+			'<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>' . $conteudo . '</body></html>'
+		);
+
+		libxml_clear_errors();
+		libxml_use_internal_errors( $erros_internos );
+
+		if ( ! $carregou ) {
+			return $conteudo;
+		}
+
+		$xpath = new DOMXPath( $documento );
+		$links = $xpath->query( '//a[@href]' );
+
+		if ( ! $links instanceof DOMNodeList || 0 === $links->length ) {
+			return $conteudo;
+		}
+
+		$removeu = false;
+
+		// A lista devolvida pelo XPath é estática, ao contrário da de
+		// `getElementsByTagName()`: dá para remover nós durante a iteração sem
+		// embaralhar o que ainda falta percorrer.
+		foreach ( $links as $link ) {
+			if ( self::caminho_de_url( $link->getAttribute( 'href' ) ) !== $alvo ) {
+				continue;
+			}
+
+			// Some o item inteiro, não só a âncora: deixar o `<li>` para trás
+			// produziria um marcador solto na coluna do rodapé.
+			$remover = $link;
+			$pai     = $link->parentNode;
+
+			while ( $pai instanceof DOMElement && 'body' !== strtolower( $pai->nodeName ) ) {
+				if ( 'li' === strtolower( $pai->nodeName ) ) {
+					$remover = $pai;
+					break;
+				}
+
+				$pai = $pai->parentNode;
+			}
+
+			if ( $remover->parentNode ) {
+				$remover->parentNode->removeChild( $remover );
+				$removeu = true;
+			}
+		}
+
+		if ( ! $removeu ) {
+			return $conteudo;
+		}
+
+		$corpo = $documento->getElementsByTagName( 'body' )->item( 0 );
+
+		if ( ! $corpo ) {
+			return $conteudo;
+		}
+
+		// Serializa filho a filho para não devolver o `<html><body>` que só existe
+		// porque foi preciso dar ao parser um documento completo.
+		$html = '';
+
+		foreach ( $corpo->childNodes as $filho ) {
+			$html .= $documento->saveHTML( $filho );
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Reduz uma URL ao caminho, em forma comparável.
+	 *
+	 * Compara-se o caminho, e não a URL inteira, porque os dois lados chegam em
+	 * formatos diferentes sem que isso signifique destinos diferentes: o
+	 * permalink vem absoluto, e o link do widget pode ter sido digitado relativo,
+	 * com `?` de rastreio ou com âncora.
+	 *
+	 * @param string $url URL absoluta ou relativa.
+	 * @return string Caminho sem a barra final, ou string vazia se não houver.
+	 */
+	private static function caminho_de_url( $url ) {
+		if ( ! is_string( $url ) || '' === $url ) {
+			return '';
+		}
+
+		$caminho = wp_parse_url( $url, PHP_URL_PATH );
+
+		if ( ! is_string( $caminho ) || '' === $caminho ) {
+			return '';
+		}
+
+		return untrailingslashit( $caminho );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -440,4 +611,24 @@ class Reconectar_Permissoes {
 
 		return false;
 	}
+}
+
+/**
+ * O usuário atual pode entrar na comunidade e nos fóruns?
+ *
+ * Fachada para o tema, que não deve conhecer a classe nem o nome da capacidade.
+ * Existe por um motivo concreto, e não por estilo: se o tema perguntasse direto
+ * por `current_user_can( 'reconectar_participar_comunidade' )` e alguém
+ * desativasse este plugin, ninguém teria a capacidade e o link sumiria para
+ * todos — inclusive para o administrador. Seria o pior resultado possível, já
+ * que sem o plugin também não existe bloqueio nenhum: a área estaria aberta e
+ * escondida ao mesmo tempo.
+ *
+ * Por isso o tema consulta esta função sob `function_exists()` e, quando ela não
+ * existe, exibe o link. Sem plugin, sem restrição.
+ *
+ * @return bool
+ */
+function reconectar_pode_participar_da_comunidade() {
+	return Reconectar_Permissoes::pode_participar_da_comunidade();
 }

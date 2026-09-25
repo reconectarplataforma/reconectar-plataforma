@@ -15,6 +15,7 @@ $reconectar_modulos = array(
 	'inc/helpers.php',
 	'inc/setup.php',
 	'inc/enqueue.php',
+	'inc/layout.php',
 
 	/*
 	 * Marketplace. A ordem importa: `consultas.php` define as funções de dados

@@ -20,6 +20,21 @@ body {
   font-family: 'Poppins', sans-serif;
 }
 
+/* Os controles de formulário precisam ser nomeados explicitamente porque não
+   herdam a fonte do `body`: o agente de usuário lhes dá uma fonte de sistema
+   própria, e o Storefront reforça isso com `body, button, input, textarea`.
+   Enquanto esta regra não existia, o site tinha Poppins na interface e Source
+   Sans Pro nos campos e botões — a busca do cabeçalho, as setas dos carrosséis
+   e todo o checkout. `inherit` em vez de repetir a família para que um ajuste
+   futuro em `body` alcance os formulários junto. */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+}
+
 /* A Thoge é uma fonte de display (formas fechadas, contraste alto): legível em
    uma palavra isolada, ilegível em títulos corridos. Por isso fica restrita ao
    logotipo textual (`.site-title`, usado quando não há logo em imagem) e os
@@ -80,74 +95,26 @@ input[type="submit"]:hover {
 }
 
 /* ==========================================================================
-   Layout responsivo (Bootstrap) — Task 8
+   Cabeçalho do Storefront — regras removidas
    ==========================================================================
-   O container `.col-full` já é nativo do Storefront (centralizado,
-   max-width ~1064px, com breakpoints próprios em 568px); reaproveitamos
-   esse container em vez de duplicá-lo com `.container` do Bootstrap.
+   Aqui viviam `.site-header > .col-full`, `.site-header .site-search` e a
+   `.reconectar-navbar` inteira: o cabeçalho do tema pai e a navbar Bootstrap
+   que o acompanhava. Nenhuma dessas classes é impressa em página alguma desde
+   que o cabeçalho autoral passou a ser montado fora do `.site-header` — foram
+   conferidas uma a uma na home, na loja, no carrinho, na conta, na vitrine de
+   lojas e no painel de transparência, sem uma única ocorrência.
+
+   Saíram em vez de ficarem "por via das dúvidas" porque uma delas carregava um
+   `!important` que disputaria a cascata com o cabeçalho novo caso o markup
+   antigo voltasse por acidente. A armadilha que aquele `!important` contornava
+   continua valendo para qualquer menu montado dentro de `.main-navigation`: o
+   WordPress injeta a classe `nav-menu` no `<ul>` do menu primário, e o
+   Storefront tem `.main-navigation ul.nav-menu { margin-left: -1em }`, que
+   corta o primeiro item.
+
+   A régua horizontal do site não é mais a do tema pai; ela é declarada em
+   `assets/css/marketplace.css`, na seção "Régua horizontal".
 */
-
-/* Cabeçalho: logo + busca de produto lado a lado, empilhando em telas
-   estreitas em vez de comprimir/transbordar. */
-.site-header > .col-full {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.site-header .site-search {
-  flex: 1 1 260px;
-  max-width: 320px;
-}
-
-@media (max-width: 568px) {
-  .site-header > .col-full {
-    justify-content: center;
-    text-align: center;
-  }
-
-  .site-header .site-search {
-    flex-basis: 100%;
-    max-width: none;
-  }
-}
-
-/* Navbar principal (Bootstrap), sobrescrita em functions.php. */
-.reconectar-navbar {
-  background-color: var(--reconectar-cor-institucional);
-}
-
-.reconectar-navbar .nav-link {
-  color: #fff;
-}
-
-.reconectar-navbar .nav-link:hover,
-.reconectar-navbar .nav-link:focus,
-.reconectar-navbar .nav-link.current-menu-item {
-  color: var(--reconectar-cor-destaque);
-}
-
-.reconectar-navbar .navbar-toggler {
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.reconectar-navbar .navbar-toggler-icon {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.85)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-}
-
-/* Neutraliza margem/padding legados que o CSS nativo do Storefront aplica a
-   listas <ul> de navegação (pensados para menus sem Bootstrap). O WordPress
-   core injeta automaticamente a classe `nav-menu` no <ul> do menu primário,
-   o que ativa a regra `.main-navigation ul.nav-menu { margin-left: -1em }`
-   do Storefront — com especificidade maior (2 classes + 1 elemento) do que
-   este seletor (2 classes), cortando o primeiro item do menu. O !important
-   é necessário para vencer essa regra legada de forma robusta. */
-.reconectar-navbar .navbar-nav {
-  margin: 0 !important;
-  padding: 0;
-}
 
 /* Painel de transparência: espaçamento vertical do bloco de cards dentro
    do fluxo de conteúdo padrão (`.col-full`/`.site-content`). */
@@ -159,40 +126,22 @@ input[type="submit"]:hover {
 /* ==========================================================================
    Home institucional
    ==========================================================================
-   Seções renderizadas via `front-page.php` + action própria `reconectar_home`
-   (reconectar_home_hero, reconectar_home_categorias,
-   reconectar_home_comunidade_transparencia). Todas usam classes do próprio
-   tema: a home não depende mais de `.storefront-product-section` nem de
-   qualquer outra classe do tema pai para o espaçamento vertical.
+   Seções renderizadas via `front-page.php` + action própria `reconectar_home`.
+   Todas usam classes do próprio tema: a home não depende mais de
+   `.storefront-product-section` nem de qualquer outra classe do tema pai para
+   o espaçamento vertical.
+
+   Só o hero e o bloco de comunidade/transparência ainda são estilizados aqui.
+   As demais seções — categorias, ofertas, lojas em destaque e a vitrine —
+   passaram para os componentes `rc-` de `assets/css/marketplace.css`, e as
+   regras `.reconectar-home-categorias*` que restavam aqui foram removidas
+   junto: a função `reconectar_home_categorias()` existe, mas hoje imprime um
+   `rc-carrossel`, não aquele markup.
 */
 
 .reconectar-hero,
-.reconectar-home-categorias,
 .reconectar-home-comunidade-transparencia {
   padding: 3rem 1rem;
-}
-
-.reconectar-home-categorias__titulo {
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.reconectar-home-categorias__item {
-  color: inherit;
-  display: block;
-  text-align: center;
-}
-
-.reconectar-home-categorias__imagem {
-  border-radius: 50%;
-  height: auto;
-  margin-bottom: 0.5rem;
-  max-width: 100%;
-}
-
-.reconectar-home-categorias__nome {
-  display: block;
-  font-weight: 600;
 }
 
 .reconectar-hero {

@@ -15,18 +15,41 @@ defined( 'ABSPATH' ) || exit;
  * Cada card só aparece se a página correspondente existir, e a seção inteira é
  * omitida quando nenhuma das duas existe — evita renderizar um bloco vazio em
  * uma instalação recém-provisionada.
+ *
+ * O card da Comunidade tem uma segunda condição, de permissão: quem não pode
+ * entrar na comunidade também não deve recebê-la como convite. O plugin já
+ * bloqueia o acesso — o cliente logado leva um 403 e o visitante deslogado é
+ * mandado para o login —, mas o bloqueio não alcançava esta superfície, e o
+ * resultado era um card que só servia para levar a um beco. A mesma regra vale
+ * no menu principal, por `Reconectar_Permissoes::ocultar_itens_da_comunidade()`,
+ * e no widget do rodapé; as três precisam concordar.
+ *
+ * A consulta passa por `function_exists()` porque o tema não pode depender do
+ * plugin: sem ele não há bloqueio nenhum, e esconder o card deixaria a área
+ * aberta e invisível ao mesmo tempo.
  */
 function reconectar_home_comunidade_transparencia() {
 	$comunidade    = get_page_by_path( 'comunidade' );
 	$transparencia = get_page_by_path( 'transparencia' );
 
+	if ( $comunidade
+		&& function_exists( 'reconectar_pode_participar_da_comunidade' )
+		&& ! reconectar_pode_participar_da_comunidade() ) {
+		$comunidade = null;
+	}
+
 	if ( ! $comunidade && ! $transparencia ) {
 		return;
 	}
+
+	// Com um card só, `row-cols-md-2` deixaria metade da linha vazia a partir de
+	// 768px. A contagem resolve tanto o caso de permissão acima quanto o de uma
+	// instalação em que só uma das duas páginas exista.
+	$colunas_md = ( $comunidade && $transparencia ) ? 'row-cols-md-2' : 'row-cols-md-1';
 	?>
 	<section class="reconectar-home-comunidade-transparencia">
 		<div class="container">
-			<div class="row row-cols-1 row-cols-md-2 g-3">
+			<div class="row row-cols-1 <?php echo esc_attr( $colunas_md ); ?> g-3">
 				<?php if ( $comunidade ) : ?>
 					<div class="col">
 						<a class="card h-100 text-decoration-none" href="<?php echo esc_url( get_permalink( $comunidade ) ); ?>">
