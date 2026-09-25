@@ -377,3 +377,69 @@ function reconectar_card_produto( $produto ) {
 	</article>
 	<?php
 }
+
+/**
+ * Card de produto na horizontal, para o catálogo da página de loja.
+ *
+ * Formato diferente do `reconectar_card_produto()` por um motivo de leitura: na
+ * home o visitante compara produtos de lojas diferentes e a imagem é o que
+ * distingue um do outro, então ela ocupa o topo do card. Dentro de uma loja ele
+ * já escolheu onde comprar e está lendo um cardápio — nome, descrição e preço
+ * alinhados à esquerda formam uma coluna de texto que se percorre de cima a
+ * baixo, com a miniatura à direita servindo de apoio.
+ *
+ * O preço sai de `get_price_html()`, e não de `reconectar_preco_em_texto()`:
+ * aqui a saída é HTML, e o método entrega o valor antigo em `<del>` e o atual em
+ * `<ins>` — que é o preço riscado do protótipo, com a semântica correta. O texto
+ * para leitor de tela que ele embute só atrapalhava onde a marcação era achatada
+ * com `wp_strip_all_tags()`, que é o caso das sugestões da busca.
+ *
+ * @param WC_Product $produto Produto do WooCommerce.
+ */
+function reconectar_card_produto_linha( $produto ) {
+	if ( ! $produto instanceof WC_Product ) {
+		return;
+	}
+
+	$resumo = $produto->get_short_description();
+	?>
+	<article class="rc-produto-linha">
+		<a class="rc-produto-linha__link" href="<?php echo esc_url( $produto->get_permalink() ); ?>">
+			<div class="rc-produto-linha__conteudo">
+				<h3 class="rc-produto-linha__nome"><?php echo esc_html( $produto->get_name() ); ?></h3>
+
+				<?php if ( $resumo ) : ?>
+					<p class="rc-produto-linha__resumo">
+						<?php echo esc_html( wp_strip_all_tags( $resumo ) ); ?>
+					</p>
+				<?php endif; ?>
+
+				<p class="rc-produto-linha__preco">
+					<?php echo wp_kses_post( $produto->get_price_html() ); ?>
+				</p>
+			</div>
+
+			<div class="rc-produto-linha__figura">
+				<?php
+				echo wp_kses_post(
+					$produto->get_image(
+						'woocommerce_thumbnail',
+						array(
+							// Decorativa: o nome do produto está ao lado, em texto.
+							'alt'     => '',
+							'loading' => 'lazy',
+						)
+					)
+				);
+				?>
+
+				<?php if ( $produto->is_on_sale() ) : ?>
+					<span class="rc-produto-linha__selo">
+						<?php esc_html_e( 'Promoção', 'reconectar' ); ?>
+					</span>
+				<?php endif; ?>
+			</div>
+		</a>
+	</article>
+	<?php
+}

@@ -40,6 +40,41 @@ else
     --skip-email
 fi
 
+echo "== Depuração: avisos no log, nunca na tela =="
+# `WORDPRESS_DEBUG=1` no compose liga `WP_DEBUG`, e o padrão de
+# `WP_DEBUG_DISPLAY` é imprimir na resposta. Um único aviso impresso antes de
+# `wp_redirect()` derruba os dois `header()` de `pluggable.php` com "headers
+# already sent" — e o efeito não é uma mensagem feia numa tela que funciona: é
+# a ação não acontecer. Foi assim que salvar uma pergunta no fórum passou a
+# terminar numa tela de erros, com o tópico gravado e o usuário sem nunca
+# chegar nele.
+#
+# Desligar `WP_DEBUG` inteiro esconderia o problema; mandar para
+# `wp-content/debug.log` mantém o aviso onde ele serve, e fora do corpo da
+# resposta. Vale para qualquer aviso futuro, não só para o que originou isto.
+# Cada entrada é `CONSTANTE:literal:avaliado`. Os dois valores são necessários
+# porque `wp config set --raw` grava o literal (`true`, `false`) enquanto
+# `wp config get` devolve o resultado da avaliação em PHP — `1` e string vazia.
+# Comparar com o literal nunca casa, e o bloco reescrevia as constantes a cada
+# execução dizendo "definida" para o que já estava lá.
+#
+# E `wp config get` de constante inexistente também devolve vazio, que é o
+# mesmo de `false`: sem o `wp config has`, `WP_DEBUG_DISPLAY` pareceria já
+# configurada numa instalação em que ela nunca foi escrita.
+for par in WP_DEBUG_LOG:true:1 WP_DEBUG_DISPLAY:false:; do
+  constante="${par%%:*}"
+  resto="${par#*:}"
+  literal="${resto%%:*}"
+  avaliado="${resto#*:}"
+  if wp config has "$constante" --type=constant >/dev/null 2>&1 &&
+    [ "$(wp config get "$constante" --type=constant 2>/dev/null)" = "$avaliado" ]; then
+    echo "$constante já estava em $literal."
+  else
+    wp config set "$constante" "$literal" --raw --type=constant
+    echo "$constante definida como $literal."
+  fi
+done
+
 echo "== Idioma (pt_BR) =="
 wp language core is-installed pt_BR || wp language core install pt_BR
 wp site switch-language pt_BR || true
@@ -56,7 +91,14 @@ else
 fi
 
 echo "== Plugins do marketplace e comunidade =="
-for plugin in woocommerce dokan-lite buddypress bbpress; do
+# `nextend-facebook-connect` é o Nextend Social Login: apesar do slug, a versão
+# livre entrega Facebook, Google e X. Ele fica instalado e ativo mesmo sem
+# credencial OAuth configurada, e essa é a intenção — sem Client ID e Secret o
+# plugin simplesmente não imprime o provedor, e a tela de login degrada para
+# e-mail e senha em vez de exibir um botão que erraria ao ser clicado. As
+# credenciais são criadas no Google Cloud Console e no Meta for Developers e
+# coladas no `wp-admin`; não entram no repositório.
+for plugin in woocommerce dokan-lite buddypress bbpress nextend-facebook-connect; do
   if wp plugin is-installed "$plugin"; then
     echo "Plugin '$plugin' já instalado."
   else
@@ -150,6 +192,29 @@ do
   fi
 done
 
+echo "== Autocadastro de vendedor (desligado) =="
+# Quem cadastra loja nesta plataforma é o Administrador ou o Administrador de
+# Empresas, pelo painel de empresas. As duas linhas abaixo NÃO são a trava — a
+# trava é `Reconectar_Cadastro_De_Lojas`, no plugin autoral, e ela existe
+# justamente porque esta opção do Dokan fecha só o checkbox do formulário de
+# registro, deixando abertos os dois shortcodes dedicados e o "Become a vendor".
+# O que se ganha aqui é coerência de tela: sem isto o site continuaria
+# oferecendo um caminho que o servidor recusa.
+if [ "$(wp option pluck dokan_appearance show_register_as_vendor 2>/dev/null || true)" = "off" ]; then
+  echo "Autocadastro de vendedor já desligado."
+else
+  wp option patch update dokan_appearance show_register_as_vendor off
+fi
+
+# A página de onboarding ficaria em branco depois que o shortcode dela sai do ar.
+pagina_onboarding="$(wp post list --post_type=page --name=vendor-onboarding --post_status=publish --field=ID)"
+if [ -n "$pagina_onboarding" ]; then
+  wp post update "$pagina_onboarding" --post_status=draft
+  echo "Página '/vendor-onboarding/' passada para rascunho."
+else
+  echo "Página '/vendor-onboarding/' já não está publicada."
+fi
+
 echo "== Resíduos da instalação padrão do WordPress =="
 # O WordPress nasce com um post "Hello world!", um comentário de "A WordPress
 # Commenter" e uma sidebar de blog. Nada disso é invisível: o post e o
@@ -201,6 +266,22 @@ else
   echo "Página 'Comunidade' já existe."
 fi
 
+echo "== Página do Painel de Empresas =="
+# A página é a âncora da rota do Administrador de Empresas: a URL do painel é
+# resolvida a partir do slug dela, e os endpoints `empresa` e `vendedor` só
+# funcionam sobre uma página existente. Sem esta página, o papel existe e não
+# tem para onde ir — o redirecionamento de saída do `/wp-admin` cai na conta.
+if ! wp post list --post_type=page --name=painel-empresas --field=ID | grep -q .; then
+  wp post create \
+    --post_type=page \
+    --post_title="Painel de Empresas" \
+    --post_name=painel-empresas \
+    --post_status=publish \
+    --post_content="[reconectar_painel_empresas]"
+else
+  echo "Página 'Painel de Empresas' já existe."
+fi
+
 echo "== Fórum inicial (bbPress) =="
 if ! wp post list --post_type=forum --field=ID | grep -q .; then
   wp post create \
@@ -209,6 +290,19 @@ if ! wp post list --post_type=forum --field=ID | grep -q .; then
     --post_status=publish
 else
   echo "Já existe pelo menos um fórum."
+fi
+
+echo "== Título da listagem de lojas =="
+# A página é criada pelo Dokan com o título "Store List", em inglês, e é ela que
+# o tema usa como vitrine de lojas. O renome só acontece enquanto o título ainda
+# for o padrão do plugin: assim o script continua idempotente e não desfaz um
+# título que o administrador tenha escolhido — a mesma promessa do bloco do
+# rodapé logo abaixo.
+lista_id=$(wp post list --post_type=page --name=store-listing --post_status=publish --field=ID)
+if [ -n "$lista_id" ] && [ "$(wp post get "$lista_id" --field=post_title)" = "Store List" ]; then
+  wp post update "$lista_id" --post_title="Lojas parceiras"
+else
+  echo "Título da listagem já foi definido."
 fi
 
 echo "== Menu principal (navegação) =="
@@ -221,16 +315,45 @@ else
   loja_id=$(wp post list --post_type=page --name=shop --post_status=publish --field=ID)
   [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Loja" --position=2
 
+  # A listagem de lojas é o destino do breadcrumb do Dokan e do "Ver todos" dos
+  # carrosséis da home. Sem item no menu, o único caminho até ela era o rodapé —
+  # e um marketplace sem link para "lojas" na navegação principal esconde
+  # justamente o que ele tem de diferente de uma loja comum.
+  lojas_id=$(wp post list --post_type=page --name=store-listing --post_status=publish --field=ID)
+  [ -n "$lojas_id" ] && wp menu item add-post "menu-principal" "$lojas_id" --title="Lojas" --position=3
+
   comunidade_id=$(wp post list --post_type=page --name=comunidade --post_status=publish --field=ID)
-  [ -n "$comunidade_id" ] && wp menu item add-post "menu-principal" "$comunidade_id" --title="Comunidade" --position=3
+  [ -n "$comunidade_id" ] && wp menu item add-post "menu-principal" "$comunidade_id" --title="Comunidade" --position=4
+
+  # O fórum entra como item custom, e não `add-post`: a listagem "Todas as
+  # perguntas" é o arquivo do post type `forum`, que não tem post próprio a que
+  # apontar. O "Fórum Geral" é uma categoria dentro dela, não a tela.
+  #
+  # Quem não participa da comunidade não vê este item: o filtro
+  # `Reconectar_Permissoes::ocultar_itens_da_comunidade()` reconhece itens custom
+  # pelo caminho da URL, além dos post types de bbPress.
+  wp menu item add-custom "menu-principal" "Fórum" "$WP_URL/forums/" --position=5
 
   transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
-  [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=4
+  [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=6
 
   conta_id=$(wp post list --post_type=page --name=my-account --post_status=publish --field=ID)
-  [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=5
+  [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=7
 
   wp menu location assign menu-principal primary
+fi
+
+# Uma instalação provisionada antes desta entrega já tem menu atribuído a
+# `primary` e cai no "pulando" acima — ficaria para sempre sem o link do fórum,
+# que é justamente a tela nova. O reparo abaixo roda em toda execução e é
+# idempotente pela URL do item, não pelo rótulo: renomear "Fórum" no painel não
+# pode fazer o script criar um segundo.
+if wp menu list --fields=slug --format=csv | grep -q "^menu-principal$" \
+  && ! wp menu item list menu-principal --fields=url --format=csv 2>/dev/null | grep -q "/forums/"; then
+  # Sem `--position`: o menu já tem ordem definida, e repetir a 5 empataria com
+  # o item que a ocupa, deixando a ordem dos dois a cargo do banco.
+  wp menu item add-custom "menu-principal" "Fórum" "$WP_URL/forums/"
+  echo "Item 'Fórum' acrescentado ao menu principal."
 fi
 
 echo "== Rodapé (widgets das três colunas) =="

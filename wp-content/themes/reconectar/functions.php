@@ -25,6 +25,9 @@ $reconectar_modulos = array(
 	'inc/marketplace/consultas.php',
 	'inc/marketplace/componentes.php',
 	'inc/marketplace/filtros.php',
+	'inc/marketplace/vitrine.php',
+	'inc/marketplace/busca-sugestoes.php',
+	'inc/marketplace/loja.php',
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',
 
@@ -36,6 +39,12 @@ $reconectar_modulos = array(
 	'inc/home/secao-ofertas.php',
 	'inc/home/secao-lojas.php',
 	'inc/home/secao-comunidade-transparencia.php',
+	// O fórum vem depois da home porque `listagem.php` e `sidebar.php` dependem
+	// das funções de `consultas.php`, e esta lista é a ordem de carga.
+	'inc/forum/consultas.php',
+	'inc/forum/componentes.php',
+	'inc/forum/listagem.php',
+	'inc/forum/sidebar.php',
 );
 
 foreach ( $reconectar_modulos as $reconectar_modulo ) {

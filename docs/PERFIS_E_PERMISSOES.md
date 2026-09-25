@@ -73,6 +73,9 @@ isolamento cai inteiro, sem erro e sem aviso. Confira com o comando na seção
 | Ver produtos, pedidos, estoque ou receita de outro vendedor | ✅ | ❌ | ❌ |
 | **Comunidade** | | | |
 | Ler e participar de fóruns | ✅ | ✅ | ❌ |
+| Perguntar, responder e marcar tags no fórum | ✅ | ✅ | ❌ |
+| Votar em pergunta ou resposta | ✅ | ✅ | ❌ |
+| Marcar a melhor resposta | ✅ | só nas próprias perguntas | ❌ |
 | Moderar e administrar a comunidade | ✅ | ❌ | ❌ |
 | **Plataforma** | | | |
 | Acessar `/wp-admin` | ✅ | ❌ | ❌ |
@@ -90,6 +93,7 @@ isolamento cai inteiro, sem erro e sem aviso. Confira com o comando na seção
 | Isola registro de outro vendedor | `restringir_por_vendedor()` | `map_meta_cap` |
 | Filtra listagens de produto do vendedor | `restringir_listagens_do_vendedor()` | `pre_get_posts` |
 | Bloqueia comunidade para o cliente | `bloquear_comunidade()` | `template_redirect` |
+| Nega escrita no fórum a quem não participa | `negar_escrita_no_forum()` | `map_meta_cap` |
 | Esconde links da comunidade | `ocultar_itens_da_comunidade()` | `wp_nav_menu_objects` |
 | Mantém não-admin fora do `/wp-admin` | `bloquear_area_administrativa()` | `admin_init` |
 | Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
@@ -98,6 +102,14 @@ isolamento cai inteiro, sem erro e sem aviso. Confira com o comando na seção
 da comunidade no menu é usabilidade — oferecer um link que devolve 403 é defeito
 de interface. Quem barra o acesso é o `template_redirect`, e ele barra mesmo que
 a URL seja digitada à mão. O edital exige as duas; nenhuma substitui a outra.
+
+**Ler e escrever são travas separadas, e por um motivo medido.** O bbPress
+processa o POST de criação em `template_redirect` **prioridade 8**, antes da
+prioridade 10 onde `bloquear_comunidade()` está — e consulta apenas a capacidade
+primitiva `publish_topics`, que todo usuário tem por causa do papel
+`bbp_participant` atribuído no registro. Sem `negar_escrita_no_forum()`, o gate
+de leitura não alcançaria a escrita. O nonce do formulário ainda barraria, mas
+uma única barreira não é uma trava: é a última que sobrou.
 
 ## O isolamento entre vendedores
 
@@ -171,12 +183,12 @@ alguém pergunta, não que a requisição foi barrada.
 
 Respostas medidas nesta instalação:
 
-| Perfil | `/wp-admin/` | `/wp-admin/plugins.php` | `/dashboard/` | `/comunidade/` |
-| --- | --- | --- | --- | --- |
-| Deslogado | — | — | — | `302` → login |
-| Cliente | `302` → `/my-account/` | — | `302` → home | `403` |
-| Vendedor | `302` → `/dashboard/` | `403` | `200` | `200` |
-| Administrador | `200` | `200` | — | `200` |
+| Perfil | `/wp-admin/` | `plugins.php` | `/dashboard/` | `/comunidade/` | `/forums/` |
+| --- | --- | --- | --- | --- | --- |
+| Deslogado | — | — | — | `302` → login | `302` → login |
+| Cliente | `302` → `/my-account/` | — | `302` → home | `403` | `403` |
+| Vendedor | `302` → `/dashboard/` | `403` | `200` | `200` | `200` |
+| Administrador | `200` | `200` | — | `200` | `200` |
 
 Note a diferença entre as duas colunas do vendedor: `/wp-admin/` redireciona —
 ele tem para onde ir — e `plugins.php` nega. São travas distintas, e o código

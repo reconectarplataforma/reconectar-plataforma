@@ -1,0 +1,363 @@
+/**
+ * Painel do Administrador de Empresas.
+ *
+ * Depende do Bootstrap que o tema já enfileira (handle `reconectar-bootstrap`):
+ * daqui saem apenas os componentes próprios do painel. As custom properties da
+ * paleta vêm de `wp-content/themes/reconectar/style.css`; os valores de reserva
+ * abaixo existem para o caso de o painel ser aberto com outro tema ativo, em que
+ * nada ficaria legível sem eles.
+ *
+ * Sem build e sem CDN, como o resto do projeto.
+ */
+
+.rc-painel-empresas {
+	--rc-pe-primaria: var( --reconectar-cor-primaria, #31BEB1 );
+	--rc-pe-secundaria: var( --reconectar-cor-secundaria, #CF6442 );
+	--rc-pe-institucional: var( --reconectar-cor-institucional, #663191 );
+	--rc-pe-borda: #dfe3e6;
+	/* Mesmo cinza do `--rc-texto` do tema, e pelo mesmo motivo: é a cor de texto
+	   do projeto inteiro. Mede 4,88:1 sobre o branco das tabelas e 4,54:1 sobre
+	   o #f5f7f8 dos blocos de aviso e de vazio — os dois fundos em que este
+	   token aparece. Os pares de cor dos selos e do aviso de erro ficam como
+	   estão: foram escolhidos um a um para atingir 4,5:1 e não acompanham este
+	   clareamento. */
+	--rc-pe-texto-suave: #717171;
+
+	/* Mesma lógica da paleta acima, aplicada à escala tipográfica: o painel adota
+	   os degraus do tema quando ele está ativo e cai nos valores de reserva
+	   quando não está. Os literais de reserva são os que a escala fixou, não os
+	   que o arquivo tinha antes — 0,9375rem e 0,8125rem eram medidas avulsas. */
+	--rc-pe-fonte-xs: var( --rc-fonte-xs, 0.8125rem );
+	--rc-pe-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-pe-fonte-base: var( --rc-fonte-base, 1rem );
+	--rc-pe-fonte-lg: var( --rc-fonte-lg, 1.25rem );
+	--rc-pe-fonte-xl: var( --rc-fonte-xl, 1.5rem );
+	--rc-pe-fonte-2xl: var( --rc-fonte-2xl, 1.75rem );
+
+	max-width: 1100px;
+	margin: 0 auto;
+}
+
+/* Trilha, sessão e títulos
+   ------------------------------------------------------------------------- */
+
+/* Trilha à esquerda, sessão à direita; embaixo da outra quando não couberem —
+   este perfil também trabalha do celular, e um "Sair" fora da tela é um "Sair"
+   que não existe. */
+.rc-painel-empresas__barra {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-bottom: 1rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid var( --rc-pe-borda );
+}
+
+.rc-painel-empresas__trilha {
+	font-size: var( --rc-pe-fonte-sm );
+}
+
+.rc-painel-empresas__sessao {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+	font-size: var( --rc-pe-fonte-sm );
+}
+
+.rc-painel-empresas__usuario {
+	color: var( --rc-pe-texto-suave );
+}
+
+.rc-painel-empresas__sair {
+	color: var( --rc-pe-institucional );
+	font-weight: 600;
+}
+
+.rc-painel-empresas__trilha a {
+	color: var( --rc-pe-institucional );
+}
+
+/* `aria-current`, nunca `aria-pressed`: o elemento é um link, e leitores de tela
+   anunciam "pressionado" como estado de botão. */
+.rc-painel-empresas__trilha a[aria-current="page"] {
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.rc-painel-empresas__topo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1.5rem;
+}
+
+.rc-painel-empresas__titulo {
+	margin: 0;
+	font-size: var( --rc-pe-fonte-2xl );
+}
+
+.rc-painel-empresas__secao {
+	margin: 2.5rem 0 1rem;
+	font-size: var( --rc-pe-fonte-xl );
+	padding-bottom: 0.5rem;
+	border-bottom: 2px solid var( --rc-pe-primaria );
+}
+
+.rc-painel-empresas__numero {
+	font-size: var( --rc-pe-fonte-xl );
+	font-weight: 600;
+}
+
+.rc-painel-empresas__vazio,
+.rc-painel-empresas__nota {
+	color: var( --rc-pe-texto-suave );
+	background: #f5f7f8;
+	border-left: 4px solid var( --rc-pe-primaria );
+	padding: 0.75rem 1rem;
+	margin-bottom: 1rem;
+}
+
+/* Avisos
+   ------------------------------------------------------------------------- */
+
+.rc-painel-empresas__aviso {
+	padding: 0.75rem 1rem;
+	margin-bottom: 1.5rem;
+	border-left: 4px solid var( --rc-pe-primaria );
+	background: #eefaf8;
+}
+
+/* Vinho sobre creme: o par atende ao contraste mínimo de 4.5:1 da WCAG 2.1, o
+   que a cor secundária da paleta sozinha não faria em texto corrido. */
+.rc-painel-empresas__aviso--erro {
+	border-left-color: var( --rc-pe-secundaria );
+	background: #fdf1ed;
+	color: #7d2d13;
+}
+
+.rc-painel-empresas__aviso--senha {
+	border-left-color: var( --rc-pe-institucional );
+	background: #f3eefa;
+}
+
+.rc-painel-empresas__aviso p {
+	margin: 0 0 0.5rem;
+}
+
+.rc-painel-empresas__aviso p:last-child {
+	margin-bottom: 0;
+}
+
+.rc-painel-empresas__link code {
+	display: block;
+	overflow-wrap: anywhere;
+	padding: 0.5rem;
+	background: #fff;
+	border: 1px solid var( --rc-pe-borda );
+}
+
+.rc-painel-empresas__negado {
+	padding: 1rem;
+	background: #fdf1ed;
+	border-left: 4px solid var( --rc-pe-secundaria );
+}
+
+/* Ações
+   ------------------------------------------------------------------------- */
+
+.rc-painel-empresas__acoes {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 1.5rem;
+}
+
+.rc-botao {
+	display: inline-block;
+	padding: 0.5rem 1.1rem;
+	border: 2px solid transparent;
+	border-radius: 4px;
+	font-weight: 600;
+	line-height: 1.4;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.rc-botao--primario {
+	background: var( --rc-pe-institucional );
+	color: #fff;
+}
+
+.rc-botao--primario:hover,
+.rc-botao--primario:focus {
+	background: #52277a;
+	color: #fff;
+}
+
+.rc-botao--discreto {
+	background: transparent;
+	border-color: var( --rc-pe-institucional );
+	color: var( --rc-pe-institucional );
+}
+
+.rc-botao--discreto:hover,
+.rc-botao--discreto:focus {
+	background: #f3eefa;
+}
+
+/* Foco sempre visível: a navegação por teclado é requisito do edital, e o reset
+   do tema pai remove o contorno padrão do navegador. */
+.rc-botao:focus-visible,
+.rc-painel-empresas :is( input, textarea, a ):focus-visible {
+	outline: 3px solid var( --rc-pe-institucional );
+	outline-offset: 2px;
+}
+
+.rc-formulario--linha {
+	display: inline-block;
+	margin: 0;
+}
+
+/* Formulários
+   ------------------------------------------------------------------------- */
+
+.rc-formulario {
+	max-width: 620px;
+	margin-bottom: 2rem;
+}
+
+.rc-formulario__campo {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	margin-bottom: 1rem;
+}
+
+.rc-formulario__campo label {
+	font-weight: 600;
+}
+
+.rc-formulario__campo input,
+.rc-formulario__campo textarea {
+	width: 100%;
+	padding: 0.5rem 0.65rem;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 4px;
+}
+
+/* Texto de apoio em 16px, o mesmo corpo do rótulo: é instrução que a pessoa
+   precisa ler para preencher o campo certo, não legenda decorativa. A distinção
+   em relação ao rótulo fica por conta do peso (600 lá, normal aqui) e da cor
+   suave — dois sinais, e nenhum deles é tamanho. */
+.rc-formulario__ajuda {
+	color: var( --rc-pe-texto-suave );
+	font-size: var( --rc-pe-fonte-base );
+}
+
+/* `:user-invalid`, e não `:invalid`: o segundo marca de vermelho, já na abertura
+   da tela, todo campo obrigatório ainda vazio — o formulário nasceria acusando
+   erro de quem não digitou nada. O primeiro só pinta depois que o usuário mexeu
+   no campo ou tentou enviar.
+
+   A borda é reforço visual da mensagem nativa do navegador, nunca o único sinal:
+   cor sozinha não comunica a quem não a distingue (WCAG 2.1, 1.4.1). */
+.rc-formulario__campo input:user-invalid {
+	border-color: #7d2d13;
+	border-width: 2px;
+}
+
+.rc-formulario__acoes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: center;
+}
+
+/* Tabelas
+   ------------------------------------------------------------------------- */
+
+.rc-tabela {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 2rem;
+}
+
+/* A legenda descreve a tabela para quem navega por leitor de tela; fica visível
+   também para quem enxerga, porque um resumo em texto ajuda os dois casos. */
+.rc-tabela__legenda {
+	caption-side: top;
+	text-align: left;
+	color: var( --rc-pe-texto-suave );
+	font-size: var( --rc-pe-fonte-base );
+	padding-bottom: 0.5rem;
+}
+
+.rc-tabela th,
+.rc-tabela td {
+	padding: 0.65rem 0.75rem;
+	border-bottom: 1px solid var( --rc-pe-borda );
+	text-align: left;
+	vertical-align: top;
+}
+
+.rc-tabela thead th {
+	border-bottom-width: 2px;
+	font-size: var( --rc-pe-fonte-sm );
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+.rc-tabela tbody th {
+	font-weight: 600;
+}
+
+/* Dados cadastrais
+   ------------------------------------------------------------------------- */
+
+.rc-dados {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 220px, 1fr ) );
+	gap: 1rem;
+	margin-bottom: 2rem;
+}
+
+.rc-dados__item dt {
+	font-size: var( --rc-pe-fonte-sm );
+	color: var( --rc-pe-texto-suave );
+}
+
+.rc-dados__item dd {
+	margin: 0;
+	font-weight: 600;
+}
+
+/* Selos de situação
+   ------------------------------------------------------------------------- */
+
+.rc-selo {
+	display: inline-block;
+	padding: 0.2rem 0.6rem;
+	border-radius: 999px;
+	font-size: var( --rc-pe-fonte-sm );
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+/* Texto escuro sobre fundo claro nos dois selos: a cor sozinha não pode ser o
+   único indicador de estado, e o rótulo textual ("Em operação" / "Desativada")
+   é quem carrega a informação. */
+.rc-selo--ativo {
+	background: #d9f4f0;
+	color: #10554e;
+}
+
+.rc-selo--inativo {
+	background: #f0e2dc;
+	color: #7d2d13;
+}

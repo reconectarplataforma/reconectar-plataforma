@@ -49,3 +49,30 @@ function reconectar_url_loja() {
 
 	return home_url( '/' );
 }
+
+/**
+ * URL da vitrine de lojas, com fallback para a página da loja.
+ *
+ * O destino é a página que o Dokan registra como `store_listing` — a mesma que
+ * o breadcrumb do plugin usa no caminho de cada loja. Consultá-la pela opção, e
+ * não pelo slug, importa porque a página é criada com nome em inglês
+ * (`store-listing`) e pode ser renomeada no painel: um caminho chumbado
+ * sobreviveria à renomeação apontando para o 404.
+ *
+ * A guarda `function_exists()` segue o mesmo motivo de `reconectar_url_loja()`:
+ * chamar a API do Dokan sem ela derruba a home com erro fatal caso o plugin
+ * seja desativado, e é justamente aí que a home precisa continuar de pé.
+ *
+ * @return string
+ */
+function reconectar_url_das_lojas() {
+	if ( function_exists( 'dokan_get_page_url' ) ) {
+		$url = dokan_get_page_url( 'store_listing' );
+
+		if ( $url ) {
+			return $url;
+		}
+	}
+
+	return reconectar_url_loja();
+}

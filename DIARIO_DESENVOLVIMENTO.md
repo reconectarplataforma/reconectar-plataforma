@@ -941,3 +941,711 @@ pendências que dependem de ação humana ou processo participativo.
   parado e passa a ser código executável.
 
 ---
+
+## 2026-09-25 — Fluxo de listagem de lojas
+
+**O que foi feito**
+- A vitrine de lojas saiu de `inc/home/secao-lojas.php` e virou componente
+  próprio em `inc/marketplace/vitrine.php`, com
+  `reconectar_vitrine_de_lojas( $args )`. Três argumentos governam o que
+  muda entre os contextos: `titulo` (vazio suprime o `<h2>`), `busca` (se
+  imprime o campo por nome) e `mais` (`expandir`, o `?lojas=N` de sempre,
+  ou `pagina`, link para a listagem completa). `secao-lojas.php` ficou só
+  com o hook e a chamada.
+- A página `/store-listing/` passou a renderizar essa vitrine: um filtro
+  em `do_shortcode_tag` troca a saída do `[dokan-stores]` pelo componente
+  do tema. Antes ela era o shortcode cru do plugin — cards de terceiro,
+  filtros em inglês e nenhum dos filtros do marketplace.
+- Busca por nome de loja: parâmetro `?busca=`, lido em
+  `reconectar_filtros_ativos()`, aplicado em
+  `reconectar_loja_passa_nos_filtros()` por
+  `reconectar_nome_casa_com_busca()` e exposto como pílula removível na
+  barra de filtros. O estado vazio ganhou um terceiro caso, que ecoa o
+  termo buscado em vez de falar em "filtros selecionados".
+- Ligados os caminhos que morriam na home: o "Ver todos" do carrossel de
+  destaques, o botão da vitrine da home ("Ver todas as lojas") e um item
+  "Lojas" na posição 3 do menu principal. A página foi renomeada de
+  "Store List" para "Lojas parceiras".
+- `provision.sh` acompanha: o item de menu entra no bloco do menu
+  principal e o renome da página só acontece enquanto o título ainda for
+  o padrão do Dokan.
+
+**Decisões técnicas**
+- **Reaproveitar `/store-listing/` em vez de criar uma página nova.** Ela
+  já é o destino do breadcrumb do Dokan em cada loja (`Rewrites.php:58`) e
+  do link do rodapé; uma página paralela criaria dois endereços para a
+  mesma lista, com o breadcrumb apontando para a errada.
+- **Substituir a saída do shortcode, e não o `post_content` da página.**
+  `dokan_is_store_listing()` identifica a página pelo ID **ou** pela
+  presença de `[dokan-stores` no conteúdo, e dela dependem o breadcrumb, a
+  classe do `<body>` e o item da barra de administração. Mantendo o
+  conteúdo intacto, nada disso precisa ser reimplementado, e instalações
+  já existentes ganham a vitrine sem migração de dados.
+- **`remove_accents()` nos dois lados da busca.** Quem digita "raizes" no
+  celular, sem parar para achar o til, está procurando o "Ateliê Raízes" —
+  e um resultado vazio aí é lido como "a loja não existe".
+- **Corte do termo em 80 caracteres**, não por segurança
+  (`sanitize_text_field()` já resolveu isso), mas porque a chave do
+  transient de `reconectar_obter_lojas()` é o `md5` dos argumentos: sem
+  teto, cada termo absurdo colado na URL cria a sua própria entrada no
+  cache.
+- **O campo de busca não tem autocomplete**, ao contrário do cabeçalho. O
+  do cabeçalho tem endpoint REST próprio e cobre o site inteiro; aqui a
+  busca é mais um filtro da vitrine, e se comporta como os outros — fica
+  na URL, é compartilhável e o botão "voltar" a desfaz.
+- **A home não expande mais a lista.** O botão leva à listagem completa:
+  a home volta a ser descoberta, e a busca por nome ganha o lugar onde
+  cabe.
+
+**Regra de CSS removida**
+- Saiu de `marketplace.css` a seção "Barra de filtros do Dokan
+  (/store-listing/)", com `#dokan-store-listing-filter-wrap .right
+  { flex-wrap: wrap; row-gap: … }`. Aquele markup não é mais renderizado
+  em lugar nenhum. O defeito que ela corrigia fica registrado aqui: o
+  `.right` é um flex container que o plugin nunca declara como quebrável,
+  e `nowrap` é o valor inicial; em 320px o botão "Filter" (98px) e o
+  formulário de ordenação (184px) somavam 282px num espaço interno de
+  233px, e a borda direita do `<select>` ficava fora da tela. A correção
+  entrava pela cascata — `marketplace.css` sai na prioridade 40, depois do
+  CSS do plugin, então especificidade idêntica vence sem `!important`. Sem
+  media query de propósito: o ponto de ruptura depende do comprimento do
+  rótulo, e "Ordenar por:" é bem mais largo que "Sort by:".
+- `.rc-busca-loja` foi renomeado para `.rc-busca-filtro`: o mesmo campo
+  com a mesma lupa serve à busca no catálogo de uma loja e à busca por
+  nome na vitrine. O que varia é só a largura, resolvida pelo ancestral
+  (`.rc-loja__controles` e `.rc-vitrine`).
+
+**Verificação**
+- Lint de cada arquivo PHP tocado no contêiner; `bash -n` no
+  `provision.sh`.
+- `/store-listing/`: `200`, `<h1>` "Lojas parceiras" sem `<h2>`
+  duplicado, `.rc-vitrine` presente, nenhum `.dokan-single-seller`, e o
+  `<body>` sem `right-sidebar`.
+- Filtros por URL, contra as 5 lojas da carga: sem filtro 5 cards,
+  `?busca=raizes` 1 ("Ateliê Raízes"), `?busca=zzz` 0 com a mensagem
+  "Nenhuma loja com “zzz” no nome.", `?cidade=Maceió` 2,
+  `?entrega=gratis` 2, `?categoria=alimentos-e-bebidas` 1. Combinando
+  `?cidade=Maceió&busca=raizes` os dois sobrevivem.
+- Os três caminhos até a página chegam em `/store-listing/`, e o
+  breadcrumb de `/store/demo-sabor-da-terra/` continua apontando para lá.
+- Página de loja revisitada por causa do renome: campo com recuo de 44px
+  e `?product_name=mel` ainda devolvendo 1 produto.
+- Mobile 375px: sem estouro horizontal no documento; campo de 343px com
+  47,9px de altura e lupa de 40×40; a barra de pílulas rola dentro de si
+  mesma, como já fazia.
+- `./scripts/verificar-acessos.sh` — 38 casos, nenhuma falha.
+
+---
+
+## 2026-09-25 — Escala tipográfica
+
+**O problema, medido**
+
+A queixa era de fonte desproporcional ao tamanho dos elementos. A base não
+tinha culpa: `html` e `body` estão em 16px, e a hipótese de um
+`html { font-size: 62.5% }` herdado do Storefront foi testada e refutada —
+`1rem` vale 16px aqui.
+
+O que havia era ausência de sistema. O `marketplace.css` trazia **38
+declarações de `font-size` em 16 valores avulsos** (0.65, 0.7, 0.75, 0.78, 0.8,
+0.8125, 0.82, 0.85, 0.87, 0.9, 0.95, 1, 1.25, 1.35, 1.5 e 2rem), cada um
+escolhido no momento em que o componente foi escrito. O resultado, medido em
+1280×900 antes da mudança:
+
+| Elemento | Caixa | Fonte |
+| --- | --- | --- |
+| `.rc-card-loja` | 283 × 114 | nome 15,2px, meta 12,8px |
+| `.rc-produto-linha` | 576 × 122 | nome 15,2px, resumo 13,12px, **selo 10,4px** |
+| `.rc-pilula` | 205 × **37** | 13,12px |
+| `.rc-vitrine__titulo` | linha de 1168px | 20px |
+
+Cards e linhas dimensionados com folga, texto uma ou duas medidas abaixo do que
+o espaço pedia. O caso extremo, `0.65rem` no selo da linha de produto, dava
+10,4px — abaixo de qualquer mínimo de legibilidade.
+
+**A escala**
+
+Nove degraus de razão 1,125 sobre 16px, declarados no `:root` de
+`marketplace.css`, ao lado dos demais `--rc-*`:
+
+| Token | Valor | Papel |
+| --- | --- | --- |
+| `--rc-fonte-2xs` | 12px | selo, badge |
+| `--rc-fonte-xs` | 13px | rótulo auxiliar |
+| `--rc-fonte-sm` | 14px | meta, apoio |
+| `--rc-fonte-base` | 16px | corpo, nome de item |
+| `--rc-fonte-md` | 18px | destaque |
+| `--rc-fonte-lg` | 20px | subtítulo |
+| `--rc-fonte-xl` | 24px | título de seção |
+| `--rc-fonte-2xl` | 28px | — |
+| `--rc-fonte-3xl` | 36px | título de página |
+
+Mais `--rc-entrelinha-justa: 1.25` e `--rc-entrelinha-compacta: 1.4`. Elas
+existem porque o `marketplace.css` tinha **um único `line-height` em 1839
+linhas**: todo o resto herdava 1,618 do Storefront, valor certo para parágrafo e
+frouxo para rótulo de card — 12,8px de texto ocupando 20,7px de linha.
+
+Por que 0.65rem virou 0.75rem, e não 0.7: o piso da escala é o menor tamanho que
+este projeto assume como legível, e um degrau que existe só para acomodar uma
+escolha antiga não é um degrau, é a mesma bagunça com nome novo.
+
+**Decisões de alcance**
+
+- A base do `html` **não** sobe. Carrinho, checkout e painel do vendedor são
+  Woo e Dokan; mexer na raiz mudaria telas que não são nossas. Medidos depois da
+  mudança: `html`/`body` em 16px e `h1` em 41,89px, iguais ao diagnóstico.
+- O painel de empresas consome os degraus **com fallback literal**
+  (`var( --rc-fonte-sm, 0.875rem )`), pelo mesmo motivo da paleta: o plugin não
+  pode exigir o tema. Os literais de reserva são os da escala, não os que o
+  arquivo tinha — 0,9375rem e 0,8125rem eram medidas avulsas.
+- `class-reconectar-aviso-demo.php` fica com o seu `0.875rem` inline: é CSS de
+  um aviso que precisa funcionar antes de qualquer folha carregar.
+
+**O que teve de acompanhar a fonte**
+
+- **`.rc-pilula`** — o recuo vertical existe pelo alvo de toque, não por
+  respiro: com 13,12px e 7px de recuo a pílula media 37px, abaixo dos 44px da
+  WCAG 2.5.5. Com 14px, 10px de recuo fecham a conta — medida hoje em 45px.
+- **Iniciais de avatar** — desviaram do que o plano previa. A tabela mandava
+  `--rc-fonte-lg` (20px), o que **reduziria** `.rc-card-categoria__inicial` (24px
+  hoje) e `.rc-loja__inicial` (32px), contradizendo a própria instrução de que as
+  iniciais sobem junto para não boiarem no círculo. Ficaram em `xl` (24px) nos
+  círculos de 56px e `3xl` (36px) no de 96px.
+- **`.reconectar-hero__titulo`** — 36px é a medida certa para a linha de 1168px
+  e vira um bloco de cinco linhas (219px de altura) nos 375px de um celular.
+  Passou a `clamp(var(--rc-fonte-2xl), 5vw, var(--rc-fonte-3xl))`, pelo mesmo
+  motivo que `.rc-loja__nome` já usava `clamp()`: 36px no desktop, 28px e 136px
+  de altura no celular.
+
+**Verificação**
+
+- `marketplace.css` servido por HTTP: 217 chaves abrindo e 217 fechando, iguais
+  às de antes, e **zero** `font-size` com valor literal fora do `:root`. O mesmo
+  no `painel-empresas.css`.
+- Medição em 1280×900 contra a tabela de origem: selo 12px (era 10,4), meta de
+  card 14px (era 12,8), nome de card 16px (era 15,2), título de seção 24px (era
+  20), `.rc-loja__nome` 36px no desktop e 28px em 375px pelo `clamp`.
+- 375px na home, em `/store-listing/` e em `/store/demo-sabor-da-terra/`:
+  `body.scrollWidth - clientWidth === 0` nas três. O estouro de 413px que o
+  `documentElement` acusa na home é dos carrosséis, que rolam dentro de si
+  mesmos — a página não rola na horizontal (`body { overflow-x: hidden }`).
+- Painel de empresas autenticado, nas três telas (lista, detalhe, formulário):
+  trilha e sessão 14px, título 28px, seção 24px, selo 14px, ajuda 16px.
+- `./scripts/verificar-acessos.sh` — 38 casos, nenhuma falha.
+
+**Achados que não entraram**
+
+- **A tabela do painel de empresas estoura em celular, e já estourava.** Em
+  375px ela mede 485px; com os valores anteriores à escala, media 478px. A
+  coluna "Situação" fica fora da tela, e o `overflow-x: hidden` do `body`
+  esconde o excedente em vez de dar rolagem. A escala contribuiu com 7px de um
+  defeito de 103px, e a correção — rolagem própria ou empilhamento em cards —
+  é decisão de layout, não de tipografia.
+- **O `-webkit-line-clamp: 2` de `.rc-produto-linha__resumo` não foi
+  exercitado.** Os oito resumos da carga cabem em uma linha, nenhum trunca.
+  Nada a concluir sobre o corte em 14px com estes dados.
+- **`.rc-card-loja__inicial` e `.rc-loja__inicial` não foram medidos no
+  navegador**: todas as lojas da carga têm logo, e a inicial só aparece sem ela.
+
+---
+
+## 2026-09-25 — Cor de texto em #717171
+
+**O pedido e o que ele alcança**
+
+Aplicar `#717171` nas fontes do projeto. O texto na tela vinha de cinco
+origens, e três eram do Storefront, não do código do projeto:
+
+| Origem | Valor anterior | Alcance |
+| --- | --- | --- |
+| `storefront_text_color` | `#6d6d6d` | `body`, todo o Woo e o Dokan |
+| `storefront_footer_text_color` | `#6d6d6d` | `.site-footer` |
+| `storefront_heading_color` | `#333333` | `h1`–`h6` |
+| `--rc-texto` | `#27272a` | 20 usos no `marketplace.css` |
+| `--rc-texto-suave` | `#71717a` | 21 usos no `marketplace.css` |
+
+Duas medições mudaram o desenho da entrega. A primeira: `--rc-texto-suave` já
+era `#71717a`, visualmente idêntico ao pedido — a mudança real estava em
+`--rc-texto` e no corpo do Storefront. A segunda: **`#767676` é o cinza mais
+claro que ainda dá 4,5:1 sobre branco**, e `#717171` está a cinco pontos desse
+teto. Não existe um "suave" mais claro que este e ainda conforme, então os dois
+tokens convergiram por obrigação matemática, não por descuido. A hierarquia
+entre texto principal e texto de apoio passou inteira para tamanho e peso — que
+a escala `--rc-fonte-*` da entrega anterior acabara de estabelecer.
+
+**O gancho do Storefront**
+
+`get_storefront_default_setting_values()` devolve
+`apply_filters( 'storefront_setting_default_values', $args )`. Filtrar ali vale
+porque `theme_mods_reconectar` **não tem nenhuma cor salva**: o filtro dos
+padrões não disputa com valor de Customizer. E o tema filho carrega antes do
+pai, então o `add_filter` de `inc/setup.php` chega bem antes do `init` em que o
+Storefront registra os `theme_mod_*`. Foi assim que a cor alcançou carrinho,
+checkout, minha conta e painel do vendedor sem uma linha de CSS nova.
+
+**Os dois casos que não podiam clarear**
+
+- **Os selos.** `#717171` sobre `--reconectar-cor-destaque` (`#F1BF3D`) mede
+  2,85:1. `.rc-card-produto__selo` e `.rc-produto-linha__selo` passaram a um
+  token próprio, `--rc-texto-sobre-destaque: #27272a` — medido no navegador em
+  `rgb(39, 39, 42)` sobre `rgb(241, 191, 61)`, 11,0:1. São os **únicos** dois
+  entre as 41 declarações que não estão sobre branco ou sobre `--rc-fundo`.
+- **O rodapé.** O fundo nativo do Storefront é `#f0f0f0`, e `#717171` sobre ele
+  dá 4,28:1 — reprova. `storefront_footer_background_color` passou a `#f7f7f8`,
+  que é o `--rc-fundo` e o mesmo fundo do rodapé autoral: 4,56:1.
+
+Ficaram de fora `storefront_heading_color` (títulos seguem em `#333333`, como
+decidido), `storefront_header_text_color` (vale para a barra de rodapé handheld,
+que tem fundo próprio não medido) e `storefront_button_text_color` (`#333333`
+sobre `#eeeeee` já está em 4,21:1; clarear pioraria).
+
+**Verificação**
+
+- `marketplace.css`: `#27272a` aparece **uma vez** (só o token do selo) e
+  `#71717a`, **nenhuma**.
+- CSS inline do Storefront em `/cart/`: 14 ocorrências de `#717171` e 30 de
+  `#333333`, nos títulos.
+- Varredura de contraste pelo DOM em `/`, `/store-listing/`,
+  `/store/demo-sabor-da-terra/`, `/my-account/` e `/cart/`: **nenhum par
+  reprovado envolve `rgb(113, 113, 113)`**. O que reprova são três coisas
+  anteriores a esta entrega — os links em `#31BEB1`, as estrelas de nota e os
+  separadores `·`.
+
+**Os quatro `#f0f0f0` que sobraram e por que não foram tocados**
+
+O CSS inline do Storefront ainda serve `#f0f0f0` em quatro lugares. Nenhum é
+texto que reprove, porque **nenhum dos quatro existe no DOM desta instalação**:
+`.main-navigation ul.nav-menu ul.children` e `.site-header-cart
+.widget_shopping_cart` pertencem ao cabeçalho do tema pai, que o cabeçalho
+autoral substituiu; `#payment .payment_methods > li:hover` pertence ao checkout
+por shortcode, e este checkout é o de blocos. Conferido elemento a elemento no
+navegador antes de decidir não mexer: uma correção ali seria CSS para seletor
+morto.
+
+**Achado preexistente, não corrigido**
+
+`a { color: var(--reconectar-cor-primaria) }` (`style.css:57`) dá **2,30:1**
+sobre branco. Os links do site reprovam AA hoje, e reprovavam antes desta
+entrega — o varredor os encontra em todas as páginas. Não foi corrigido aqui
+porque mudar a cor de link é decisão de identidade visual, não de contraste
+isolado, e o edital exige WCAG 2.1: vale uma decisão em separado.
+
+---
+
+## 2026-09-25 — Tela de acesso e SSO
+
+**O que havia**
+
+`/my-account/` usava o `form-login.php` nativo do WooCommerce, sem override no
+tema: duas colunas lado a lado, "Login" e "Register", com o checkbox "I am a
+vendor" do Dokan injetado no meio e sem tradução. Nenhum plugin de SSO
+instalado.
+
+**O que passou a haver**
+
+Override em `woocommerce/myaccount/form-login.php`, espelhando o protótipo:
+coluna de arte à esquerda com o gradiente institucional → primária (o mesmo de
+`.reconectar-hero`, reaproveitado em vez de pedir arte nova) e painel à direita
+com os botões de SSO no topo, separador, e os dois formulários sob gatilhos.
+
+**Os dois formulários nativos são preservados inteiros**, com todos os
+`do_action` do WooCommerce no lugar — `woocommerce_login_form_start`,
+`woocommerce_login_form`, `woocommerce_login_form_end` e os três de registro.
+Remover qualquer um quebraria o Dokan e o próprio Nextend, que se penduram
+neles.
+
+Os botões saem dos shortcodes do plugin (`[nextend_social_login
+provider="facebook"]` e `provider="google"`), e não da API PHP interna, porque
+shortcode muda menos entre versões. **Sem credenciais configuradas o shortcode
+devolve string vazia** — confirmado no ambiente — e o `trim()` no template faz o
+separador "ou" desaparecer junto. É essa degradação que deixa a tela funcional
+antes de existirem os apps OAuth.
+
+**Progressive enhancement, como no resto do tema**
+
+Os dois gatilhos nascem com `hidden` no HTML e `aria-expanded="true"`; é o
+`login.js` que os revela e fecha os blocos correspondentes. Sem script a tela é
+linear — formulários abertos, nada a clicar antes de digitar — e **nunca exibe
+um botão que não abriria coisa alguma**. Conferido no HTML servido: os dois
+`<button>` chegam com `hidden`, os dois `<div class="rc-login__bloco">` chegam
+sem, e os dois `submit` estão lá.
+
+O script também respeita os avisos do WooCommerce: se a página trouxe
+`.woocommerce-error`, `.woocommerce-message` ou `.woocommerce-info`, ele sai sem
+colapsar nada — um erro de login dentro de um bloco fechado seria um erro
+invisível.
+
+**A regressão de acessibilidade que a própria entrega criou**
+
+`storefront_page_header()` imprime `<h1 class="entry-title">` com o título do
+post — "My account", em inglês, vindo do WooCommerce. Com o painel novo a tela
+passou a ter **dois `<h1>`**, o segundo sendo o "Acessar a plataforma" que é o
+título verdadeiro do documento. Quem navega por cabeçalhos ouviria os dois e
+teria de decidir qual nomeia a página. `reconectar_remover_titulo_da_tela_de_acesso()`
+em `inc/layout.php` remove o do tema pai, e só para quem ainda não entrou —
+`is_account_page()` responde verdadeiro também no painel do cliente, onde
+"Minha conta" é o único título e precisa continuar de pé.
+
+**Verificação**
+
+- **1280×900:** sem estouro horizontal, coluna de arte visível em 568px, painel
+  em 480px, **um** `<h1>`.
+- **375px:** sem estouro, arte em `display: none`, os dois gatilhos com 46px de
+  altura (acima dos 44px da WCAG 2.5.5), `aria-expanded="false"` e blocos
+  `hidden` no carregamento.
+- **Login ponta a ponta por `curl` com cookie**, nunca digitando senha no
+  navegador: POST em `/my-account/` com o nonce → 302 para `/my-account/`,
+  sessão autenticada, painel renderizado.
+- **Interação:** abrir alterna `aria-expanded` para `"true"`, revela o bloco e
+  move o foco ao primeiro campo — abrir sem mover o foco obrigaria quem navega
+  por teclado a percorrer de novo o caminho até lá.
+- **Teclado:** a ordem de Tab acompanha a ordem visual (gatilho "E-mail e
+  senha" → campos → gatilho "Criar conta"), e o foco é visível — contorno de
+  3px sólido em `#663191` com 2px de afastamento, medido com `:focus-visible`
+  ativo por Tab real.
+
+**O que a automação não conseguiu provar**
+
+A ativação por Enter. O automatizador entrega o `keydown` ao elemento, mas o
+navegador não sintetiza dali o `click` — o espião registrou `keydown: 1` e
+`click: 0`. Como o gatilho é um `<button type="button">` e o listener é de
+`click`, essa ativação é a nativa do elemento, garantida pelo navegador. Mesma
+limitação do clique por coordenada, que também não dispara o handler enquanto um
+`click()` em JavaScript dispara.
+
+**As credenciais OAuth são do usuário**
+
+Client ID e Client Secret do Google e do Facebook precisam ser criados no Google
+Cloud Console e no Meta for Developers e colados na tela do Nextend, no
+`wp-admin`. Não entram no repositório, não vão para o `.env` e não foram
+digitados aqui. Enquanto não existirem, a tela funciona com e-mail e senha e os
+botões simplesmente não aparecem.
+
+---
+
+## 2026-09-25 — Só o administrador cadastra lojas
+
+**A falha, medida antes**
+
+`curl` em `/my-account/` deslogado devolvia os campos `role`, `shopname`,
+`shopurl` e `phone`. Qualquer visitante abria uma loja.
+
+**A descoberta que desmonta a solução óbvia**
+
+A opção `show_register_as_vendor` do Dokan **não fecha o cadastro de vendedor**.
+São quatro portas independentes e ela alcança uma — e mesmo essa pela metade:
+
+| Via | Onde | A opção fecha? |
+| --- | --- | --- |
+| Checkbox "I am a vendor" | `/my-account/` | sim, só o checkbox |
+| `[dokan-vendor-onboarding-registration]` | `/vendor-onboarding/`, publicada | **não** |
+| `[dokan-vendor-registration]` | qualquer página | **não** |
+| "Become a vendor" | `/my-account/` logado | **não existe opção** |
+
+As duas do meio escapam porque `Registration::get_allowed_registration_roles()`
+reabre `seller` assim que `is_vendor_form_request()` reconhece o nonce do
+formulário dedicado. A quarta é outro caminho inteiro:
+`BecomeAVendor::become_a_seller_form_handler()` chama
+`dokan_user_update_to_seller()` direto, sem consultar opção nenhuma.
+
+**Pior: desligar a opção sozinha piora a tela.** Ela remove o checkbox mas
+mantém `dokan_seller_reg_form_fields()` pendurada em `woocommerce_register_form`
+— e era o JavaScript do checkbox que ocultava aqueles campos. Desligada a opção
+e nada mais, "Nome da loja", "URL" e "Telefone" passam a aparecer **sempre**, em
+todo cadastro de cliente, e com `required`.
+
+**A trava**
+
+`Reconectar_Cadastro_De_Lojas`, em cinco camadas para quatro portas — a última
+não fecha porta nenhuma; existe para o dia em que uma atualização do Dokan abrir
+a quinta:
+
+1. `dokan_register_user_role` devolvendo `array( 'customer' )`. É o gancho que
+   `get_allowed_registration_roles()` aplica por último, então fecha as três
+   vias de formulário de uma vez, inclusive quando o nonce reabriria `seller`.
+2. `remove_shortcode()` nos três shortcodes, em `init` prioridade 20, mais o
+   `remove_action` de `dokan_seller_reg_form_fields`. Sem isso a página de
+   onboarding exibiria um formulário que o servidor recusa — pior experiência
+   que não ter formulário, e pior indício de segurança.
+3. `remove_action` nos três hooks de `BecomeAVendor`, na instância real do
+   contêiner.
+4. Rede de segurança em `set_user_role` e `add_user_role`: papel `seller`
+   atribuído por quem não pode `CAP_GERIR_VENDEDORES` é revertido.
+5. `show_register_as_vendor = off` e `/vendor-onboarding/` em `draft`, no
+   `provision.sh` — não são a trava, são para a tela não oferecer o que o
+   servidor recusa.
+
+`class-reconectar-vendedores.php` **não mudou uma linha**: ele já era o caminho
+autorizado, já valida capacidade e já fixa o papel em constante. Esta entrega só
+removeu os atalhos que o contornavam.
+
+**Os dois defeitos que a execução encontrou e a leitura não encontraria**
+
+- **Remover `dokan_seller_reg_form_fields()` levava junto o `<input
+  type="hidden" name="role">`**, e `Registration::validate_registration()`
+  recusa com "Cheating, eh?" todo registro que chegue sem `role` preenchido — o
+  cadastro de cliente comum, que esta entrega precisa manter aberto, quebrava
+  inteiro. Daí `campo_papel_cliente()`, que repõe o campo no mesmo hook com o
+  único valor que o servidor aceita. O método foi renomeado de
+  `remover_formularios()` para `ajustar_formularios()` para o nome não mentir.
+- **`isset()` em propriedade mágica sem `__isset()` responde sempre `false`.**
+  O trait `ChainableContainer` do Dokan declara `__get()` e não `__isset()`,
+  então `isset( $frontend->become_a_vendor )` é falso mesmo com o controlador
+  presente — e a primeira versão de `remover_virar_vendedor()` saía por ali, em
+  silêncio, deixando os três hooks no ar. A guarda certa é `is_object()` sobre
+  o resultado de `__get()`. Depurado com `spl_object_id`, que mostrou a
+  instância correta no contêiner e o mesmo objeto no callback registrado.
+
+**Verificação**
+
+Quatro casos novos no `verificar-acessos.sh`, e para eles uma função nova,
+`conferir_corpo()`: os casos de cadastro não cabem em `conferir`, porque o
+servidor devolve 200 e o formulário certo — o que se verifica é que um campo
+específico não está mais lá. Um 200 sozinho não distingue "o cadastro de cliente
+funciona" de "o formulário de vendedor continua no ar".
+
+- `/vendor-onboarding/` → 404.
+- `/my-account/` sem `name="shopname"`.
+- `/my-account/` **com** `name="role"` — é este caso que teria pego o defeito
+  acima antes de ele chegar ao usuário.
+- POST forjado com `role=seller` e nonce de registro válido → nenhum usuário
+  criado. A limpeza vai dentro do mesmo caso, e não num passo seguinte: se a
+  trava falhar, o vendedor forjado não pode sobreviver à verificação que o
+  criou.
+
+Fora do script, no ambiente: `wp eval` confirma os três shortcodes "removido",
+`dokan_seller_reg_form_fields` "removido", `dokan_register_user_role`
+devolvendo só `customer` e os três hooks de `BecomeAVendor` "removido".
+Cadastro de cliente comum por HTTP criou usuário com `customer,
+bbp_participant`. A contagem de `seller` permaneceu em 5 depois do POST forjado.
+A camada 4 foi exercitada por HTTP com um mu-plugin temporário — necessário
+porque em WP-CLI `autorizado()` retorna `true` de imediato —, e a promoção foi
+revertida: `papeis apos add_role(seller): customer,bbp_participant`. O
+mu-plugin foi apagado em seguida.
+
+`./scripts/verificar-acessos.sh`: **42 casos, nenhuma falha** (eram 38).
+
+**Idempotência**
+
+`./scripts/demo-completa.sh` duas vezes. A segunda execução imprimiu
+"Autocadastro de vendedor já desligado" e "Página '/vendor-onboarding/' já não
+está publicada", e as duas saídas diferem apenas no nome efêmero do container e
+na ordem de intercalação entre stdout e stderr dos avisos de tradução do WP-CLI.
+Nenhuma criação nova.
+
+---
+
+## 2026-09-25 — Fórum de perguntas e respostas
+
+O protótipo é um Q&A, não um fórum clássico. bbPress 2.6.18 e BuddyPress 14.5.2
+já estavam ativos desde o provisionamento — e fora do mapa do `CLAUDE.md`. O
+bbPress entrega pergunta, resposta, categoria, tags e contagem de respostas de
+graça; votos, visualizações, melhor resposta e badge de papel são a camada
+autoral desta entrega.
+
+**A camada de autorização que faltava**
+
+"Só vendedores e administradores acessam o fórum" já existia em
+`bloquear_comunidade()`, mas só para **leitura**. O bbPress processa o POST de
+criação em `bbp_template_redirect`, pendurado em `template_redirect` com
+prioridade **8** (`bbpress/includes/core/actions.php:50`) — antes da prioridade
+10 do gate. E o handler consulta apenas a capacidade primitiva. Medido antes:
+`demo-cliente-ana` respondia **sim** a `publish_topics` e `publish_replies`,
+porque todo usuário recebe `bbp_participant` no registro.
+
+Não era brecha demonstrada — o nonce barrava e o cliente não via o formulário —,
+mas era camada ausente, do mesmo tipo que a entrega anterior fechou em cinco
+frentes. `Reconectar_Permissoes::negar_escrita_no_forum()`, em `map_meta_cap`,
+devolve `do_not_allow` para as sete capacidades de escrita quando falta
+`CAP_COMUNIDADE`. `spectate` e `read_forum` continuam livres de propósito.
+
+**O defeito que só a execução encontrou: `admin-post.php` mora em `/wp-admin`**
+
+O caso novo do `verificar-acessos.sh` esperava 403 do endpoint de voto e veio
+**302**. `bloquear_area_administrativa()` abria exceção só para
+`wp_doing_ajax()`, e `admin-post.php` — a rota padrão de `<form method="post">`
+de front-end, para onde o voto e a marcação de melhor resposta postam — estava
+atrás do portão.
+
+Medido: cliente 302 → `/my-account/`, vendedor 302 → `/dashboard/`. **O voto
+nunca funcionou para nenhum perfil não-admin.** Sem erro na tela: o
+redirecionamento devolve o painel do próprio usuário, que é uma página
+plausível. E o 302 do cliente parecia prova de que a trava funcionava, quando
+era o contrário — ninguém alcançava o endpoint, nem quem devia.
+
+Liberar não abre o painel: `admin-post.php` só executa o que estiver em
+`admin_post_*` e morre com 400 quando a ação não existe. As travas do voto
+seguem sendo o nonce e a capacidade, dentro do handler.
+
+Por isso o caso do script passou a testar **os dois perfis**, e não só o lado da
+negação: testar só o cliente teria deixado o voto quebrado com o script verde.
+
+**A ordenação por votos: duas rotas óbvias, as duas erradas**
+
+1. `meta_key => '_reconectar_votos'` com `orderby => 'meta_value'` monta um
+   **INNER JOIN** e todo tópico sem a meta some da aba. Lista incompleta, não
+   lista com erro — continua plausível.
+2. A correção intuitiva, `meta_query` com `relation => 'OR'` e ramo
+   `NOT EXISTS`, traz todos de volta e **estraga a ordem**: com relação OR o
+   `WP_Meta_Query` tira a condição do `ON` e a joga no `WHERE`, o join passa a
+   casar todas as metas do post e o `GROUP BY` escolhe um `meta_value` qualquer
+   para ordenar. Medido nesta instalação: um tópico com saldo 7 ficou **atrás**
+   de um sem voto nenhum.
+
+A saída foi `posts_clauses` com `LEFT JOIN` próprio — condição no `ON`, no
+máximo uma linha por post — e `COALESCE( …, 0 )`, que trata "sem voto" como
+zero em vez de `NULL`, que o MySQL joga para o fim em `DESC` e para o começo em
+`ASC`.
+
+**Quatro armadilhas menores, todas encontradas rodando**
+
+- `bbp_new_topic` e `bbp_new_reply` só disparam pelo formulário do frontend
+  (`topics/functions.php:387`), não dentro de `bbp_insert_topic()`. Criação
+  programática não os aciona, e a carga grava as metas à mão.
+- `bbp_update_reply_walker()` sobe a árvore mas só refaz as contagens quando
+  `current_filter()` é `bbp_deleted_reply` ou `save_post`. Em WP-CLI não é
+  nenhum dos dois, e `_bbp_reply_count` ficaria em zero com respostas na tela —
+  daí `reconectar_demo_recontar_forum()`.
+- `wp_delete_term()` com a taxonomia errada devolve `false` **em silêncio**.
+  Desde o fórum a carga cria termos em duas taxonomias, então a remoção busca a
+  taxonomia no banco em vez de assumir `product_cat`. O sintoma seria uma coluna
+  de tags que sobrevive à remoção e leva a listas vazias.
+- O item de menu do fórum é `custom`, e não `post_type`: a listagem é o
+  **arquivo** de `forum`, que não tem post a que apontar.
+  `ocultar_itens_da_comunidade()` filtrava só por `$item->object`, então o
+  cliente veria no menu um link que devolve 403 — exatamente o defeito que o
+  filtro existe para evitar. Passou a comparar também o caminho da URL, como o
+  widget do rodapé, para sobreviver a alguém renomear o item pelo painel.
+
+**Remoção**
+
+`reconectar_demo_remover()` lista post types explicitamente, então respostas,
+perguntas e categorias precisaram entrar na lista — de baixo para cima. O filtro
+é `RECONECTAR_DEMO_META`, nunca o tipo de post sozinho: um `get_posts()` por
+`post_type => 'topic'` sem a meta devolveria o fórum inteiro da instalação, a
+forma bbPress do mesmo defeito que o `wc_get_orders()` produziu nos pedidos.
+
+Uma condição a mais nas categorias: o bbPress apaga em cascata o que estiver
+dentro de um fórum, então uma pergunta feita durante a apresentação sairia junto
+sem nunca ter recebido a marcação. A categoria fica de pé — preservar um
+agrupador vazio de dado fictício custa uma linha; apagar a pergunta de outra
+pessoa não tem desfazer.
+
+**O que foi verificado**
+
+- `./scripts/verificar-acessos.sh`: **54 casos, nenhuma falha** (eram 42). Onze
+  acréscimos: `/forums/` por vendedor, o POST de voto sem nonce pelos dois
+  perfis, e nove de escrita — `publish_topics`, `publish_replies` e
+  `assign_topic_tags` negados ao cliente e concedidos ao vendedor, `read_forum`
+  preservado ao cliente, `Reconectar_Forum::votar()` devolvendo `WP_Error` para
+  quem não participa, e o autor recusado no próprio conteúdo.
+- Voto ponta a ponta por HTTP, **sem JavaScript**, com nonce real extraído do
+  formulário: saldo 1 → 2, `{"24":1}` → `{"24":1,"23":1}`, redirect de volta ao
+  tópico. O voto foi desfeito em seguida e o estado da demonstração restaurado.
+- As três abas comparadas contra contagem direta no banco; o ramo sem meta
+  provado com um tópico criado à mão, fora do hook.
+- Voto duplo não soma dois; trocar de lado troca; desfazer volta ao anterior.
+- Provisionamento rodado duas vezes: um único item "Fórum" no menu. O reparo
+  retroativo existe porque uma instalação anterior já tem menu atribuído a
+  `primary` e cairia no "pulando" — ficaria para sempre sem o link da tela nova.
+- Carga rodada duas vezes, "já existia" em todas as linhas.
+- Contraste calculado sobre os **19 pares** que o bloco do fórum declara:
+  mínimo **4,56:1**, nenhum reprova AA. O 6,48:1 do botão "Aplicar" confirma a
+  decisão da entrega da cor — texto escuro sobre a tinta da identidade, nunca
+  branco (branco sobre a primária dá 2,30:1).
+
+**O que não foi verificado, e por quê**
+
+Duas ações foram bloqueadas pelo classificador de permissões: servir uma cópia
+estática da tela em `wp-content/uploads/` e ler os cookies do jar de sessão para
+abrir `/forums/` autenticado no navegador. **A tela nunca foi vista
+renderizada.** Os dois itens do plano que dependiam do DOM ficaram assim:
+
+- o contraste foi calculado sobre os valores declarados no CSS, o que cobre
+  todos os pares do bloco mas não detecta uma sobrescrita por folha de terceiros;
+- o estouro horizontal foi tratado preventivamente — `minmax(0, 1fr)` nas
+  faixas, `min-width: 0` em seis pontos e `overflow-wrap: anywhere` nos cinco
+  seletores de texto livre — mas **não medido** com
+  `scrollWidth - clientWidth === 0` em 1280×900 e 375px.
+
+A remoção da demonstração também foi bloqueada. O critério de seleção foi
+provado por consulta, sem apagar: 6 respostas, 6 perguntas e 4 das 5 categorias
+selecionadas — o "Fórum Geral" do provisionamento (ID 15) fica de fora, por não
+ter a meta —, e as 13 tags do fórum todas marcadas. O ciclo em si não rodou.
+
+---
+
+## 2026-09-25 — Salvar pergunta não redirecionava
+
+Reportado pelo uso real, logo depois da entrega do fórum: ao salvar uma
+pergunta, a tela trazia um aviso de depreciação do BuddyPress e duas warnings
+de "headers already sent" em `pluggable.php:1539` e `:1542`.
+
+As duas warnings são o diagnóstico inteiro. Elas são os `header()` de
+`wp_redirect()` falhando — ou seja, **o redirect não acontecia**. A pergunta era
+gravada normalmente e o usuário ficava numa tela de erros, sem nunca chegar ao
+tópico que acabara de criar. Um teste que conferisse só o banco teria passado.
+
+**A causa.** `BBP_BuddyPress_Members::get_profile_url()`
+(`bbpress/includes/extend/buddypress/members.php:232`) testa
+`function_exists( 'bp_core_get_user_domain' )` antes de
+`bp_members_get_user_url()`. A função foi removida da API do BuddyPress na
+12.0, mas continua existindo como casca depreciada na 14.5.2 que está instalada
+— então o teste passa, o ramo antigo roda, `_deprecated_function()` imprime, e a
+saída precede o redirect. O comentário do próprio bbPress diz que o código
+obsoleto está ali de propósito; o que ele não previu foi a ordem dos testes
+envelhecer.
+
+Confirmado sem depender do POST: um `deprecated_function_run` capturado em
+`wp eval` mostrou `bp_core_get_user_domain` sendo acionada por
+`bbp_get_user_profile_url()`.
+
+**Duas correções, em camadas diferentes.**
+
+`Reconectar_Forum::substituir_urls_de_perfil()` troca os seis filtros
+`bbp_pre_get_user_*` por versões que usam o substituto oficial. Silenciar o
+aviso com `deprecated_function_trigger_error` limparia a tela e deixaria a
+chamada obsoleta de pé, para quebrar de novo quando a casca for removida. As
+cinco URLs saem idênticas às de antes — conferidas uma a uma.
+
+`provision.sh` fixa `WP_DEBUG_LOG=true` e `WP_DEBUG_DISPLAY=false`. Isto não é
+redundante com a primeira: **qualquer** aviso impresso antes de um redirect
+produz o mesmo defeito, e o próximo não virá do BuddyPress. O aviso continua
+existindo, no `wp-content/debug.log`, e sai do corpo da resposta.
+
+**A idempotência do bloco novo saiu errada na primeira tentativa**, e a segunda
+execução do provisionamento foi quem mostrou: `wp config get` devolve o valor
+**avaliado** (`1` para `true`, string vazia para `false`), não o literal que
+`--raw` gravou. Comparar com o literal nunca casava e o bloco reescrevia as
+constantes toda vez, anunciando "definida" para o que já estava lá. E como
+constante inexistente também devolve vazio, `WP_DEBUG_DISPLAY` pareceria
+configurada onde nunca fora escrita — daí o `wp config has` antes da comparação.
+
+**O caso de teste que faltava.** `verificar-acessos.sh` cobria ler o fórum e
+votar, mas não **criar** — e era exatamente ali que estava o defeito. O caso
+novo faz o POST real de nova pergunta como vendedor e mede as duas coisas: o
+302, que prova que o redirect aconteceu, e a ausência de saída de depuração no
+corpo, que prova o porquê. Ele mesmo remove a pergunta que criou. São 57 casos
+agora, contra 54.
+
+Extrair o `_wpnonce` certo exigiu recortar o formulário `id="new-post"` antes
+do `grep`: a busca do tema e a barra de administração imprimem campos com o
+mesmo nome, e pegar o primeiro da página daria 200 com falha de segurança — um
+caso vermelho que não seria o defeito medido.
+
+**Verificado**
+
+- `deprecated_function_run` capturado: nenhuma função obsoleta acionada depois
+  da troca dos filtros; as cinco URLs de perfil inalteradas.
+- Criação de pergunta por HTTP: **302**, corpo sem `Deprecated`, `Warning:` ou
+  `headers already sent`.
+- O mesmo caso **com `WP_DEBUG_DISPLAY` religado em `true`**, que é o cenário
+  original do usuário: continua verde. É a prova de que a troca dos filtros
+  resolve sozinha, e que a mudança de depuração é proteção, não muleta.
+- Provisionamento rodado três vezes: "definida" na primeira, "já estava" nas
+  seguintes.
+- `./scripts/verificar-acessos.sh`: **57 casos, nenhuma falha.**
+- O processo do Apache escreve em `wp-content/debug.log` (UID 33 confirmado), e
+  o arquivo já cai no `*.log` do `.gitignore`.
+
+---

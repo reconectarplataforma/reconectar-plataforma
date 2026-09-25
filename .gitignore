@@ -25,6 +25,13 @@ docker/db-data/
 # contêm dados de instalação e não devem ir para o repositório público)
 docker/backup-*.sql
 
+# Artefatos intermediários da tradução: extraídos do .po do Dokan pelo
+# po_ferramenta.py e consumidos pelo lote.py. São derivados — o entregável é o
+# .po final em reconectar-core/languages/, e versionar o intermediário faria o
+# diff de uma revisão de tradução aparecer duas vezes, em 600 KB de JSON.
+scripts/i18n/po_entradas.json
+scripts/i18n/lotes/
+
 # Logs
 *.log
 

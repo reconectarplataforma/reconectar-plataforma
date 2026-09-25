@@ -90,21 +90,63 @@ function reconectar_resumo_do_carrinho() {
  * Busca restrita a `post_type=product`: quem digita na barra de um marketplace
  * quer encontrar o que comprar, não uma página institucional. As páginas
  * continuam encontráveis pela busca padrão do WordPress.
+ *
+ * A lupa é o botão de envio, e não um enfeite ao lado de um botão escrito
+ * "Buscar": o rótulo textual consumia cerca de 60px da largura útil do campo —
+ * num componente que no celular ocupa a linha inteira, esse é o espaço de mais
+ * três ou quatro caracteres visíveis.
+ *
+ * O markup de `combobox` só ganha sentido com `assets/js/busca.js` carregado.
+ * Sem ele — JS desligado, bloqueado por extensão, arquivo que não chegou — o
+ * que sobra é o formulário de sempre: Enter e clique na lupa submetem para a
+ * página de resultados. A lista de sugestões nasce vazia e assim permanece.
  */
 function reconectar_campo_de_busca() {
+	/*
+	 * Os rótulos do painel viajam em JSON no markup em vez de morarem no JS: o
+	 * tema não carrega `wp-i18n`, e string cravada em arquivo `.js` fica fora do
+	 * alcance do `.pot` — invisível para quem traduzir a plataforma depois.
+	 */
+	$textos = array(
+		'produtos' => __( 'Produtos', 'reconectar' ),
+		'lojas'    => __( 'Lojas', 'reconectar' ),
+		/* translators: %s: termo digitado. */
+		'vazio'    => __( 'Nada encontrado para “%s”.', 'reconectar' ),
+		/* translators: %s: termo digitado. */
+		'todos'    => __( 'Ver todos os resultados para “%s”', 'reconectar' ),
+		'nenhuma'  => __( 'Nenhuma sugestão.', 'reconectar' ),
+		'uma'      => __( '1 sugestão disponível.', 'reconectar' ),
+		/* translators: %d: quantidade de sugestões. */
+		'varias'   => __( '%d sugestões disponíveis.', 'reconectar' ),
+	);
 	?>
-	<form class="rc-busca" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
+	<form
+		class="rc-busca"
+		role="search"
+		method="get"
+		action="<?php echo esc_url( home_url( '/' ) ); ?>"
+		data-rc-busca
+		data-rc-busca-sugestoes="<?php echo esc_url( rest_url( 'reconectar/v1/sugestoes' ) ); ?>"
+		data-rc-busca-textos="<?php echo esc_attr( wp_json_encode( $textos ) ); ?>"
+	>
 		<label class="screen-reader-text" for="rc-busca-campo">
 			<?php esc_html_e( 'Buscar produtos e lojas', 'reconectar' ); ?>
 		</label>
 
-		<span class="rc-busca__icone" aria-hidden="true">
-			<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" focusable="false">
+		<button type="submit" class="rc-busca__enviar" aria-label="<?php esc_attr_e( 'Buscar', 'reconectar' ); ?>">
+			<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" focusable="false" aria-hidden="true">
 				<circle cx="11" cy="11" r="7"></circle>
 				<path d="m20 20-3.5-3.5"></path>
 			</svg>
-		</span>
+		</button>
 
+		<?php
+		/*
+		 * `autocomplete="off"` porque o histórico do navegador desenha sua
+		 * própria lista por cima da nossa, e as duas juntas viram uma pilha de
+		 * sugestões que ninguém sabe operar.
+		 */
+		?>
 		<input
 			type="search"
 			id="rc-busca-campo"
@@ -112,13 +154,27 @@ function reconectar_campo_de_busca() {
 			name="s"
 			value="<?php echo esc_attr( get_search_query() ); ?>"
 			placeholder="<?php esc_attr_e( 'Busque por item ou loja', 'reconectar' ); ?>"
+			autocomplete="off"
+			role="combobox"
+			aria-expanded="false"
+			aria-controls="rc-busca-sugestoes"
+			aria-autocomplete="list"
+			data-rc-busca-campo
 		/>
 
 		<input type="hidden" name="post_type" value="product" />
 
-		<button type="submit" class="rc-busca__enviar">
-			<?php esc_html_e( 'Buscar', 'reconectar' ); ?>
-		</button>
+		<ul class="rc-busca__sugestoes" id="rc-busca-sugestoes" role="listbox" hidden
+			aria-label="<?php esc_attr_e( 'Sugestões de produtos e lojas', 'reconectar' ); ?>"
+			data-rc-busca-lista></ul>
+
+		<?php
+		/*
+		 * O painel aparece sem nenhum aviso para quem não o vê: esta região é o
+		 * que anuncia quantas sugestões surgiram.
+		 */
+		?>
+		<span class="screen-reader-text" role="status" aria-live="polite" data-rc-busca-aviso></span>
 	</form>
 	<?php
 }
@@ -195,6 +251,14 @@ function reconectar_atalho_de_conta() {
 	if ( ! is_user_logged_in() ) {
 		$destino = wp_login_url( home_url( add_query_arg( array() ) ) );
 		$rotulo  = __( 'Entrar', 'reconectar' );
+	} elseif ( class_exists( 'Reconectar_Painel_Empresas' )
+		&& current_user_can( Reconectar_Permissoes::CAP_PAINEL_EMPRESAS )
+		&& '' !== Reconectar_Painel_Empresas::url() ) {
+		// Antes do ramo do vendedor: o Administrador de Empresas não é vendedor,
+		// e mandá-lo para "Minha conta" esconderia justamente a única área que ele
+		// administra.
+		$destino = Reconectar_Painel_Empresas::url();
+		$rotulo  = __( 'Painel de Empresas', 'reconectar' );
 	} elseif ( function_exists( 'dokan_is_user_seller' ) && dokan_is_user_seller( get_current_user_id() ) ) {
 		$destino = function_exists( 'dokan_get_navigation_url' ) ? dokan_get_navigation_url() : home_url( '/' );
 		$rotulo  = __( 'Minha loja', 'reconectar' );

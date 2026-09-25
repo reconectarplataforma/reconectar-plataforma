@@ -134,6 +134,18 @@ Fóruns e perfis. Acesso restrito a Administrador e Vendedor; o Cliente não
 entra, por decisão de negócio do edital. A trava não está aqui, está na camada
 seguinte.
 
+O fórum de perguntas e respostas é bbPress **com uma camada autoral por cima**.
+O plugin entrega pergunta (`topic`), resposta (`reply`), categoria (`forum`),
+tags (`topic-tag`) e a contagem de respostas; votos, visualizações, melhor
+resposta e badge de papel do autor são de `Reconectar_Forum`. Os templates
+ficam em `themes/reconectar/bbpress/` e a lógica de tela em `inc/forum/`.
+
+**O bbPress processa POST em `template_redirect` prioridade 8**
+(`bbpress/includes/core/actions.php:50`), antes da prioridade 10 do gate de
+leitura, e o handler de criação só consulta `publish_topics` — que todo usuário
+tem por causa do papel `bbp_participant` dado no registro. Por isso a escrita
+tem trava própria em `map_meta_cap`, e não herda a de leitura.
+
 ## 7. Regras autorais — plugin `reconectar-core`
 
 O diretório é **`includes/`**. (`inc/` é o tema. Confundir leva a criar arquivo
@@ -146,6 +158,7 @@ em lugar que nada carrega.)
 | `class-reconectar-painel-transparencia.php` | prestação de contas pública |
 | `class-reconectar-proposta-votacao.php` | governança participativa |
 | `class-reconectar-aviso-demo.php` | aviso de ambiente de demonstração |
+| `class-reconectar-forum.php` | votos, visualizações e melhor resposta do Q&A |
 
 **Por que as regras estão em plugin, e não no tema.** Trocar de tema não pode
 derrubar autorização. A migração para o Blocksy está em aberto; se o RBAC

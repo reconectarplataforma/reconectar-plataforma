@@ -150,13 +150,22 @@ input[type="submit"]:hover {
   text-align: center;
 }
 
+/* Os degraus `--rc-fonte-*` são declarados no `:root` do `marketplace.css`, ao
+   lado dos demais tokens `--rc-*`. As duas folhas são enfileiradas juntas na
+   prioridade 40 por `inc/enqueue.php`, então não há fallback aqui: se uma
+   carregar, a outra carregou. */
+/* `clamp()` pelo mesmo motivo de `.rc-loja__nome`: o degrau de 36px é a medida
+   certa para a linha de 1168px do desktop e vira um bloco de cinco linhas nos
+   375px de um celular, onde o título sozinho ocupava 219px de altura antes de
+   qualquer conteúdo aparecer. O piso é o degrau anterior da escala, não um
+   número novo. */
 .reconectar-hero__titulo {
   color: #fff;
-  font-size: 2rem;
+  font-size: clamp(var(--rc-fonte-2xl), 5vw, var(--rc-fonte-3xl));
 }
 
 .reconectar-hero__subtitulo {
-  font-size: 1.125rem;
+  font-size: var(--rc-fonte-md);
   margin-bottom: 1.5rem;
 }
 

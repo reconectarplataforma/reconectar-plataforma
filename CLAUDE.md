@@ -21,6 +21,8 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/verificar-acessos.sh` | testa as travas de RBAC por HTTP, nos três perfis |
 | `wp-content/themes/reconectar/` | tema autoral (child theme do Storefront) |
 | `wp-content/plugins/reconectar-core/` | plugin autoral: RBAC, status, governança |
+| `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
+| `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
 | `docs/PERFIS_E_PERMISSOES.md` | os três atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
@@ -115,6 +117,89 @@ limpa essas linhas: o plugin as remove a partir dos seus próprios hooks de
 estorno, não da exclusão definitiva. Linhas órfãs viram faturamento fantasma no
 painel. Veja `reconectar_demo_limpar_tabelas_dokan()`.
 
+### bbPress e BuddyPress estão ativos
+
+bbPress 2.6.18 e BuddyPress 14.5.2 são instalados e ativados pelo
+`provision.sh`. O fórum de perguntas e respostas é bbPress com uma camada
+autoral por cima (`Reconectar_Forum`, no plugin; `inc/forum/`, no tema; overrides
+em `themes/reconectar/bbpress/`).
+
+### O bbPress processa POST em `template_redirect` **prioridade 8**
+
+`bbp_template_redirect` (`bbpress/includes/core/actions.php:50`) roda **antes**
+da prioridade 10, onde está `bloquear_comunidade()`. E o handler de criação só
+consulta a capacidade primitiva (`publish_topics`), que todo usuário tem por
+causa do papel `bbp_participant` dado no registro. Quem barra a escrita é
+`Reconectar_Permissoes::negar_escrita_no_forum()`, em `map_meta_cap` — não o
+gate de leitura.
+
+### `admin-post.php` mora dentro de `/wp-admin`
+
+É a rota padrão de `<form method="post">` de front-end, e o portão
+`bloquear_area_administrativa()` a interceptava. O sintoma não é erro: é 302
+para `/my-account/` ou `/dashboard/` e a ação simplesmente não acontecer, numa
+página plausível. Há exceção explícita para ela, irmã da de `wp_doing_ajax()`.
+**Todo endpoint novo de front-end precisa dessa exceção ou de outra rota.**
+
+### Qualquer aviso PHP impresso antes de um redirect cancela a ação
+
+`WORDPRESS_DEBUG=1` liga `WP_DEBUG`, e o padrão de `WP_DEBUG_DISPLAY` é
+imprimir no corpo da resposta. Uma linha impressa antes de `wp_redirect()`
+derruba os dois `header()` de `pluggable.php:1539` e `:1542` com "headers
+already sent" — e o efeito não é uma mensagem feia numa tela que funciona: **é
+a ação não acontecer**. Salvar pergunta no fórum gravava o tópico e parava numa
+tela de avisos, sem nunca chegar nele.
+
+`provision.sh` fixa `WP_DEBUG_LOG=true` e `WP_DEBUG_DISPLAY=false`: o aviso
+continua existindo, em `wp-content/debug.log`, e fora do corpo da resposta.
+Ao conferir essas constantes, lembre que `wp config get` devolve o valor
+**avaliado** (`1` e string vazia), nunca o literal que `--raw` gravou — e que
+uma constante inexistente também devolve vazio, igual a `false`.
+
+### A integração bbPress↔BuddyPress chama função removida na 12.0
+
+`BBP_BuddyPress_Members::get_profile_url()`
+(`bbpress/includes/extend/buddypress/members.php:232`) testa
+`function_exists( 'bp_core_get_user_domain' )` **antes** de
+`bp_members_get_user_url()`. No BuddyPress 12+ a primeira continua existindo
+como casca depreciada, então o teste passa, o ramo antigo roda e o aviso sai —
+junto com o defeito acima, já que `bbp_get_user_profile_url()` é chamado no
+fluxo de criação de tópico.
+
+`Reconectar_Forum::substituir_urls_de_perfil()` troca os seis filtros
+`bbp_pre_get_user_*` por versões que usam o substituto oficial. Silenciar o
+aviso resolveria a tela e deixaria a chamada obsoleta de pé, para quebrar de
+novo quando o BuddyPress remover a casca.
+
+### Ordenar por meta no `WP_Query`: as duas rotas óbvias falham
+
+`meta_key` + `orderby => 'meta_value'` monta INNER JOIN e some com quem não tem
+a meta. E `meta_query` com `relation => 'OR'` e ramo `NOT EXISTS` traz todos de
+volta **estragando a ordem** — a condição sai do `ON` para o `WHERE`, o join
+casa todas as metas do post e o `GROUP BY` ordena por uma qualquer. Medido: um
+tópico com saldo 7 atrás de um sem voto. Use `posts_clauses` com `LEFT JOIN`
+próprio e `COALESCE( …, 0 )`, como em `Reconectar_Forum::ordenar_por_votos()`.
+
+### `bbp_new_topic`/`bbp_new_reply` só disparam pelo formulário do frontend
+
+`bbp_insert_topic()` e `bbp_insert_reply()` não os acionam. Criação programática
+precisa gravar as metas à mão — e recontar: `bbp_update_reply_walker()` só refaz
+as contagens sob `bbp_deleted_reply` ou `save_post`, e em WP-CLI o resultado
+seria `_bbp_reply_count` em zero com respostas na tela.
+
+### `reconectar_demo_remover()` lista post types explicitamente
+
+Um tipo novo na carga **não sai sozinho**. E o filtro é sempre
+`RECONECTAR_DEMO_META`: `get_posts()` por `post_type => 'topic'` sem a meta
+devolve o fórum inteiro da instalação — a forma bbPress do defeito do
+`wc_get_orders()`.
+
+### `wp_delete_term()` com a taxonomia errada devolve `false` em silêncio
+
+A carga cria termos em `product_cat` e em `topic-tag`. A remoção busca a
+taxonomia no `term_taxonomy` em vez de assumir uma; sem isso, sobrevivem tags
+que levam a listas vazias.
+
 ### O diretório do plugin é `includes/`, não `inc/`
 
 `inc/` é a convenção do **tema**. Confundir os dois leva a criar arquivo em
@@ -200,6 +285,32 @@ Declaradas como custom properties em `wp-content/themes/reconectar/style.css`:
 | `--reconectar-cor-institucional` | `#663191` |
 
 Poppins na interface. Thoge **apenas** em `.site-title`.
+
+**Nunca escreva um `font-size` literal em componente `rc-`.** A escala está no
+`:root` de `assets/css/marketplace.css`, em nove degraus de razão 1,125 sobre os
+16px do documento:
+
+| Token | Valor | Papel |
+| --- | --- | --- |
+| `--rc-fonte-2xs` | 12px | selo, badge — **piso**, nada desce daqui |
+| `--rc-fonte-xs` | 13px | rótulo auxiliar |
+| `--rc-fonte-sm` | 14px | meta, apoio |
+| `--rc-fonte-base` | 16px | corpo, nome de item |
+| `--rc-fonte-md` | 18px | destaque |
+| `--rc-fonte-lg` | 20px | subtítulo |
+| `--rc-fonte-xl` | 24px | título de seção |
+| `--rc-fonte-2xl` | 28px | — |
+| `--rc-fonte-3xl` | 36px | título de página |
+
+Mais `--rc-entrelinha-justa` (1.25) e `--rc-entrelinha-compacta` (1.4), para
+rótulo e título: sem elas o Storefront entrega 1,618 a tudo, e um rótulo de uma
+palavra vira ar. Antes da escala eram 16 valores avulsos entre 0.65rem e 2rem —
+o menor deles rendia selo de 10,4px dentro de linha de produto de 122px.
+
+A base do `html` fica em 16px de propósito: subi-la mexeria em carrinho,
+checkout e painel do vendedor, que são Woo e Dokan. O painel de empresas, por
+ser plugin e não poder exigir o tema, consome os degraus com fallback literal
+(`var( --rc-fonte-sm, 0.875rem )`).
 
 ## Antes de dar algo por pronto
 

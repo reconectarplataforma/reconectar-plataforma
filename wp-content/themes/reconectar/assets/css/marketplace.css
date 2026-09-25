@@ -17,12 +17,47 @@
   --rc-superficie: #ffffff;
   --rc-fundo: #f7f7f8;
   --rc-borda: #e4e4e7;
-  --rc-texto: #27272a;
-  --rc-texto-suave: #71717a;
+  /* Os dois no mesmo cinza, e isto não é descuido: #767676 é o cinza mais claro
+     que ainda atinge 4,5:1 sobre branco, e #717171 está a cinco pontos dele —
+     não existe espaço para um "suave" mais claro que este e ainda conforme. A
+     distinção entre texto principal e texto de apoio passou para tamanho e
+     peso, na escala --rc-fonte-*. O alias fica declarado em vez de reescrever os
+     21 usos, e para que um redesenho futuro tenha um ponto único onde separar os
+     dois de novo. Medidas: 4,88:1 sobre branco, 4,56:1 sobre --rc-fundo. */
+  --rc-texto: #717171;
+  --rc-texto-suave: var(--rc-texto);
+
+  /* Os selos são texto sobre o amarelo da identidade, onde #717171 cai para
+     2,85:1. Por isso ficam no cinza escuro que o --rc-texto tinha antes: são as
+     duas únicas declarações de cor deste arquivo que não acompanham o
+     clareamento. */
+  --rc-texto-sobre-destaque: #27272a;
+
   --rc-raio: 8px;
   --rc-sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
   --rc-largura: 1200px;
   --rc-espaco: 16px;
+
+  /* Escala de razão 1,125 sobre a base de 16px do documento. Os componentes
+     vinham de dezesseis valores avulsos entre 0.65rem e 2rem, cada um escolhido
+     na hora: o que sobrava era selo de 10,4px dentro de linha de produto de
+     122px, e nome de loja de 15,2px dentro de card de 283px. Nenhum degrau
+     desce de 0.75rem, que é o piso de legibilidade assumido aqui. */
+  --rc-fonte-2xs: 0.75rem;    /* 12px — selo, badge */
+  --rc-fonte-xs: 0.8125rem;   /* 13px — rótulo auxiliar */
+  --rc-fonte-sm: 0.875rem;    /* 14px — meta, apoio */
+  --rc-fonte-base: 1rem;      /* 16px — corpo, nome de item */
+  --rc-fonte-md: 1.125rem;    /* 18px — destaque */
+  --rc-fonte-lg: 1.25rem;     /* 20px — subtítulo, inicial de avatar */
+  --rc-fonte-xl: 1.5rem;      /* 24px — título de seção */
+  --rc-fonte-2xl: 1.75rem;    /* 28px */
+  --rc-fonte-3xl: 2.25rem;    /* 36px — título de página */
+
+  /* O Storefront entrega 1,618 a tudo que não declara entrelinha, e este arquivo
+     tinha um único `line-height` em 1839 linhas. Em rótulo de uma palavra aquilo
+     vira ar: 12,8px de texto ocupando 20,7px de linha. */
+  --rc-entrelinha-justa: 1.25;
+  --rc-entrelinha-compacta: 1.4;
 }
 
 /* ==========================================================================
@@ -112,17 +147,31 @@
   flex: 0 0 auto;
 }
 
+/* O teto é de altura, e não de largura, porque o logotipo do projeto empilha
+   três linhas de texto — "RECONECTAR", "Incubadora Digital" e "PARA VÍNCULOS E
+   NEGÓCIOS" — dentro de uma imagem de proporção 2560×1130. O que a altura
+   disponível limita é o corpo de cada linha, não o desenho inteiro.
+
+   Medido no arquivo de origem: a palavra "RECONECTAR" ocupa cerca de 30% da
+   altura da imagem. Nos 44px anteriores isso dava 13px de corpo — abaixo do
+   tamanho de um texto comum de interface, e o subtítulo ficava em 3px. Os 64px
+   levam o nome a 19px, na mesma ordem de grandeza do resto do cabeçalho.
+
+   Não vai além disso por aritmética: a 64px o logotipo mede 145px de largura, e
+   marca, busca e ações somam 1136 dos 1200px úteis. Cada 8px de altura a mais
+   custa 18px de largura, tirados da busca, que é o componente mais usado da
+   página. */
 .rc-cabecalho__marca img {
   display: block;
   height: auto;
-  max-height: 44px;
+  max-height: 64px;
   width: auto;
 }
 
 .rc-cabecalho__nome {
   color: var(--reconectar-cor-institucional);
   font-family: 'Thoge', 'Poppins', sans-serif;
-  font-size: 1.35rem;
+  font-size: var(--rc-fonte-xl);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -174,55 +223,183 @@
   position: relative;
 }
 
-/* O recuo à esquerda abre lugar para a lupa e o da direita para o botão
-   "Buscar", que é texto e não ícone: ele mede cerca de 60px e fica a 8px da
-   borda. Com os 44px que havia aqui — medida de um botão só com ícone, que o
-   markup não tem — o que se digitava passava por baixo do botão. */
-.rc-busca__campo {
+/* Dois níveis de seletor por necessidade, não por descuido: o Storefront declara
+   `input[type="text"], …, input[type="search"], textarea, .input-text` com
+   `padding: 0.618047em` e `border: 0`, e um seletor de atributo (0,1,1) vence
+   uma classe (0,1,0) por mais tarde que esta folha carregue. Enquanto a regra
+   aqui foi `.rc-busca__campo`, o recuo nunca chegou ao elemento — o computado
+   era 9,89px em todos os lados — e o texto digitado passava por baixo da lupa.
+   Quem "simplificar" este seletor para um nível traz o defeito de volta.
+
+   O recuo à esquerda abre lugar para a lupa, que agora é o próprio botão de
+   envio; à direita não há mais nada a evitar desde que o botão escrito "Buscar"
+   saiu do markup. */
+.rc-busca .rc-busca__campo {
   background: var(--rc-fundo);
   border: 1px solid var(--rc-borda);
   border-radius: 999px;
   color: var(--rc-texto);
-  padding: 10px 80px 10px 42px;
+  padding: 10px 16px 10px 44px;
   width: 100%;
 }
 
-.rc-busca__campo:focus {
+.rc-busca .rc-busca__campo:focus {
   background: var(--rc-superficie);
   border-color: var(--reconectar-cor-primaria);
   outline: 2px solid transparent;
 }
 
+/* A lupa é o botão de envio, e fica à esquerda porque é ali que o olho procura
+   o ícone de busca. Os 40px de lado são o alvo mínimo de toque da WCAG 2.5.5: o
+   ícone desenha 18px, o resto é área clicável. */
 .rc-busca__enviar {
+  align-items: center;
   background: none;
   border: 0;
+  border-radius: 999px;
   color: var(--rc-texto-suave);
   cursor: pointer;
-  padding: 6px;
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  left: 4px;
+  padding: 0;
   position: absolute;
-  right: 8px;
   top: 50%;
   transform: translateY(-50%);
+  width: 40px;
+  z-index: 1;
 }
 
 .rc-busca__enviar:hover {
   color: var(--reconectar-cor-primaria);
 }
 
-/* A lupa é irmã do campo, e não filha do botão: sem posicionamento ela caía no
-   fluxo do formulário e aparecia solta acima do input, como um ícone órfão. O
-   `pointer-events: none` devolve ao campo a área que ela cobre — clicar na lupa
-   precisa dar foco ao input, não engolir o clique. */
-.rc-busca__icone {
-  color: var(--rc-texto-suave);
-  display: block;
-  height: 20px;
-  left: 14px;
-  pointer-events: none;
+/* O botão passou a ser focável quando deixou de ser um `<span>` decorativo, e o
+   reset do tema pai remove o contorno padrão do navegador. */
+.rc-busca__enviar:focus-visible {
+  color: var(--reconectar-cor-primaria);
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
+}
+
+/* Painel de sugestões
+   -------------------------------------------------------------------------- */
+
+/* Mesmo mecanismo do seletor de município: painel absoluto ancorado no elemento
+   posicionado logo acima, acima do conteúdo pelo `z-index` e com rolagem quando
+   a lista não couber. */
+.rc-busca__sugestoes {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  box-shadow: var(--rc-sombra);
+  left: 0;
+  list-style: none;
+  margin: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px 0;
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+}
+
+.rc-busca__sugestoes[hidden] {
+  display: none;
+}
+
+.rc-busca__titulo {
+  color: var(--rc-texto-suave);
+  font-size: var(--rc-fonte-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 8px 14px 4px;
+  text-transform: uppercase;
+}
+
+.rc-busca__opcao {
+  align-items: center;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 14px;
+}
+
+/* Fundo e barra lateral juntos: cor sozinha não indica estado para quem não a
+   distingue (WCAG 2.1, 1.4.1). O mesmo par já é usado no seletor de município. */
+.rc-busca__opcao:hover,
+.rc-busca__opcao[aria-selected="true"] {
+  background: var(--rc-fundo);
+  border-left-color: var(--reconectar-cor-primaria);
+}
+
+.rc-busca__miniatura {
+  align-items: center;
+  background: var(--rc-fundo);
+  border-radius: 6px;
+  display: flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  overflow: hidden;
+  width: 36px;
+}
+
+.rc-busca__miniatura img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rc-busca__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rc-busca__nome {
+  color: var(--rc-texto);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-busca__apoio {
+  color: var(--rc-texto-suave);
+  font-size: var(--rc-fonte-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* O atalho para a página completa não é uma sugestão como as outras: separá-lo
+   por uma linha evita que seja lido como mais um produto da lista. */
+.rc-busca__opcao--todos {
+  border-top: 1px solid var(--rc-borda);
+  color: var(--reconectar-cor-institucional);
+  font-weight: 600;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.rc-busca__opcao--todos .rc-busca__miniatura {
+  display: none;
+}
+
+/* `.rc-busca__nome` crava a cor do texto; sem herdar, o atalho voltaria ao
+   cinza do resto da lista e deixaria de se distinguir. */
+.rc-busca__opcao--todos .rc-busca__nome {
+  color: inherit;
+  white-space: normal;
+}
+
+.rc-busca__vazio {
+  color: var(--rc-texto-suave);
+  padding: 12px 14px;
 }
 
 /* Seletor de município e atalho de conta
@@ -267,7 +444,7 @@
    no celular e o cabeçalho inteiro ganhava altura por causa de duas palavras. */
 .rc-municipio__rotulo {
   display: block;
-  font-size: 0.7rem;
+  font-size: var(--rc-fonte-xs);
   color: var(--rc-texto-suave);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -279,7 +456,7 @@
    Em desktop nada é cortado — o gatilho só encolhe quando o espaço acaba. */
 .rc-municipio__valor {
   display: block;
-  font-size: 0.85rem;
+  font-size: var(--rc-fonte-sm);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -341,7 +518,7 @@
 
 .rc-conta__rotulo,
 .rc-carrinho__texto {
-  font-size: 0.85rem;
+  font-size: var(--rc-fonte-sm);
   font-weight: 600;
 }
 
@@ -352,7 +529,7 @@
 .rc-carrinho__itens {
   color: var(--rc-texto-suave);
   display: block;
-  font-size: 0.75rem;
+  font-size: var(--rc-fonte-xs);
   font-weight: 400;
 }
 
@@ -398,7 +575,7 @@
 .rc-menu__lista a {
   color: var(--rc-texto);
   display: block;
-  font-size: 0.9rem;
+  font-size: var(--rc-fonte-base);
   padding: 6px 0;
   text-decoration: none;
 }
@@ -579,7 +756,8 @@
 }
 
 .rc-carrossel__titulo {
-  font-size: 1.25rem;
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0;
 }
 
@@ -590,7 +768,7 @@
 }
 
 .rc-carrossel__ver-todos {
-  font-size: 0.85rem;
+  font-size: var(--rc-fonte-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -634,7 +812,7 @@
 }
 
 .rc-carrossel__seta-icone {
-  font-size: 1.25rem;
+  font-size: var(--rc-fonte-lg);
   line-height: 1;
 }
 
@@ -649,6 +827,30 @@
   /* `scrollbar-width` em vez de esconder a barra por completo: em desktop sem o
      script, ela é a única pista de que a faixa rola. */
   scrollbar-width: thin;
+}
+
+/* A barra some quando — e só quando — as setas estão no ar. A classe
+   `is-interativo` é posta pelo script depois de medir `scrollWidth` contra
+   `clientWidth`, de modo que este seletor nunca esconde a barra de uma faixa
+   sem controle visível: sem o script, com o script ainda por carregar, ou numa
+   faixa cujos cards já cabem inteiros (que aí nem rola). Trocar a pista por
+   nada é o defeito que esta condição evita.
+
+   `padding-bottom` vai a zero junto porque os 8px eram a folga da barra — os
+   cards não têm sombra que precise deles. Nenhuma das duas propriedades altera
+   `scrollWidth` ou `clientWidth`, então a conta que liga e desliga as setas
+   segue valendo e não há oscilação com o `ResizeObserver`.
+
+   Duas declarações porque uma só não cobre o parque: `scrollbar-width` é do
+   padrão e vale no Firefox e no Chromium 121+; o pseudo-elemento é o que
+   atende Chromium anterior e Safari abaixo do 18.2. */
+.rc-carrossel.is-interativo .rc-carrossel__faixa {
+  padding-bottom: 0;
+  scrollbar-width: none;
+}
+
+.rc-carrossel.is-interativo .rc-carrossel__faixa::-webkit-scrollbar {
+  display: none;
 }
 
 .rc-carrossel__faixa > * {
@@ -754,12 +956,13 @@
 .rc-card-categoria__inicial {
   background: var(--reconectar-cor-primaria);
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: var(--rc-fonte-xl);
   font-weight: 600;
 }
 
 .rc-card-categoria__nome {
-  font-size: 0.85rem;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
   font-weight: 500;
   margin: 0;
 }
@@ -797,7 +1000,8 @@
 .rc-card-loja__inicial {
   background: var(--reconectar-cor-institucional);
   color: #ffffff;
-  font-size: 1.25rem;
+  /* Acompanha o círculo de 56px: em 20px a letra boiava no meio do disco. */
+  font-size: var(--rc-fonte-xl);
   font-weight: 600;
 }
 
@@ -806,7 +1010,8 @@
 }
 
 .rc-card-loja__nome {
-  font-size: 0.95rem;
+  font-size: var(--rc-fonte-base);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0 0 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -818,8 +1023,9 @@
   color: var(--rc-texto-suave);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.8rem;
+  font-size: var(--rc-fonte-sm);
   gap: 6px;
+  line-height: var(--rc-entrelinha-compacta);
   margin: 0;
 }
 
@@ -851,13 +1057,14 @@
 }
 
 .rc-card-produto__nome {
-  font-size: 0.9rem;
+  font-size: var(--rc-fonte-base);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0 0 4px;
 }
 
 .rc-card-produto__loja {
   color: var(--rc-texto-suave);
-  font-size: 0.78rem;
+  font-size: var(--rc-fonte-sm);
   margin: 0 0 6px;
 }
 
@@ -875,8 +1082,8 @@
 .rc-card-produto__selo {
   background: var(--reconectar-cor-destaque);
   border-radius: 999px;
-  color: var(--rc-texto);
-  font-size: 0.7rem;
+  color: var(--rc-texto-sobre-destaque);
+  font-size: var(--rc-fonte-2xs);
   font-weight: 600;
   padding: 2px 10px;
 }
@@ -905,7 +1112,8 @@
 }
 
 .rc-card-destaque__nome {
-  font-size: 1rem;
+  font-size: var(--rc-fonte-md);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0 0 4px;
 }
 
@@ -913,8 +1121,9 @@
   color: var(--rc-texto-suave);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.8rem;
+  font-size: var(--rc-fonte-sm);
   gap: 6px;
+  line-height: var(--rc-entrelinha-compacta);
   margin: 0;
 }
 
@@ -944,6 +1153,20 @@
   margin-bottom: var(--rc-espaco);
 }
 
+/* A faixa de filtros rola sem barra, ao contrário dos carrosséis, que só
+   escondem a sua quando as setas aparecem. Aqui não há seta — e mesmo assim
+   nada se perde, por dois motivos medidos nesta página:
+
+   quem enxerga vê a pílula seguinte cortada pela borda direita, que é o mesmo
+   aviso de continuação que o carrossel dá; e quem navega por teclado alcança
+   cada pílula com Tab, momento em que o próprio navegador rola o contêiner até
+   ela — as pílulas são links, não um bloco inerte com `tabindex`.
+
+   `flex-wrap: wrap` seria a saída óbvia para não ter rolagem nenhuma, e foi
+   descartada por escala: a lista é dois filtros fixos mais uma pílula por
+   município cadastrado. Na demonstração são 6; num marketplace estadual viram
+   dezenas, e o que hoje é uma linha viraria um muro de filtros acima da
+   vitrine. */
 .rc-filtros__lista {
   display: flex;
   gap: 8px;
@@ -951,7 +1174,11 @@
   margin: 0;
   overflow-x: auto;
   padding: 4px 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.rc-filtros__lista::-webkit-scrollbar {
+  display: none;
 }
 
 .rc-filtros__lista > li {
@@ -965,8 +1192,11 @@
   border-radius: 999px;
   color: var(--rc-texto);
   display: inline-block;
-  font-size: 0.82rem;
-  padding: 7px 14px;
+  font-size: var(--rc-fonte-sm);
+  /* O recuo vertical existe para o alvo de toque, não para respiro: com 13,12px
+     de fonte e 7px de recuo a pílula media 37px, abaixo dos 44px da WCAG 2.5.5.
+     Ao subir a fonte para 14px, 10px de recuo fecham a conta. */
+  padding: 10px 16px;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -1005,7 +1235,8 @@
 }
 
 .rc-vitrine__titulo {
-  font-size: 1.25rem;
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0 0 12px;
 }
 
@@ -1029,37 +1260,526 @@
 }
 
 /* ==========================================================================
-   Barra de filtros do Dokan (/store-listing/)
+   Página de loja (/store/{slug}/)
    ==========================================================================
-   Markup de plugin de terceiro: nada aqui edita arquivo do Dokan, a correção
-   entra pela cascata. O `marketplace.css` é enfileirado na prioridade 40 e sai
-   depois do CSS do plugin, então uma regra de especificidade idêntica à dele
-   vence sem precisar de `!important`.
+   O template é `dokan/store.php`, deste tema, e o conteúdo sai dentro do
+   `#primary.content-area` do Storefront — `.dokan-store-wrap` e `#dokan-primary`
+   não chegam ao DOM, então não há largura de plugin a neutralizar aqui. A
+   largura total vem de `reconectar_ajustar_classes_de_layout()`, que tira o
+   `right-sidebar` do `<body>` nesta página.
 
-   O defeito: `#dokan-store-listing-filter-wrap .right` é um flex container que
-   o plugin nunca declara como quebrável, e `nowrap` é o valor inicial. Em
-   320px, os dois filhos visíveis — o botão "Filter" (98px) e o formulário de
-   ordenação (184px: rótulo de 58px mais o `<select>` de 122px) — somam 282px
-   num espaço interno de 233px. O formulário passa 49px do pai e 13px da régua
-   do `.col-full`, e o `<select>` fica com a borda direita para fora da tela.
+   O único markup de terceiro nesta seção é o formulário de contato do Dokan,
+   dentro do painel "Ver mais"; ele é tratado no fim do bloco, pela cascata e
+   sem `!important`, como já se faz na seção seguinte. */
 
-   Não há media query aqui de propósito. O ponto exato de ruptura depende do
-   comprimento do rótulo, e a interface do Dokan ainda está em inglês: com
-   "Sort by:" o estouro só aparece até 414px, mas "Ordenar por:" é bem mais
-   largo e empurraria o mesmo defeito para telas maiores no dia em que a
-   tradução entrar. Um breakpoint chumbado hoje nasceria com data de validade;
-   `flex-wrap` mede o texto real e se ajusta sozinho.
-
-   A alternativa descartada foi deixar o `<select>` encolher (`min-width: 0` no
-   formulário). Ela resolve o overflow, mas corta o nome da opção selecionada no
-   meio — trocar um defeito de layout por um de legibilidade.
-
-   O `row-gap` só tem efeito quando a linha realmente quebra: onde os dois
-   controles cabem lado a lado, esta regra não muda pixel nenhum. */
-#dokan-store-listing-filter-wrap .right {
-  flex-wrap: wrap;
-  row-gap: calc(var(--rc-espaco) / 2);
+.rc-loja__cabecalho {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  margin-bottom: 24px;
+  overflow: hidden;
 }
+
+/* Altura em `clamp()` e não em `aspect-ratio`: o banner é servido no tamanho
+   `large` (1024px de largura), e uma proporção fixa numa tela de 1440px o
+   esticaria além do que a imagem tem para mostrar. O piso de 120px mantém a
+   faixa reconhecível no celular. */
+.rc-loja__banner {
+  background: var(--rc-fundo);
+  height: clamp(120px, 20vw, 240px);
+  overflow: hidden;
+}
+
+.rc-loja__banner img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* Loja sem banner recebe a faixa da identidade, não uma foto de banco de
+   imagens: o lugar continua ocupado, o cabeçalho não muda de altura entre uma
+   loja e outra, e nada é afirmado sobre a loja que ela não tenha cadastrado. */
+.rc-loja__banner--vazio {
+  background: linear-gradient(
+    135deg,
+    var(--reconectar-cor-institucional),
+    var(--reconectar-cor-primaria)
+  );
+}
+
+.rc-loja__identificacao {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rc-espaco);
+  padding: 0 var(--rc-espaco) var(--rc-espaco);
+}
+
+/* A margem negativa sobe a logo por cima do banner, como no protótipo. A borda
+   branca é o que a separa da imagem — sem ela, uma logo clara sobre um banner
+   claro se perderia no recorte. */
+.rc-loja__logo {
+  align-items: center;
+  background: var(--rc-superficie);
+  border: 4px solid var(--rc-superficie);
+  border-radius: 50%;
+  box-shadow: var(--rc-sombra);
+  display: flex;
+  flex: 0 0 auto;
+  height: 96px;
+  justify-content: center;
+  margin-top: -40px;
+  overflow: hidden;
+  width: 96px;
+}
+
+.rc-loja__logo img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* Mesma solução do card de loja da vitrine: sem logo cadastrada, a inicial em
+   círculo colorido no lugar de um buraco. */
+.rc-loja__inicial {
+  align-items: center;
+  background: var(--reconectar-cor-institucional);
+  border-radius: 50%;
+  color: #ffffff;
+  display: flex;
+  /* O círculo aqui tem 96px, contra 56px do card da vitrine: a inicial sobe
+     junto para manter a mesma proporção entre letra e disco. */
+  font-size: var(--rc-fonte-3xl);
+  font-weight: 600;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}
+
+/* `min-width: 0` porque um item de flex não encolhe abaixo do seu conteúdo por
+   padrão, e um nome de loja longo empurraria a linha inteira. */
+.rc-loja__titulo {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.rc-loja__nome {
+  font-size: clamp(var(--rc-fonte-2xl), 3vw, var(--rc-fonte-3xl));
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 4px;
+}
+
+.rc-loja__meta {
+  align-items: center;
+  color: var(--rc-texto-suave);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--rc-fonte-sm);
+  gap: 6px;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0;
+}
+
+.rc-loja__separador {
+  color: var(--rc-borda);
+}
+
+/* Painel "Ver mais"
+   -------------------------------------------------------------------------- */
+
+.rc-loja__mais {
+  border-top: 1px solid var(--rc-borda);
+  padding: 0 var(--rc-espaco);
+}
+
+/* `list-style: none` some com o triângulo do navegador, e o `::after` abaixo o
+   repõe do lado direito. Os 44px de altura são o alvo mínimo de toque da WCAG
+   2.5.5 — o texto sozinho daria cerca de 26px. */
+.rc-loja__mais-titulo {
+  align-items: center;
+  color: var(--reconectar-cor-institucional);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  gap: 6px;
+  list-style: none;
+  min-height: 44px;
+}
+
+/* O Safari ainda desenha o marcador por um pseudo-elemento próprio, que
+   `list-style` não alcança. */
+.rc-loja__mais-titulo::-webkit-details-marker {
+  display: none;
+}
+
+.rc-loja__mais-titulo::after {
+  content: "\25BE";
+}
+
+.rc-loja__mais[open] .rc-loja__mais-titulo::after {
+  content: "\25B4";
+}
+
+.rc-loja__mais-titulo:focus-visible {
+  outline: 2px solid var(--reconectar-cor-institucional);
+  outline-offset: 2px;
+}
+
+.rc-loja__mais-conteudo {
+  font-size: var(--rc-fonte-base);
+  padding-bottom: var(--rc-espaco);
+}
+
+.rc-loja__descricao {
+  color: var(--rc-texto);
+  margin: 0 0 var(--rc-espaco);
+  max-width: 70ch;
+}
+
+.rc-loja__contatos {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  list-style: none;
+  margin: 0 0 var(--rc-espaco);
+  padding: 0;
+}
+
+.rc-loja__contato {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-loja__contato-rotulo {
+  color: var(--rc-texto-suave);
+  font-size: var(--rc-fonte-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rc-loja__contato-valor {
+  color: var(--rc-texto);
+}
+
+/* Barra de controles
+   -------------------------------------------------------------------------- */
+
+.rc-loja__controles {
+  align-items: center;
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px var(--rc-espaco);
+  margin-bottom: 24px;
+  padding: 12px var(--rc-espaco);
+}
+
+/* Componente compartilhado por dois contextos: a busca no catálogo de uma loja
+   e a busca por nome na vitrine (`inc/marketplace/vitrine.php`). São o mesmo
+   campo com a mesma lupa — duplicar o bloco por causa do nome custaria trinta
+   linhas e a garantia de que os dois divergiriam na primeira correção feita só
+   em um deles. O que muda entre eles é só a largura, resolvida abaixo pelo
+   ancestral. */
+.rc-busca-filtro {
+  margin-bottom: 0;
+  min-width: 0;
+  position: relative;
+}
+
+/* Na barra da loja o campo divide a linha com entrega e horário, e por isso
+   cresce; na vitrine ele ocupa a sua própria linha, onde um campo de 1200px
+   pareceria um erro de layout. */
+.rc-loja__controles .rc-busca-filtro {
+  flex: 1 1 260px;
+}
+
+.rc-vitrine .rc-busca-filtro {
+  margin-bottom: var(--rc-espaco);
+  max-width: 420px;
+}
+
+/* Dois níveis de seletor pelo mesmo motivo documentado em `.rc-busca
+   .rc-busca__campo`: o Storefront estiliza `input[type="search"]` por seletor
+   de atributo (0,1,1), que vence uma classe (0,1,0) por mais tarde que esta
+   folha carregue. Com um nível só, o recuo à esquerda não chegaria ao elemento
+   e o texto digitado passaria por baixo da lupa. */
+.rc-busca-filtro .rc-busca-filtro__campo {
+  background: var(--rc-fundo);
+  border: 1px solid var(--rc-borda);
+  border-radius: 999px;
+  color: var(--rc-texto);
+  padding: 10px 16px 10px 44px;
+  width: 100%;
+}
+
+.rc-busca-filtro .rc-busca-filtro__campo:focus {
+  background: var(--rc-superficie);
+  border-color: var(--reconectar-cor-primaria);
+  outline: 2px solid transparent;
+}
+
+.rc-busca-filtro__botao {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--rc-texto-suave);
+  cursor: pointer;
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  left: 4px;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  z-index: 1;
+}
+
+.rc-busca-filtro__botao:hover {
+  color: var(--reconectar-cor-primaria);
+}
+
+.rc-busca-filtro__botao:focus-visible {
+  color: var(--reconectar-cor-primaria);
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
+}
+
+.rc-loja__entrega,
+.rc-loja__horario {
+  align-items: center;
+  color: var(--rc-texto-suave);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--rc-fonte-sm);
+  gap: 6px;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0;
+}
+
+.rc-loja__entrega-rotulo {
+  font-weight: 600;
+}
+
+.rc-loja__entrega-tempo {
+  color: var(--rc-texto);
+}
+
+/* O estado é a bolinha mais o texto, e não a cor do texto: "Aberta agora" e
+   "Fechada agora" já dizem tudo sem a cor, como a WCAG 1.4.1 exige. É também o
+   que permite usar as cores da identidade aqui — nenhuma das duas atinge 4,5:1
+   sobre o branco, e nenhuma das duas precisa: quem carrega o contraste é o
+   texto, em `--rc-texto` e `--rc-texto-suave`. */
+.rc-loja__estado {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.rc-loja__estado::before {
+  border-radius: 50%;
+  content: "";
+  height: 8px;
+  width: 8px;
+}
+
+.rc-loja__estado--aberta {
+  color: var(--rc-texto);
+}
+
+.rc-loja__estado--aberta::before {
+  background: var(--reconectar-cor-primaria);
+}
+
+.rc-loja__estado--fechada::before {
+  background: var(--reconectar-cor-secundaria);
+}
+
+/* Catálogo
+   -------------------------------------------------------------------------- */
+
+.rc-loja__secao {
+  margin-bottom: 32px;
+}
+
+.rc-loja__secao-titulo {
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 12px;
+}
+
+.rc-loja__grade {
+  display: grid;
+  gap: var(--rc-espaco);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 767px) {
+  .rc-loja__grade {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rc-loja__vazio,
+.rc-loja__aviso {
+  background: var(--rc-fundo);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto-suave);
+  padding: 40px var(--rc-espaco);
+  text-align: center;
+}
+
+/* Card horizontal
+   -------------------------------------------------------------------------- */
+
+.rc-produto-linha {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  overflow: hidden;
+}
+
+/* O contorno de foco fica no `<article>`, e não no `<a>`: o link é o cartão
+   inteiro, e um contorno no elemento interno recortaria a borda arredondada. */
+.rc-produto-linha:focus-within {
+  outline: 2px solid var(--reconectar-cor-primaria);
+  outline-offset: 2px;
+}
+
+.rc-produto-linha:hover {
+  box-shadow: var(--rc-sombra);
+}
+
+.rc-produto-linha__link {
+  color: var(--rc-texto);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.rc-produto-linha__conteudo {
+  min-width: 0;
+}
+
+.rc-produto-linha__nome {
+  font-size: var(--rc-fonte-base);
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 4px;
+}
+
+/* Duas linhas e reticências: as descrições da carga têm comprimentos
+   diferentes, e sem o corte os cards de uma mesma fileira ficariam com alturas
+   desencontradas. O `-webkit-` aqui não é legado — é o único caminho com
+   suporte real para `line-clamp` hoje, e degrada para texto inteiro onde não
+   existir. */
+.rc-produto-linha__resumo {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--rc-texto-suave);
+  display: -webkit-box;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 8px;
+  overflow: hidden;
+}
+
+.rc-produto-linha__preco {
+  font-weight: 600;
+  margin: 0;
+}
+
+/* `get_price_html()` imprime o preço antigo em `<del>` e o novo em `<ins>`. O
+   sublinhado do `<ins>` sugeriria link dentro de um cartão que já é um. */
+.rc-produto-linha__preco del {
+  color: var(--rc-texto-suave);
+  font-weight: 400;
+  margin-right: 6px;
+}
+
+.rc-produto-linha__preco ins {
+  background: none;
+  text-decoration: none;
+}
+
+.rc-produto-linha__figura {
+  background: var(--rc-fundo);
+  border-radius: var(--rc-raio);
+  flex: 0 0 auto;
+  height: 96px;
+  overflow: hidden;
+  position: relative;
+  width: 96px;
+}
+
+.rc-produto-linha__figura img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* `white-space: nowrap` porque a miniatura tem 96px e a palavra "Promoção"
+   quebrava em duas linhas dentro do selo, virando um bloco que cobria metade da
+   foto do produto. */
+.rc-produto-linha__selo {
+  background: var(--reconectar-cor-destaque);
+  border-radius: 999px;
+  color: var(--rc-texto-sobre-destaque);
+  font-size: var(--rc-fonte-2xs);
+  font-weight: 600;
+  left: 4px;
+  padding: 2px 8px;
+  position: absolute;
+  top: 4px;
+  white-space: nowrap;
+}
+
+/* Formulário de contato do Dokan
+   -------------------------------------------------------------------------- */
+
+/* Markup de plugin de terceiro, impresso por `dokan_store_contact_widget()`
+   dentro do painel "Ver mais". Os seletores são por elemento de propósito: as
+   classes do widget (`dokan-form-group`, `dokan-btn`) pertencem ao plugin e
+   podem mudar numa atualização, enquanto `input` e `textarea` continuam sendo
+   `input` e `textarea`. */
+.rc-loja__contato-formulario {
+  max-width: 480px;
+}
+
+.rc-loja__contato-formulario .widget-title {
+  font-size: var(--rc-fonte-md);
+  margin: 0 0 8px;
+}
+
+/* Os tipos são listados um a um para não pegar o botão de envio, que o widget
+   imprime como `input[type="submit"]` e que `width: 100%` deixaria da largura
+   do formulário inteiro. */
+.rc-loja__contato-formulario input[type="text"],
+.rc-loja__contato-formulario input[type="email"],
+.rc-loja__contato-formulario textarea {
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+/* Aqui havia uma correção de `flex-wrap` para a barra de filtros do Dokan em
+   `/store-listing/`, que estourava a régua em telas estreitas. O markup deixou
+   de ser renderizado: a saída do `[dokan-stores]` agora é a vitrine do tema
+   (`inc/marketplace/vitrine.php`). A regra saiu com ele; o defeito e a medição
+   estão registrados no `DIARIO_DESENVOLVIMENTO.md`, caso o shortcode do plugin
+   volte a ser usado em algum lugar. */
 
 /* ==========================================================================
    Botões
@@ -1104,7 +1824,8 @@
 }
 
 .rc-rodape__titulo {
-  font-size: 0.95rem;
+  font-size: var(--rc-fonte-base);
+  line-height: var(--rc-entrelinha-justa);
   margin: 0 0 12px;
 }
 
@@ -1115,17 +1836,17 @@
 }
 
 /* Nem toda coluna é lista de links: a institucional é texto corrido, e sem esta
-   regra ela apareceria em 1rem ao lado de colunas de links em 0,87rem, com as
+   regra ela apareceria em 1rem ao lado de colunas de links em 14px, com as
    primeiras linhas desalinhadas entre si. */
 .rc-rodape__bloco p {
   color: var(--rc-texto-suave);
-  font-size: 0.87rem;
+  font-size: var(--rc-fonte-sm);
   margin: 0 0 8px;
 }
 
 .rc-rodape__bloco a {
   color: var(--rc-texto);
-  font-size: 0.87rem;
+  font-size: var(--rc-fonte-sm);
   text-decoration: none;
 }
 
@@ -1136,7 +1857,7 @@
 .rc-rodape__legal {
   border-top: 1px solid var(--rc-borda);
   color: var(--rc-texto-suave);
-  font-size: 0.8rem;
+  font-size: var(--rc-fonte-sm);
   padding-top: 16px;
 }
 
@@ -1148,6 +1869,1033 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
+}
+
+/* ==========================================================================
+   Tela de acesso
+   ==========================================================================
+   Sobrescreve a apresentação de `/my-account/` deslogado, cujo markup sai de
+   `woocommerce/myaccount/form-login.php`. As classes `woocommerce-*` continuam
+   no HTML e não são removidas: o Dokan e os plugins de campo extra se penduram
+   nelas, e o CSS do WooCommerce ainda é quem estiliza os campos por dentro.
+*/
+
+.rc-login {
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: var(--rc-largura);
+}
+
+/* O mesmo gradiente de `.reconectar-hero`, e não arte nova: é o que a
+   identidade já tem. A coluna é `aria-hidden` no markup — ela não carrega
+   informação que não esteja no painel ao lado. */
+.rc-login__arte {
+  align-items: center;
+  background: linear-gradient(135deg, var(--reconectar-cor-institucional), var(--reconectar-cor-primaria));
+  border-radius: var(--rc-raio);
+  color: #ffffff;
+  display: none;
+  padding: 48px 40px;
+}
+
+.rc-login__arte-conteudo {
+  max-width: 34ch;
+}
+
+.rc-login__arte img {
+  height: auto;
+  margin-bottom: 24px;
+  max-width: 240px;
+}
+
+.rc-login__marca {
+  font-family: 'Thoge', 'Poppins', sans-serif;
+  font-size: var(--rc-fonte-3xl);
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 24px;
+}
+
+.rc-login__chamada {
+  color: #ffffff;
+  font-size: var(--rc-fonte-md);
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0;
+}
+
+.rc-login__painel {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  box-shadow: var(--rc-sombra);
+  margin: 0 auto;
+  max-width: 480px;
+  padding: 32px 24px;
+  width: 100%;
+}
+
+.rc-login__titulo {
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 4px;
+}
+
+.rc-login__subtitulo {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  margin: 0 0 24px;
+}
+
+/* Os botões dos provedores vêm prontos do Nextend, com as cores e os logotipos
+   que o Facebook e o Google exigem nas suas diretrizes de marca. Daqui sai só a
+   geometria: largura cheia e alvo de toque de 44px. Repintá-los violaria as
+   diretrizes dos dois e quebraria a cada atualização do plugin. */
+.rc-login__sso {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rc-login__sso .nsl-container {
+  margin: 0;
+}
+
+.rc-login__sso a,
+.rc-login__sso .nsl-button {
+  min-height: 44px;
+  width: 100%;
+}
+
+/* A linha é desenhada com bordas nos dois lados do texto em vez de um `<hr>`
+   posicionado por cima: assim ela acompanha o comprimento da palavra sem
+   nenhuma medida fixa. */
+.rc-login__separador {
+  align-items: center;
+  color: var(--rc-texto);
+  display: flex;
+  font-size: var(--rc-fonte-sm);
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.rc-login__separador::before,
+.rc-login__separador::after {
+  background: var(--rc-borda);
+  content: '';
+  flex: 1;
+  height: 1px;
+}
+
+.rc-login__botao {
+  border-radius: var(--rc-raio);
+  cursor: pointer;
+  display: block;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+  min-height: 44px;
+  padding: 10px 20px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Institucional, e não a cor primária: #31BEB1 com texto branco dá 2,3:1, e
+   este botão nasce agora — não há por que herdar um contraste que já reprova em
+   outros pontos do site. O seletor cita o elemento porque `.woocommerce
+   button.button` do `style.css` e do Storefront somam 0,2,1 de especificidade e
+   venceriam uma classe sozinha. */
+.rc-login button.rc-login__botao--primario {
+  background: var(--reconectar-cor-institucional);
+  border: 2px solid transparent;
+  color: #ffffff;
+}
+
+.rc-login button.rc-login__botao--primario:hover,
+.rc-login button.rc-login__botao--primario:focus {
+  background: #52277a;
+  color: #ffffff;
+}
+
+.rc-login button.rc-login__botao--secundario {
+  background: var(--rc-superficie);
+  border: 2px solid var(--rc-borda);
+  color: var(--rc-texto);
+  margin-bottom: 12px;
+}
+
+.rc-login button.rc-login__botao--secundario:hover,
+.rc-login button.rc-login__botao--secundario:focus {
+  background: var(--rc-fundo);
+  border-color: var(--reconectar-cor-institucional);
+  color: var(--rc-texto);
+}
+
+/* O tema pai remove o contorno padrão do navegador, e a navegação por teclado é
+   requisito do edital. */
+.rc-login :is(button, input, a):focus-visible {
+  outline: 3px solid var(--reconectar-cor-institucional);
+  outline-offset: 2px;
+}
+
+.rc-login__bloco {
+  margin-bottom: 8px;
+}
+
+.rc-login__bloco-titulo {
+  font-size: var(--rc-fonte-md);
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 12px;
+}
+
+.rc-login__ajuda {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+}
+
+.rc-login .woocommerce-form label {
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+}
+
+.rc-login .woocommerce-form input[type="text"],
+.rc-login .woocommerce-form input[type="email"],
+.rc-login .woocommerce-form input[type="password"] {
+  width: 100%;
+}
+
+/* O checkbox de "continuar conectado" herdaria o `font-weight: 600` do rótulo
+   acima; aqui ele é texto corrente ao lado de uma caixa, não rótulo de campo. */
+.rc-login .woocommerce-form-login__rememberme {
+  font-weight: 400;
+}
+
+.rc-login .woocommerce-LostPassword {
+  font-size: var(--rc-fonte-sm);
+  margin-bottom: 0;
+}
+
+/* A coluna de arte só a partir de 768px, a mesma quebra dos demais componentes
+   deste arquivo. No celular ela empurraria o formulário para baixo da dobra, e
+   quem abre esta tela veio para entrar. */
+@media (min-width: 768px) {
+  .rc-login {
+    align-items: center;
+    gap: 32px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rc-login__arte {
+    display: flex;
+  }
+
+  .rc-login__painel {
+    margin: 0;
+    padding: 40px 32px;
+  }
+}
+
+/* ==========================================================================
+   Fórum de perguntas e respostas
+   ==========================================================================
+   Os selos de papel e o contador de pergunta resolvida usam tinta clara da
+   identidade com texto escuro da mesma matiz, e não o inverso. A razão é
+   medida: texto branco sobre `--reconectar-cor-secundaria` (#CF6442) dá 3,78:1
+   e reprova em AA, e sobre a primária (#31BEB1) dá 2,30:1 — o mesmo 2,30 que já
+   reprovou os links do tema. Invertendo, o par #0E6259 sobre #E3F6F4 chega a
+   6,4:1 e o roxo institucional a 8,7:1 sobre branco, com folga para o fundo
+   tênue. O selo continua colorido e continua legível, que era o ponto.
+
+   Nenhum `font-size` literal aqui: só degraus de `--rc-fonte-*`. */
+
+.rc-forum {
+  max-width: var(--rc-largura);
+  margin: 0 auto;
+}
+
+.rc-forum-wrapper {
+  /* O bbPress traz folha própria com margens generosas em volta de
+     `#bbpress-forums`. O zero aqui é o que impede a tela de nascer com dois
+     recuos somados, o dele e o da régua do tema. */
+  margin: 0;
+  padding: 0;
+}
+
+/* Cabeçalho ------------------------------------------------------------- */
+
+.rc-forum__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rc-espaco);
+  margin-bottom: 24px;
+}
+
+.rc-forum__titulo {
+  margin: 0;
+  font-size: var(--rc-fonte-3xl);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum__total {
+  margin: 4px 0 0;
+  font-size: var(--rc-fonte-sm);
+  color: var(--rc-texto);
+}
+
+.rc-forum__perguntar {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 24px;
+  border-radius: var(--rc-raio);
+  background: var(--reconectar-cor-institucional);
+  color: #ffffff;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  text-decoration: none;
+}
+
+.rc-forum__perguntar:hover,
+.rc-forum__perguntar:focus {
+  color: #ffffff;
+  filter: brightness(1.12);
+}
+
+/* Colunas --------------------------------------------------------------- */
+
+.rc-forum__colunas {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  gap: 24px;
+  align-items: start;
+}
+
+/*
+ * `minmax(0, 1fr)` e não `1fr` na coluna do meio: o default de uma faixa de
+ * grade é `min-width: auto`, que a impede de encolher abaixo do conteúdo. Um
+ * título de pergunta longo, sem espaço, empurraria a grade inteira e devolveria
+ * a barra horizontal que o resto do tema não tem.
+ */
+.rc-forum__colunas--sem-laterais {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rc-forum__lateral {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rc-forum__lista {
+  min-width: 0;
+}
+
+/* Filtros --------------------------------------------------------------- */
+
+.rc-forum__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--rc-espaco);
+  margin-bottom: var(--rc-espaco);
+  padding-bottom: var(--rc-espaco);
+  border-bottom: 1px solid var(--rc-borda);
+}
+
+.rc-forum__abas ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum__aba {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  text-decoration: none;
+}
+
+.rc-forum__aba:hover,
+.rc-forum__aba:focus {
+  background: var(--rc-fundo);
+  color: var(--rc-texto);
+}
+
+/* A aba ativa não se distingue só pela cor: o sublinhado espesso sobrevive ao
+   modo de alto contraste e a quem não separa os dois cinzas. */
+.rc-forum__aba.is-ativa {
+  background: var(--rc-fundo);
+  border-bottom: 3px solid var(--reconectar-cor-primaria);
+  border-radius: var(--rc-raio) var(--rc-raio) 0 0;
+  color: var(--rc-texto-sobre-destaque);
+}
+
+.rc-forum__form-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0;
+}
+
+.rc-forum__campo {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.rc-forum__rotulo {
+  font-size: var(--rc-fonte-xs);
+  font-weight: 600;
+  color: var(--rc-texto);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum__select,
+.rc-forum__busca {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+  font-size: var(--rc-fonte-sm);
+  color: var(--rc-texto-sobre-destaque);
+}
+
+.rc-forum__aplicar {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--rc-raio);
+  background: var(--reconectar-cor-primaria);
+  color: var(--rc-texto-sobre-destaque);
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  cursor: pointer;
+}
+
+.rc-forum__aplicar:hover,
+.rc-forum__aplicar:focus {
+  filter: brightness(1.08);
+}
+
+/* Cards ----------------------------------------------------------------- */
+
+.rc-forum__perguntas {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rc-espaco);
+  justify-content: space-between;
+  padding: var(--rc-espaco);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+.rc-forum-card__corpo {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* O `min-width: 0` das faixas de grade deixa a coluna encolher, mas não obriga
+   uma palavra a quebrar: uma URL colada no título de uma pergunta, ou uma tag
+   composta, continuaria transbordando e devolveria a barra horizontal em 375px
+   — o defeito que a tabela do painel de empresas já tem e que este bloco não
+   pode repetir. `anywhere`, e não `break-word`: só ele deixa a palavra longa
+   participar do cálculo de largura mínima do contêiner flexível. */
+.rc-forum-card__titulo,
+.rc-forum-card__resumo,
+.rc-forum-tag,
+.rc-forum-alta__titulo,
+.rc-forum-atividade__texto {
+  overflow-wrap: anywhere;
+}
+
+.rc-forum-card__titulo {
+  margin: 0;
+  font-size: var(--rc-fonte-md);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-forum-card__titulo a {
+  color: var(--rc-texto-sobre-destaque);
+  text-decoration: none;
+}
+
+.rc-forum-card__titulo a:hover,
+.rc-forum-card__titulo a:focus {
+  text-decoration: underline;
+}
+
+.rc-forum-card__categoria {
+  margin: 4px 0 0;
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum-card__categoria a {
+  color: var(--rc-texto);
+}
+
+.rc-forum-card__resumo {
+  margin: 8px 0 0;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+  color: var(--rc-texto);
+}
+
+.rc-forum-card__tags,
+.rc-forum-pergunta__tags,
+.rc-forum-bloco__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--rc-fundo);
+  border: 1px solid var(--rc-borda);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-2xs);
+  line-height: var(--rc-entrelinha-justa);
+  text-decoration: none;
+}
+
+.rc-forum-tag:hover,
+.rc-forum-tag:focus {
+  border-color: var(--reconectar-cor-primaria);
+  color: var(--rc-texto);
+}
+
+.rc-forum-tag__contagem {
+  font-weight: 700;
+  color: var(--rc-texto-sobre-destaque);
+}
+
+/* Assinatura e selos ----------------------------------------------------- */
+
+.rc-forum-assinatura {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto);
+}
+
+.rc-forum-assinatura__avatar,
+.rc-forum-atividade__avatar {
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.rc-forum-assinatura__nome {
+  font-weight: 600;
+  color: var(--rc-texto-sobre-destaque);
+}
+
+.rc-forum-selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--rc-fonte-2xs);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum-selo--vendedor {
+  background: #e3f6f4;
+  color: #0e6259;
+}
+
+.rc-forum-selo--empresa {
+  background: #f1ecf7;
+  color: var(--reconectar-cor-institucional);
+}
+
+.rc-forum-selo--admin {
+  background: var(--rc-fundo);
+  color: var(--rc-texto-sobre-destaque);
+}
+
+/* Contadores ------------------------------------------------------------- */
+
+.rc-forum-card__contadores {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum-contador {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--rc-borda);
+  background: var(--rc-superficie);
+  color: var(--rc-texto);
+}
+
+.rc-forum-contador__valor {
+  font-size: var(--rc-fonte-base);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto-sobre-destaque);
+}
+
+.rc-forum-contador--votos {
+  background: var(--rc-fundo);
+}
+
+/* Pergunta com resposta aceita. O verde não é o único sinal: o item seguinte da
+   lista imprime o tique, e o texto acessível diz "Pergunta resolvida". */
+.rc-forum-contador--resolvida {
+  background: #e3f6f4;
+  border-color: #0e6259;
+}
+
+.rc-forum-contador--resolvida .rc-forum-contador__valor {
+  color: #0e6259;
+}
+
+.rc-forum-contador--selo {
+  width: auto;
+  height: auto;
+  min-width: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #e3f6f4;
+  color: #0e6259;
+  font-size: var(--rc-fonte-md);
+  font-weight: 700;
+}
+
+/* Paginação e estado vazio ----------------------------------------------- */
+
+.rc-forum__paginacao ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum__pagina {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  text-decoration: none;
+}
+
+.rc-forum__pagina.is-atual {
+  background: var(--reconectar-cor-primaria);
+  border-color: var(--reconectar-cor-primaria);
+  color: var(--rc-texto-sobre-destaque);
+  font-weight: 700;
+}
+
+.rc-forum__vazio {
+  padding: 40px var(--rc-espaco);
+  border: 1px dashed var(--rc-borda);
+  border-radius: var(--rc-raio);
+  text-align: center;
+  font-size: var(--rc-fonte-base);
+  color: var(--rc-texto);
+}
+
+/* Colunas laterais -------------------------------------------------------- */
+
+.rc-forum-bloco {
+  padding: var(--rc-espaco);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+.rc-forum-bloco__titulo {
+  margin: 0 0 12px;
+  font-size: var(--rc-fonte-sm);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rc-texto);
+}
+
+.rc-forum-bloco__mais {
+  margin: 12px 0 0;
+  font-size: var(--rc-fonte-xs);
+}
+
+.rc-forum-atividade,
+.rc-forum-alta {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rc-forum-atividade__item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.rc-forum-atividade__texto {
+  min-width: 0;
+}
+
+.rc-forum-atividade__acao,
+.rc-forum-atividade__data,
+.rc-forum-alta__meta {
+  margin: 0;
+  font-size: var(--rc-fonte-2xs);
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto);
+}
+
+.rc-forum-atividade__alvo {
+  margin: 2px 0;
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum-atividade__alvo a,
+.rc-forum-alta__titulo {
+  color: var(--rc-texto-sobre-destaque);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rc-forum-atividade__alvo a:hover,
+.rc-forum-atividade__alvo a:focus,
+.rc-forum-alta__titulo:hover,
+.rc-forum-alta__titulo:focus {
+  text-decoration: underline;
+}
+
+.rc-forum-alta__titulo {
+  display: block;
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-forum-numeros {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.rc-forum-numeros__item {
+  padding: 12px 8px;
+  border-radius: var(--rc-raio);
+  background: var(--rc-fundo);
+  text-align: center;
+}
+
+.rc-forum-numeros__item dt {
+  font-size: var(--rc-fonte-2xs);
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto);
+}
+
+.rc-forum-numeros__item dd {
+  margin: 2px 0 0;
+  font-size: var(--rc-fonte-xl);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto-sobre-destaque);
+}
+
+/* Pergunta e respostas ---------------------------------------------------- */
+
+.rc-forum-topico {
+  max-width: var(--rc-largura);
+  margin: 0 auto;
+}
+
+.rc-forum-pergunta,
+.rc-forum-resposta {
+  display: flex;
+  gap: var(--rc-espaco);
+  padding: var(--rc-espaco);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+.rc-forum-pergunta__corpo,
+.rc-forum-resposta__corpo {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.rc-forum-pergunta__titulo {
+  margin: 0;
+  font-size: var(--rc-fonte-2xl);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-forum-pergunta__texto,
+.rc-forum-resposta__texto {
+  margin-top: 12px;
+  font-size: var(--rc-fonte-base);
+}
+
+.rc-forum-topico__titulo-respostas {
+  margin: 32px 0 12px;
+  font-size: var(--rc-fonte-xl);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum-topico__lista {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A resposta aceita se distingue pela borda e pela faixa lateral, além do selo
+   com a palavra escrita — cor sozinha não marcaria nada para quem não a vê. */
+.rc-forum-resposta.is-aceita {
+  border-color: #0e6259;
+  border-left-width: 4px;
+}
+
+.rc-forum-topico__sem-resposta {
+  padding: 24px var(--rc-espaco);
+  border: 1px dashed var(--rc-borda);
+  border-radius: var(--rc-raio);
+  text-align: center;
+  font-size: var(--rc-fonte-sm);
+  color: var(--rc-texto);
+}
+
+/* Votação ----------------------------------------------------------------- */
+
+.rc-forum-votacao {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.rc-forum-votacao__form {
+  margin: 0;
+}
+
+.rc-forum-voto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--rc-borda);
+  border-radius: 50%;
+  background: var(--rc-superficie);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rc-forum-voto:hover,
+.rc-forum-voto:focus {
+  border-color: var(--reconectar-cor-primaria);
+  background: var(--rc-fundo);
+  color: var(--rc-texto);
+}
+
+/* O voto dado pelo próprio usuário é preenchido, e não só recolorido: o botão
+   também carrega `aria-pressed` e o texto acessível muda para "Remover meu
+   voto" — três sinais, porque este é o único controle da tela cujo estado o
+   usuário precisa reconhecer antes de clicar. */
+.rc-forum-voto.is-meu {
+  border-color: #0e6259;
+  background: #e3f6f4;
+  color: #0e6259;
+}
+
+.rc-forum-votacao__saldo {
+  margin: 0;
+  font-size: var(--rc-fonte-md);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto-sobre-destaque);
+}
+
+/* Melhor resposta --------------------------------------------------------- */
+
+.rc-forum-aceita,
+.rc-forum-aceita__form {
+  margin: 12px 0 0;
+}
+
+.rc-forum-aceita {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #e3f6f4;
+  color: #0e6259;
+  font-size: var(--rc-fonte-xs);
+  font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-forum-aceita__botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--rc-borda);
+  border-radius: 999px;
+  background: var(--rc-superficie);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  cursor: pointer;
+}
+
+.rc-forum-aceita__botao.is-aceita {
+  border-color: #0e6259;
+  background: #e3f6f4;
+  color: #0e6259;
+}
+
+/* Formulários do bbPress -------------------------------------------------- */
+
+.rc-forum__form-pergunta,
+.rc-forum__form-resposta {
+  margin-top: 32px;
+  padding: var(--rc-espaco);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+/* Responsivo -------------------------------------------------------------- */
+
+@media (max-width: 1024px) {
+  /*
+   * A coluna de atividade sai primeiro, e não a da direita. Ela é a que menos
+   * decide: tags e perguntas em alta são caminhos de navegação, atividade
+   * recente é contexto. Some quem menos custa.
+   */
+  .rc-forum__colunas {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+
+  .rc-forum__lateral--esquerda {
+    display: none;
+  }
+}
+
+@media (max-width: 782px) {
+  .rc-forum__colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rc-forum__lateral--direita {
+    /* Abaixo do centro, e não escondida: em duas colunas de meia largura os
+       blocos continuam legíveis e a navegação por tags sobrevive ao celular. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rc-forum__titulo {
+    font-size: var(--rc-fonte-2xl);
+  }
+}
+
+@media (max-width: 480px) {
+  .rc-forum__lateral--direita {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+   * Os três contadores passam a ficar em linha sob o texto, e não ao lado dele:
+   * em 375px a coluna de 52px ao lado do corpo deixava o título quebrando a cada
+   * duas palavras.
+   */
+  .rc-forum-card {
+    flex-direction: column;
+  }
+
+  .rc-forum-card__contadores {
+    justify-content: flex-start;
+  }
+
+  .rc-forum__form-filtro {
+    width: 100%;
+  }
+
+  .rc-forum__campo {
+    flex: 1 1 100%;
+  }
+
+  .rc-forum__select,
+  .rc-forum__busca {
+    width: 100%;
+  }
 }
 
 /* ==========================================================================
@@ -1165,9 +2913,11 @@
   }
 
   .rc-busca,
+  .rc-busca-filtro,
   .rc-filtros,
   .rc-carrossel__controles,
-  .rc-vitrine__mais {
+  .rc-vitrine__mais,
+  .rc-login__arte {
     display: none;
   }
 }

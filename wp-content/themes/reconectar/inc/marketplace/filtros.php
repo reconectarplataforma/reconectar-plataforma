@@ -32,7 +32,7 @@ define( 'RECONECTAR_LOJAS_LIMITE_MAXIMO', 96 );
  * do tema lê `$_GET` para isso — centralizar garante que a sanitização aconteça
  * sempre, e não "quase sempre".
  *
- * @return array{categoria:string,cidade:string,so_gratis:bool,ordenar:string,limite:int}
+ * @return array{categoria:string,cidade:string,busca:string,so_gratis:bool,ordenar:string,limite:int}
  */
 function reconectar_filtros_ativos() {
 	// Leitura de filtro de navegação pública, sem efeito colateral: não há o que
@@ -43,6 +43,19 @@ function reconectar_filtros_ativos() {
 	$gratis    = isset( $_GET['entrega'] ) && 'gratis' === sanitize_key( wp_unslash( $_GET['entrega'] ) );
 	$ordenar   = isset( $_GET['ordenar'] ) ? sanitize_key( wp_unslash( $_GET['ordenar'] ) ) : 'avaliacao';
 	$limite    = isset( $_GET['lojas'] ) ? absint( wp_unslash( $_GET['lojas'] ) ) : 0;
+
+	/*
+	 * `busca` e não `loja`: `lojas` já é o limite da vitrine, e dois parâmetros
+	 * separados por uma única letra no plural seriam confundidos na primeira vez
+	 * que alguém precisasse montar uma URL à mão.
+	 *
+	 * O corte em 80 caracteres não é sobre segurança — `sanitize_text_field()`
+	 * já resolveu isso —, e sim sobre a chave do transient de
+	 * `reconectar_obter_lojas()`: sem teto, cada termo absurdo colado na URL
+	 * cria a sua própria entrada no cache.
+	 */
+	$busca = isset( $_GET['busca'] ) ? sanitize_text_field( wp_unslash( $_GET['busca'] ) ) : '';
+	$busca = trim( mb_substr( $busca, 0, 80 ) );
 	// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 	// Ordenação vem de uma lista fechada: um valor inventado na URL volta ao
@@ -61,6 +74,7 @@ function reconectar_filtros_ativos() {
 	return array(
 		'categoria' => $categoria,
 		'cidade'    => $cidade,
+		'busca'     => $busca,
 		'so_gratis' => $gratis,
 		'ordenar'   => $ordenar,
 		'limite'    => $limite,
@@ -86,7 +100,7 @@ function reconectar_url_de_filtro( $chave, $valor ) {
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$parametros = array_intersect_key(
 		wp_unslash( $_GET ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		array_flip( array( 'categoria', 'cidade', 'entrega', 'ordenar' ) )
+		array_flip( array( 'categoria', 'cidade', 'busca', 'entrega', 'ordenar' ) )
 	);
 
 	if ( null === $valor || '' === $valor ) {
@@ -119,7 +133,7 @@ function reconectar_url_base_da_vitrine() {
  * @param array $ativos Filtros ativos, de `reconectar_filtros_ativos()`.
  */
 function reconectar_barra_de_filtros( $ativos ) {
-	$tem_filtro = $ativos['categoria'] || $ativos['cidade'] || $ativos['so_gratis'] || 'avaliacao' !== $ativos['ordenar'];
+	$tem_filtro = $ativos['categoria'] || $ativos['cidade'] || $ativos['busca'] || $ativos['so_gratis'] || 'avaliacao' !== $ativos['ordenar'];
 	?>
 	<nav class="rc-filtros" aria-label="<?php esc_attr_e( 'Filtros da vitrine de lojas', 'reconectar' ); ?>">
 		<ul class="rc-filtros__lista">
@@ -148,6 +162,30 @@ function reconectar_barra_de_filtros( $ativos ) {
 				);
 				?>
 			</li>
+
+			<?php
+			/*
+			 * A busca ativa vira pílula pelo mesmo motivo dos demais filtros: ela
+			 * restringe a lista, e quem chega por um link compartilhado precisa
+			 * ver o que está restringindo — e desfazer com um clique. O campo de
+			 * texto sozinho não faz esse papel: ele fica acima da barra e some da
+			 * vista quando a página é rolada até os resultados.
+			 */
+			?>
+			<?php if ( $ativos['busca'] ) : ?>
+				<li>
+					<?php
+					reconectar_pilula_de_filtro(
+						array(
+							/* translators: %s: termo buscado. */
+							'rotulo' => sprintf( __( 'Busca: %s', 'reconectar' ), $ativos['busca'] ),
+							'url'    => reconectar_url_de_filtro( 'busca', null ),
+							'ativo'  => true,
+						)
+					);
+					?>
+				</li>
+			<?php endif; ?>
 
 			<?php foreach ( reconectar_obter_cidades() as $cidade ) : ?>
 				<?php $marcada = sanitize_title( $cidade ) === sanitize_title( $ativos['cidade'] ); ?>

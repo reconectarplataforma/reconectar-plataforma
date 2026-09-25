@@ -97,6 +97,35 @@ function reconectar_enqueue_assets() {
 		reconectar_versao_asset( 'assets/js/marketplace.js' ),
 		true
 	);
+
+	/*
+	 * As sugestões da busca seguem a mesma regra: sem este arquivo, o campo do
+	 * cabeçalho continua sendo um formulário que submete no Enter e no clique da
+	 * lupa. Daí o rodapé e a ausência de dependências — inclusive de jQuery, que
+	 * o tema não carrega.
+	 */
+	wp_enqueue_script(
+		'reconectar-busca',
+		$theme_uri . '/assets/js/busca.js',
+		array(),
+		reconectar_versao_asset( 'assets/js/busca.js' ),
+		true
+	);
+
+	/*
+	 * Só na tela de acesso, e só para quem ainda não entrou: `is_account_page()`
+	 * responde verdadeiro em todo o painel do cliente — pedidos, endereços,
+	 * downloads —, onde este script não teria o que fazer.
+	 */
+	if ( function_exists( 'is_account_page' ) && is_account_page() && ! is_user_logged_in() ) {
+		wp_enqueue_script(
+			'reconectar-login',
+			$theme_uri . '/assets/js/login.js',
+			array(),
+			reconectar_versao_asset( 'assets/js/login.js' ),
+			true
+		);
+	}
 }
 add_action( 'wp_enqueue_scripts', 'reconectar_enqueue_assets', 40 );
 

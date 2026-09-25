@@ -44,7 +44,91 @@ class Reconectar_Permissoes {
 	 *
 	 * @var string[]
 	 */
-	const PAPEIS_DA_COMUNIDADE = array( 'administrator', 'seller' );
+	const PAPEIS_DA_COMUNIDADE = array( 'administrator', 'seller', 'company_admin' );
+
+	/**
+	 * Papel do Administrador de Empresas.
+	 *
+	 * Quarto ator da plataforma: administra a *operação* — cadastra empresas e
+	 * vendedores, consulta produtos e pedidos de quem gere — sem administrar a
+	 * *tecnologia*. É o princípio que a especificação enuncia, e a razão de este
+	 * papel não receber nenhuma capacidade nativa do WordPress para isso.
+	 */
+	const PAPEL_ADMIN_EMPRESAS = 'company_admin';
+
+	/**
+	 * Portão da rota `/painel-empresas/`.
+	 */
+	const CAP_PAINEL_EMPRESAS = 'reconectar_acessar_painel_empresas';
+
+	/**
+	 * Criar, editar, ativar e desativar empresas.
+	 */
+	const CAP_GERIR_EMPRESAS = 'reconectar_gerir_empresas';
+
+	/**
+	 * Criar, editar, ativar e desativar vendedores.
+	 */
+	const CAP_GERIR_VENDEDORES = 'reconectar_gerir_vendedores';
+
+	/**
+	 * Ler produtos, pedidos, estoque e faturamento das empresas sob gestão.
+	 */
+	const CAP_VER_OPERACAO = 'reconectar_ver_operacao_da_empresa';
+
+	/**
+	 * Alcance total: administra todas as empresas, e não apenas as vinculadas.
+	 *
+	 * Fica **fora** do papel por padrão. O vínculo normal é N:N e explícito, na
+	 * user meta `_reconectar_empresas_geridas`; esta capacidade é a exceção
+	 * prevista pela especificação ("salvo quando possuir uma permissão específica
+	 * para administrar múltiplas empresas") e precisa ser concedida a dedo, a um
+	 * usuário por vez. Separá-la do papel é o que impede que "administrar uma
+	 * empresa" vire, por descuido, "administrar todas".
+	 */
+	const CAP_TODAS_AS_EMPRESAS = 'reconectar_gerir_todas_as_empresas';
+
+	/**
+	 * Todas as capacidades ligadas à administração de empresas.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DE_EMPRESA = array(
+		self::CAP_PAINEL_EMPRESAS,
+		self::CAP_GERIR_EMPRESAS,
+		self::CAP_GERIR_VENDEDORES,
+		self::CAP_VER_OPERACAO,
+		self::CAP_TODAS_AS_EMPRESAS,
+	);
+
+	/**
+	 * Capacidades do papel `company_admin`.
+	 *
+	 * A lista é deliberadamente curta, e o que ela *não* traz importa tanto
+	 * quanto o que traz: sem `manage_options`, `manage_woocommerce`,
+	 * `edit_users`, `create_users`, `promote_users`, `list_users`, sem nenhuma
+	 * `CAPS_DE_PLUGIN` e sem `dokandar`.
+	 *
+	 * As três primeiras abririam o `/wp-admin` inteiro — `bloquear_area_administrativa()`
+	 * usa `manage_options` e `manage_woocommerce` como portão, e `edit_users` dá
+	 * acesso a qualquer conta, inclusive às administrativas. `dokandar` é a
+	 * capacidade que, para o Dokan, *define* que alguém é vendedor
+	 * (`dokan_is_user_seller()` é literalmente `user_can( $id, 'dokandar' )`):
+	 * concedê-la faria este ator herdar em silêncio tudo que o plugin liberar por
+	 * ela daqui em diante.
+	 *
+	 * `CAP_TODAS_AS_EMPRESAS` também está de fora — ver o comentário dela.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DO_ADMIN_DE_EMPRESAS = array(
+		'read',
+		self::CAP_COMUNIDADE,
+		self::CAP_PAINEL_EMPRESAS,
+		self::CAP_GERIR_EMPRESAS,
+		self::CAP_GERIR_VENDEDORES,
+		self::CAP_VER_OPERACAO,
+	);
 
 	/**
 	 * Capacidades de gestão de plugins, restritas ao Administrador.
@@ -71,7 +155,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 1;
+	const VERSAO_CAPACIDADES = 2;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -87,8 +171,19 @@ class Reconectar_Permissoes {
 		// Autorização.
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restringir_por_vendedor' ), 10, 4 );
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restringir_gestao_de_plugins' ), 10, 2 );
+		add_filter( 'map_meta_cap', array( __CLASS__, 'negar_escrita_ao_admin_de_empresas' ), 10, 4 );
+		add_filter( 'map_meta_cap', array( __CLASS__, 'negar_escrita_no_forum' ), 10, 3 );
 		add_action( 'template_redirect', array( __CLASS__, 'bloquear_comunidade' ) );
-		add_action( 'admin_init', array( __CLASS__, 'bloquear_area_administrativa' ) );
+		// Prioridade 1, e não a padrão: o WooCommerce registra em `admin_init` o
+		// seu próprio bloqueio (`WC_Admin::prevent_admin_access()`), que manda para
+		// "Minha conta" quem não tem `edit_posts`, `manage_woocommerce` nem
+		// `view_admin_dashboard`. O Administrador de Empresas não tem nenhuma das
+		// três — e caía lá, em vez de no painel dele, porque o WooCommerce chegava
+		// primeiro. Com o vendedor a inversão não aparecia (o Dokan lhe dá
+		// `edit_posts`) e com o cliente o destino coincidia, então o defeito só se
+		// revelou no ator novo. Quem decide para onde vai cada ator da plataforma
+		// é a plataforma.
+		add_action( 'admin_init', array( __CLASS__, 'bloquear_area_administrativa' ), 1 );
 		add_action( 'pre_get_posts', array( __CLASS__, 'restringir_listagens_do_vendedor' ) );
 
 		// Interface: o que já foi negado acima também não deve ser oferecido.
@@ -113,6 +208,8 @@ class Reconectar_Permissoes {
 			return;
 		}
 
+		self::sincronizar_papel_do_admin_de_empresas();
+
 		$papeis = wp_roles();
 
 		foreach ( $papeis->get_names() as $papel => $nome ) {
@@ -132,7 +229,21 @@ class Reconectar_Permissoes {
 			}
 
 			if ( 'administrator' === $papel ) {
+				// O Administrador acumula os dois lados: administra a tecnologia
+				// e, por consequência, também a operação. Recebe inclusive
+				// `CAP_TODAS_AS_EMPRESAS` — sem ela, o painel de empresas ficaria
+				// vazio para quem instalou a plataforma.
+				foreach ( self::CAPS_DE_EMPRESA as $capacidade ) {
+					$objeto->add_cap( $capacidade );
+				}
+
 				continue;
+			}
+
+			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel ) {
+				foreach ( self::CAPS_DE_EMPRESA as $capacidade ) {
+					$objeto->remove_cap( $capacidade );
+				}
 			}
 
 			foreach ( self::CAPS_DE_PLUGIN as $capacidade ) {
@@ -141,6 +252,34 @@ class Reconectar_Permissoes {
 		}
 
 		update_option( self::OPCAO_VERSAO, self::VERSAO_CAPACIDADES );
+	}
+
+	/**
+	 * Cria — ou recria — o papel do Administrador de Empresas.
+	 *
+	 * `remove_role()` antes de `add_role()` não é redundância com o `add_role()`
+	 * sozinho, que é inerte quando o papel já existe: sem a remoção, uma
+	 * capacidade retirada de `CAPS_DO_ADMIN_DE_EMPRESAS` continuaria gravada no
+	 * banco para sempre. Como a lista é justamente o registro do que este ator
+	 * *não* pode, ela precisa ser a verdade — e não o teto histórico.
+	 *
+	 * Os dois passos acontecem no mesmo tique, então nenhum usuário chega a ser
+	 * observado sem capacidades no intervalo.
+	 */
+	private static function sincronizar_papel_do_admin_de_empresas() {
+		$capacidades = array();
+
+		foreach ( self::CAPS_DO_ADMIN_DE_EMPRESAS as $capacidade ) {
+			$capacidades[ $capacidade ] = true;
+		}
+
+		remove_role( self::PAPEL_ADMIN_EMPRESAS );
+
+		add_role(
+			self::PAPEL_ADMIN_EMPRESAS,
+			__( 'Administrador de Empresas', 'reconectar-core' ),
+			$capacidades
+		);
 	}
 
 	/**
@@ -163,6 +302,105 @@ class Reconectar_Permissoes {
 			// endurece quando não for.
 			$caps[] = 'manage_options';
 		}
+
+		return $caps;
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Administração técnica × administração operacional
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * O usuário administra a *tecnologia* da plataforma?
+	 *
+	 * Este par de capacidades funciona como portão em quatro travas desta classe:
+	 * quem passa aqui enxerga o `/wp-admin`, a barra administrativa, os registros
+	 * de todos os vendedores e as listagens sem filtro. Estava repetido nos quatro
+	 * lugares, o que tornava difícil responder à pergunta que a especificação do
+	 * Administrador de Empresas obriga a responder: *quem*, exatamente, é
+	 * administração técnica aqui dentro.
+	 *
+	 * Reunir a resposta em um método não muda comportamento nenhum — muda o fato
+	 * de que a resposta agora tem um nome e um lugar só. O `company_admin` não
+	 * tem nenhuma das duas capacidades e, portanto, não passa: ele administra a
+	 * operação, não a tecnologia.
+	 *
+	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
+	 * @return bool
+	 */
+	public static function eh_administracao_tecnica( $usuario_id = 0 ) {
+		if ( $usuario_id ) {
+			return user_can( $usuario_id, 'manage_options' ) || user_can( $usuario_id, 'manage_woocommerce' );
+		}
+
+		return current_user_can( 'manage_options' ) || current_user_can( 'manage_woocommerce' );
+	}
+
+	/**
+	 * O usuário tem o papel de Administrador de Empresas?
+	 *
+	 * A pergunta é pelo papel, e não pela capacidade, porque quem também a
+	 * responde "sim" é o Administrador — que tem `CAP_PAINEL_EMPRESAS` e não deve
+	 * ser atingido pela trava de escrita abaixo.
+	 *
+	 * @param int $usuario_id ID do usuário.
+	 * @return bool
+	 */
+	public static function eh_admin_de_empresas( $usuario_id ) {
+		$usuario = get_userdata( $usuario_id );
+
+		return $usuario && in_array( self::PAPEL_ADMIN_EMPRESAS, (array) $usuario->roles, true );
+	}
+
+	/**
+	 * Nega ao Administrador de Empresas qualquer escrita em produto ou pedido.
+	 *
+	 * O alcance dele sobre a operação é de **consulta**: ele vê o catálogo, o
+	 * estoque, os pedidos e o faturamento dos vendedores que administra, e não
+	 * altera nenhum deles — quem administra o produto é o vendedor dono da loja.
+	 *
+	 * O papel já não traz essas capacidades, então em uma instalação intacta este
+	 * filtro nunca decide nada. Ele existe para a instalação que não está intacta:
+	 * basta um plugin de terceiro conceder `edit_products` por papel — o Dokan
+	 * concede seis capacidades de produto ao `seller` desse jeito — para o alcance
+	 * silenciosamente deixar de ser consulta. A garantia precisa estar na
+	 * autorização, não na lista de capacidades do papel.
+	 *
+	 * @param string[] $caps       Capacidades primitivas exigidas.
+	 * @param string   $cap        Capacidade consultada.
+	 * @param int      $usuario_id Usuário sob avaliação.
+	 * @param array    $args       Argumentos; `$args[0]` costuma ser o ID do objeto.
+	 * @return string[]
+	 */
+	public static function negar_escrita_ao_admin_de_empresas( $caps, $cap, $usuario_id, $args ) {
+		$monitoradas = array(
+			'edit_post',
+			'delete_post',
+			'publish_post',
+			'edit_product',
+			'delete_product',
+			'publish_products',
+			'edit_products',
+			'edit_shop_order',
+			'delete_shop_order',
+		);
+
+		if ( ! in_array( $cap, $monitoradas, true ) ) {
+			return $caps;
+		}
+
+		if ( ! self::eh_admin_de_empresas( $usuario_id ) ) {
+			return $caps;
+		}
+
+		// A empresa é justamente o que este ator administra, e o CPT dela responde
+		// pelas meta caps genéricas de post. Sem esta exceção, a trava cortaria a
+		// própria razão de ser do papel.
+		if ( ! empty( $args[0] ) && Reconectar_Empresa::POST_TYPE === get_post_type( (int) $args[0] ) ) {
+			return $caps;
+		}
+
+		$caps[] = 'do_not_allow';
 
 		return $caps;
 	}
@@ -214,9 +452,9 @@ class Reconectar_Permissoes {
 			return $caps;
 		}
 
-		// Quem administra a loja enxerga tudo — é o papel dele. A consulta usa
-		// uma capacidade fora da lista monitorada, então não há recursão.
-		if ( user_can( $usuario_id, 'manage_woocommerce' ) ) {
+		// Quem administra a tecnologia enxerga tudo — é o papel dele. A consulta
+		// usa capacidades fora da lista monitorada, então não há recursão.
+		if ( self::eh_administracao_tecnica( $usuario_id ) ) {
 			return $caps;
 		}
 
@@ -290,7 +528,7 @@ class Reconectar_Permissoes {
 
 		$usuario_id = get_current_user_id();
 
-		if ( current_user_can( 'manage_woocommerce' ) || ! self::eh_vendedor( $usuario_id ) ) {
+		if ( self::eh_administracao_tecnica() || ! self::eh_vendedor( $usuario_id ) ) {
 			return;
 		}
 
@@ -300,6 +538,74 @@ class Reconectar_Permissoes {
 	/* ---------------------------------------------------------------------
 	 * Comunidade e fóruns
 	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Capacidades com que o bbPress autoriza escrita.
+	 *
+	 * Leitura fica de fora de propósito: `spectate` e `read_forum` continuam
+	 * livres, para que uma autorização concedida por outro caminho — um papel
+	 * novo, uma capacidade a dedo — não perca a leitura por causa desta trava.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DE_ESCRITA_NO_FORUM = array(
+		'publish_topics',
+		'edit_topics',
+		'publish_replies',
+		'edit_replies',
+		'assign_topic_tags',
+		'publish_forums',
+		'edit_forums',
+	);
+
+	/**
+	 * Nega a escrita no fórum a quem não participa da comunidade.
+	 *
+	 * `bloquear_comunidade()` fecha a porta da frente, e é por onde todo mundo
+	 * passa — mas ela não é a única. O bbPress atende ao POST de criação em
+	 * `bbp_template_redirect`, pendurado em `template_redirect` com **prioridade
+	 * 8** (`bbpress/includes/core/actions.php:50`), enquanto o bloqueio está na
+	 * prioridade padrão, **10**. O handler roda antes, e o que ele consulta é a
+	 * capacidade primitiva:
+	 *
+	 *     if ( ! current_user_can( 'publish_topics' ) ) { … return; }
+	 *
+	 * Medido nesta instalação: `demo-cliente-ana` responde **sim** a
+	 * `publish_topics` e a `publish_replies`. O bbPress dá `bbp_participant` a
+	 * todo usuário que se registra, cliente inclusive, e esse papel traz as duas.
+	 *
+	 * Hoje o nonce `bbp-new-topic` ainda barra — o cliente não chega a ver o
+	 * formulário que o imprimiria. Esta camada existe porque "o nonce segura" não
+	 * é uma regra de autorização: basta um widget, um shortcode ou uma versão
+	 * nova do plugin imprimir aquele campo numa página que o cliente possa abrir.
+	 * É o mesmo raciocínio de `Reconectar_Cadastro_De_Lojas`, onde quatro portas
+	 * independentes exigiram cinco camadas justamente porque nenhuma cobria as
+	 * outras.
+	 *
+	 * `map_meta_cap` alcança capacidade primitiva: `WP_User::has_cap()` chama
+	 * `map_meta_cap()` para toda checagem, e para uma cap que não é meta o retorno
+	 * é `array( $cap )` — que passa por este filtro como qualquer outro.
+	 *
+	 * @param string[] $caps       Capacidades primitivas exigidas.
+	 * @param string   $cap        Capacidade consultada.
+	 * @param int      $usuario_id Usuário sob avaliação.
+	 * @return string[]
+	 */
+	public static function negar_escrita_no_forum( $caps, $cap, $usuario_id ) {
+		if ( ! in_array( $cap, self::CAPS_DE_ESCRITA_NO_FORUM, true ) ) {
+			return $caps;
+		}
+
+		// `user_can()` reentra em `map_meta_cap`, agora com `CAP_COMUNIDADE` —
+		// que não está na lista acima e sai pela linha anterior. Não há recursão.
+		if ( user_can( $usuario_id, self::CAP_COMUNIDADE ) ) {
+			return $caps;
+		}
+
+		$caps[] = 'do_not_allow';
+
+		return $caps;
+	}
 
 	/**
 	 * A requisição atual aponta para conteúdo de comunidade?
@@ -388,6 +694,20 @@ class Reconectar_Permissoes {
 		$comunidade = get_page_by_path( 'comunidade' );
 		$pagina_id  = $comunidade ? (int) $comunidade->ID : 0;
 
+		/*
+		 * O item "Fórum" que o provisionamento cria é `custom`, e não `post_type`:
+		 * a listagem de perguntas mora no arquivo de `forum`, que não tem post a
+		 * que um item de menu possa apontar. Um item custom chega aqui com
+		 * `object` valendo 'custom', de modo que a comparação por post type abaixo
+		 * não o alcança — e o cliente voltaria a ver no menu um link que devolve
+		 * 403, que é exatamente o defeito que este filtro existe para evitar.
+		 *
+		 * A comparação é pelo caminho da URL, como no widget do rodapé, e pela
+		 * mesma razão: sobrevive a alguém reordenar o menu ou trocar o rótulo
+		 * pelo painel.
+		 */
+		$caminho_do_forum = self::caminho_de_url( get_post_type_archive_link( 'forum' ) );
+
 		foreach ( $itens as $indice => $item ) {
 			$aponta_para_pagina = $pagina_id
 				&& 'post_type' === $item->type
@@ -395,7 +715,11 @@ class Reconectar_Permissoes {
 
 			$aponta_para_forum = in_array( $item->object, array( 'forum', 'topic' ), true );
 
-			if ( $aponta_para_pagina || $aponta_para_forum ) {
+			$aponta_para_listagem = '' !== $caminho_do_forum
+				&& 'custom' === $item->type
+				&& self::caminho_de_url( $item->url ) === $caminho_do_forum;
+
+			if ( $aponta_para_pagina || $aponta_para_forum || $aponta_para_listagem ) {
 				unset( $itens[ $indice ] );
 			}
 		}
@@ -566,19 +890,42 @@ class Reconectar_Permissoes {
 	/**
 	 * Mantém clientes e vendedores fora do `/wp-admin`.
 	 *
-	 * O vendedor trabalha no painel do Dokan, no front-end, e o cliente na área
-	 * "Minha conta". Nenhum dos dois tem o que fazer no painel do WordPress, e a
-	 * especificação lista a área administrativa como exclusiva do Administrador.
+	 * O vendedor trabalha no painel do Dokan, no front-end; o Administrador de
+	 * Empresas, no painel de empresas; e o cliente, na área "Minha conta".
+	 * Nenhum dos três tem o que fazer no painel do WordPress, e a especificação
+	 * lista a área administrativa como exclusiva do Administrador.
 	 */
 	public static function bloquear_area_administrativa() {
 		// `admin-ajax.php` mora dentro de `/wp-admin` e atende requisições do
 		// front-end — inclusive as do carrinho e as do painel do Dokan. Bloqueá-lo
-		// quebraria a loja para as duas pessoas que este método protege.
+		// quebraria a loja para as pessoas que este método protege.
 		if ( wp_doing_ajax() ) {
 			return;
 		}
 
-		if ( current_user_can( 'manage_woocommerce' ) || current_user_can( 'manage_options' ) ) {
+		/*
+		 * `admin-post.php` é irmão do `admin-ajax.php` e a exceção existe pela
+		 * mesma razão, só que descoberta mais tarde: ele é a rota padrão do
+		 * WordPress para um `<form method="post">` de front-end, e é para lá que o
+		 * voto do fórum e a marcação de melhor resposta postam.
+		 *
+		 * Medido antes da correção: o vendedor que clicasse em votar recebia
+		 * 302 para `/dashboard/` e o voto não acontecia — sem erro nenhum na tela,
+		 * porque o redirecionamento devolve o painel dele, que é uma página
+		 * plausível. O cliente recebia 302 para `/my-account/` pelo mesmo caminho,
+		 * o que dava a impressão de que a trava do endpoint estava funcionando
+		 * quando na verdade ela nunca era alcançada.
+		 *
+		 * Liberar aqui não abre o painel: `admin-post.php` só executa o que
+		 * estiver pendurado em `admin_post_*` e morre com 400 quando a ação não
+		 * existe. As travas do voto seguem sendo o nonce e a capacidade, dentro do
+		 * próprio handler.
+		 */
+		if ( isset( $GLOBALS['pagenow'] ) && 'admin-post.php' === $GLOBALS['pagenow'] ) {
+			return;
+		}
+
+		if ( self::eh_administracao_tecnica() ) {
 			return;
 		}
 
@@ -586,12 +933,37 @@ class Reconectar_Permissoes {
 			return;
 		}
 
-		$destino = self::eh_vendedor( get_current_user_id() ) && function_exists( 'dokan_get_navigation_url' )
-			? dokan_get_navigation_url()
-			: ( function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' ) );
-
-		wp_safe_redirect( $destino );
+		wp_safe_redirect( self::destino_fora_do_painel() );
 		exit;
+	}
+
+	/**
+	 * Para onde mandar quem foi barrado na porta do `/wp-admin`.
+	 *
+	 * A ordem das três tentativas é a da especificidade: cada ator tem uma área
+	 * própria de trabalho, e devolvê-lo a ela é mais útil que um 403. O
+	 * `home_url()` do fim é o caso em que nenhum dos plugins está de pé.
+	 *
+	 * @return string URL absoluta.
+	 */
+	private static function destino_fora_do_painel() {
+		$usuario_id = get_current_user_id();
+
+		if ( user_can( $usuario_id, self::CAP_PAINEL_EMPRESAS ) ) {
+			$painel = Reconectar_Painel_Empresas::url();
+
+			if ( '' !== $painel ) {
+				return $painel;
+			}
+		}
+
+		if ( self::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_navigation_url' ) ) {
+			return dokan_get_navigation_url();
+		}
+
+		return function_exists( 'wc_get_page_permalink' )
+			? wc_get_page_permalink( 'myaccount' )
+			: home_url( '/' );
 	}
 
 	/**
@@ -605,7 +977,7 @@ class Reconectar_Permissoes {
 			return $exibir;
 		}
 
-		if ( current_user_can( 'manage_woocommerce' ) || current_user_can( 'manage_options' ) ) {
+		if ( self::eh_administracao_tecnica() ) {
 			return $exibir;
 		}
 

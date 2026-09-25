@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-hidden="true" focusable="false">
+  <title>Avatar padrão</title>
+  <defs>
+    <clipPath id="recorte">
+      <circle cx="32" cy="32" r="32"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#recorte)">
+    <rect width="64" height="64" fill="#663191"/>
+    <circle cx="32" cy="25" r="11" fill="#ffffff"/>
+    <circle cx="32" cy="57" r="19" fill="#ffffff"/>
+  </g>
+</svg>

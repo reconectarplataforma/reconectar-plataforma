@@ -191,6 +191,37 @@ divide em um sub-pedido por vendedor, cada qual visível apenas para o seu dono.
 As idades em dias existem para que a coluna de data do painel sirva para algo.
 Um histórico em que tudo aconteceu hoje não se parece com uma loja em operação.
 
+**4 categorias de fórum**, **6 perguntas**, **6 respostas** e **13 tags**. As
+categorias são post types `forum` do bbPress e ficam ao lado do "Fórum Geral"
+que o provisionamento cria — este último não é da demonstração e não sai na
+remoção.
+
+| Categoria | Perguntas |
+|---|---|
+| Produção e matéria-prima | 1 |
+| Vendas e precificação | 2 |
+| Entrega e logística | 2 |
+| A plataforma | 1 |
+
+**Quatro das seis têm melhor resposta marcada** e **duas ficam sem resposta
+nenhuma**, de propósito: a aba "Sem resposta" precisa ter o que mostrar, e uma
+listagem em que toda pergunta já foi respondida não se parece com uma
+comunidade em atividade. Votos (de 1 a 5) e visualizações (de 23 a 184) são
+declarados no catálogo e variam entre as perguntas para que as abas "Votos" e
+"Recentes" produzam ordens visivelmente diferentes — com todos os saldos
+iguais, não haveria como ver se a ordenação funciona.
+
+O número de visualizações é o único desses valores que **muda depois da
+carga**: o contador é real e sobe a cada leitura, uma vez por sessão e nunca
+para o próprio autor. Se o banco mostrar 24 onde o catálogo declara 23, alguém
+abriu a pergunta — é o contador funcionando, não divergência.
+
+Os autores são **vendedores e administradores de empresa**, nunca clientes: o
+fórum é fechado a quem não participa da comunidade, e a ausência do cliente no
+catálogo é parte da demonstração da regra. Os votos são atribuídos a eleitores
+que não são o autor do conteúdo — ninguém vota em si mesmo, no catálogo como no
+endpoint.
+
 **Vendedores e clientes entram com a mesma senha**, `reconectar-demo`, definida
 em `demo.php` e substituível pela variável de ambiente
 `RECONECTAR_DEMO_SENHA`. São contas de ambiente local, não credenciais de
@@ -230,6 +261,19 @@ serem apagados (caso contrário o perfil ficaria apontando para anexos
 inexistentes); depois os anexos, os usuários — vendedores e clientes saem
 juntos, porque recebem a mesma meta —, os termos e, por fim, a opção
 `reconectar_demo_ativo`, o que faz a faixa de aviso desaparecer.
+
+O fórum sai entre os produtos e os usuários, de baixo para cima: respostas,
+depois perguntas, depois categorias. **Uma categoria com conteúdo que não é da
+demonstração fica de pé**, ainda que ela própria tenha a meta: o bbPress apaga
+em cascata o que estiver dentro de um fórum, e uma pergunta feita por alguém de
+verdade durante a apresentação sairia junto sem nunca ter recebido a marcação.
+Preservar um agrupador vazio de dado fictício custa uma linha no seletor;
+apagar a pergunta de outra pessoa não tem desfazer.
+
+As tags do fórum saem pelo mesmo caminho das categorias de produto — a consulta
+ao `termmeta` —, mas a taxonomia é lida do banco e não assumida:
+`wp_delete_term()` com a taxonomia errada devolve `false` **em silêncio**, e o
+sintoma seria uma coluna de tags que sobrevive à remoção e leva a listas vazias.
 
 ### As tabelas paralelas do Dokan
 
