@@ -1,0 +1,117 @@
+# Sincroniza o código autoral com a instância EC2 e provisiona.
+#
+# O deploy é `rsync` por SSH a partir do próprio runner: ele já tem o checkout e
+# já tem a chave, então o servidor não precisa de credencial do GitHub nenhuma.
+#
+# Preparação do servidor e lista de secrets: `docs/DEPLOY.md`.
+
+name: Implantar
+
+on:
+  push:
+    branches: [main]
+  # Permite repetir o deploy do estado atual da `main` sem precisar de um commit
+  # vazio — é a rota de rollback: dar deploy de novo depois de reverter.
+  workflow_dispatch:
+
+# Dois pushes seguidos na `main` disparariam dois `rsync` concorrentes no mesmo
+# diretório do servidor, e o segundo sincronizaria por cima de uma árvore que o
+# primeiro ainda está escrevendo. `cancel-in-progress: false` põe o segundo na
+# fila em vez de matar o primeiro no meio da escrita.
+concurrency:
+  group: implantar-producao
+  cancel-in-progress: false
+
+jobs:
+  implantar:
+    runs-on: ubuntu-latest
+    # O environment é o que dá ao GitHub onde guardar secret separado e onde
+    # exigir revisor antes de publicar — o análogo do *Protected* do GitLab.
+    # Somado ao gatilho (só `push` na `main`), é o que mantém a chave fora do
+    # alcance de um pull request de fork: o GitHub não entrega secret nenhum a
+    # workflow disparado por fork.
+    environment:
+      name: producao
+      url: http://${{ vars.SSH_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/preparar-ssh
+        with:
+          chave-privada: ${{ secrets.SSH_CHAVE_PRIVADA }}
+          host-key: ${{ vars.SSH_HOST_KEY }}
+          host: ${{ vars.SSH_HOST }}
+          usuario: ${{ vars.SSH_USUARIO }}
+          caminho-remoto: ${{ vars.CAMINHO_REMOTO }}
+
+      - name: Criar a árvore de destino
+        env:
+          CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
+        run: |
+          ssh $OPCOES_SSH "$ALVO" "mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts"
+
+      # ATENÇÃO — o recorte abaixo não é arbitrário e não pode ser "simplificado"
+      # para um `rsync wp-content/`.
+      #
+      # Só `wp-content/themes/reconectar/` e `wp-content/plugins/reconectar-core/`
+      # são versionados (confira com `git ls-files wp-content/`). O núcleo do
+      # WordPress, o Storefront, o WooCommerce, o Dokan, o bbPress, o BuddyPress e
+      # TODO o `uploads/` chegam pelo `provision.sh` no destino e não existem aqui.
+      #
+      # Um `--delete` no nível de `wp-content/` apagaria os cinco plugins de
+      # terceiros, o tema pai e os uploads — que não têm origem nenhuma para serem
+      # restaurados. Dentro de cada diretório listado o `--delete` é justamente o
+      # que se quer: arquivo removido do tema tem de sumir do servidor.
+      #
+      # `--rsync-path="sudo rsync"` porque os arquivos do bind-mount pertencem ao
+      # UID 33 (a imagem Apache é Debian) e o `ec2-user` é 1000. Sem isso a escrita
+      # falha em arquivo que já existe.
+      - name: Sincronizar o código autoral
+        env:
+          CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
+        run: |
+          rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+            wp-content/themes/reconectar/ \
+            "$ALVO:$CAMINHO_REMOTO/wp-content/themes/reconectar/"
+
+          rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+            wp-content/plugins/reconectar-core/ \
+            "$ALVO:$CAMINHO_REMOTO/wp-content/plugins/reconectar-core/"
+
+          rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+            scripts/ \
+            "$ALVO:$CAMINHO_REMOTO/scripts/"
+
+          rsync -az --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+            docker-compose.yml \
+            "$ALVO:$CAMINHO_REMOTO/docker-compose.yml"
+
+      # Os serviços são nomeados de propósito, e é assim que o phpMyAdmin fica fora
+      # do ar sem precisar de arquivo de override: um `docker-compose.prod.yml`
+      # declarando `ports` não substituiria a lista do arquivo base — o Compose
+      # CONCATENA listas de portas, e a 8090 continuaria aberta, em silêncio.
+      # O `wpcli` sobe sob demanda no passo seguinte; o `demo` já está atrás de
+      # profile.
+      - name: Subir o banco e o WordPress
+        run: ssh $OPCOES_SSH "$ALVO" "$COMPOSE up -d db wordpress"
+
+      # O WP-CLI que chega antes de o núcleo terminar de ser copiado para o volume
+      # falha com "This does not seem to be a WordPress installation" — erro que
+      # descreve o instante, não o problema. Mesmo laço de `scripts/demo-completa.sh`.
+      # `$COMPOSE` expande aqui; `\$decorrido` fica para o shell do servidor.
+      - name: Esperar o wp-config.php aparecer
+        run: |
+          ssh $OPCOES_SSH "$ALVO" "
+            decorrido=0
+            until $COMPOSE exec -T wordpress test -f /var/www/html/wp-config.php; do
+              if [ \$decorrido -ge 120 ]; then
+                echo 'wp-config.php não apareceu em 120s'
+                exit 1
+              fi
+              sleep 2
+              decorrido=\$(( decorrido + 2 ))
+            done
+          "
+
+      - name: Provisionar
+        run: ssh $OPCOES_SSH "$ALVO" "$COMPOSE run --rm wpcli bash /var/www/scripts/provision.sh"

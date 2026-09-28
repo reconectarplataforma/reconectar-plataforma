@@ -11,7 +11,7 @@ completo (fases, cronograma do edital, indicadores),
 cronológico de cada etapa concluída, e
 [docs/PAGAMENTOS.md](docs/PAGAMENTOS.md) para a estrutura do módulo de
 pagamentos (Pix/Cartão/Boleto) e [docs/DEPLOY.md](docs/DEPLOY.md) para a esteira
-de publicação no GitLab CI.
+de publicação em GitHub Actions.
 
 ## Stack técnica
 

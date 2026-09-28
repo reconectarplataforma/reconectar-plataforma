@@ -2807,6 +2807,12 @@ copia.
 
 ## 2026-09-28 — Esteira de deploy no GitLab CI
 
+> **Substituída no mesmo dia pela entrada seguinte.** O `.gitlab-ci.yml` descrito
+> aqui não existe mais; a esteira é GitHub Actions. O registro fica porque as
+> decisões técnicas abaixo — o recorte do `rsync`, a ausência de
+> `docker-compose.prod.yml`, o `seed-demo.sh` — sobreviveram à troca de
+> plataforma e são a razão de o desenho ser o que é.
+
 **O que foi feito**
 - Criado `.gitlab-ci.yml` com três estágios: `verificar` (lint de PHP e de
   shell, em toda branch e todo merge request), `implantar` (push na `main`) e
@@ -2866,3 +2872,77 @@ conferido zero arquivo, que é o pior resultado possível.
   da AWS, e com o default o site sobe carimbando todo asset com `localhost`.
 - A esteira ainda não rodou uma vez — nada aqui foi verificado contra a
   instância. O roteiro de verificação está em `docs/DEPLOY.md`.
+
+---
+
+## 2026-09-28 — A esteira migra para GitHub Actions
+
+**Por que**
+
+O remote sempre foi GitHub (`reconectarplataforma/reconectar-plataforma`), e o
+projeto no GitLab nunca chegou a ser criado. Manter a esteira na plataforma
+errada custaria um espelhamento de repositório para sustentar um passo que a
+plataforma de origem já faz sozinha.
+
+**O que foi feito**
+- `.gitlab-ci.yml` removido; entram `.github/workflows/verificar.yml`,
+  `implantar.yml` e `demonstracao.yml`, mais a ação composta
+  `.github/actions/preparar-ssh/`.
+- `docs/DEPLOY.md` reescrito: a seção de variáveis CI/CD vira **Secrets e
+  variables do repositório**, com a explicação do `environment: producao` no
+  lugar da do *File/Masked/Protected*.
+- Referências corrigidas em `CLAUDE.md` e `README.md`.
+
+**O que a troca de plataforma impôs**
+
+O GitLab não tem `concurrency`, e este é o ganho mais concreto da migração. Dois
+pushes seguidos na `main` disparariam dois `rsync` no mesmo diretório do
+servidor, e o segundo escreveria por cima de uma árvore que o primeiro ainda
+está montando. `implantar` e `demonstracao` enfileiram
+(`cancel-in-progress: false`); `verificar` cancela o anterior, porque uma
+verificação de commit que já não é o topo não diz nada.
+
+O GitHub não tem `extends`, que era como os dois jobs remotos compartilhavam o
+`before_script`. O preparo do SSH virou ação composta em vez de bloco duplicado:
+duas cópias divergem, e a que não recebe o ajuste passa a falhar por um motivo
+que ninguém procuraria no arquivo certo.
+
+Não existe variável tipo *File*. `SSH_CHAVE_PRIVADA` é secret comum e o conteúdo
+é escrito com `printf '%s\n'`, nunca `echo` — o `echo` de alguns shells
+interpreta escapes, e o base64 sairia corrompido com sintoma "invalid format",
+que não parece corrupção de escrita.
+
+Os valores chegam aos scripts por `env:`, nunca interpolados no corpo do `run:`.
+Um `${{ }}` ali é substituição textual **antes** de o shell existir: um valor com
+aspas ou `$(...)` viraria comando.
+
+O *Protected* do GitLab vira duas coisas: o `environment: producao`, onde ficam
+required reviewers e a restrição de branch, e o comportamento do próprio GitHub
+de **não entregar secret a workflow disparado por fork**. Por isso a chave do
+host e o DNS são *variables*, não secrets — a chave do host é pública por
+definição, e mascarar o `SSH_HOST` quebraria a URL do environment e deixaria a
+mensagem de erro de host mudado ilegível justamente quando ela importa.
+
+A dedup de push/pull_request, que no GitLab era `workflow.rules`, virou um `if`
+comparando o repositório de origem do PR. Consequência a lembrar se algum dia
+houver required status checks: **job pulado por `if` fica *skipped*, e check
+obrigatório não se satisfaz com skipped** — marque como obrigatório o workflow,
+não estes jobs.
+
+O `when: manual` virou `workflow_dispatch` com `type: choice`, o que é melhor:
+`instalar` e `remover` saem de um só job em vez de dois, e a escolha fica
+explícita na tela do disparo.
+
+Uma linha a mais no lint de PHP: a imagem oficial `php:8.2-cli` é Debian slim e
+não traz git. Sem ele o `actions/checkout` cai no download por API — que
+funciona, mas em silêncio e por outro caminho.
+
+**Pendências que dependem de ação humana**
+
+As mesmas da entrada anterior, menos "criar o projeto no GitLab". No lugar dela:
+cadastrar o secret `SSH_CHAVE_PRIVADA` e as quatro variables em Settings →
+Secrets and variables → Actions, e criar o environment `producao` em Settings →
+Environments se quiser revisor obrigatório antes do deploy.
+
+Os quatro YAML foram validados (`yaml.safe_load` carrega os quatro). Nada rodou
+contra a instância.
