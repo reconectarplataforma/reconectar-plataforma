@@ -179,6 +179,12 @@ próprio GitHub: **secrets não são entregues a workflow disparado por pull
 request de fork**, então um PR de terceiro nunca vê a chave, mesmo que altere o
 arquivo do workflow.
 
+Se alguma dessas cinco entradas (`SSH_CHAVE_PRIVADA`, `SSH_HOST`, `SSH_USUARIO`,
+`SSH_HOST_KEY`, `CAMINHO_REMOTO`) estiver ausente, os workflows remotos param
+antes do primeiro `ssh` e registram no resumo do job quais valores faltam. O
+erro antigo era pior: o job seguia com `ALVO=@` e falhava com a ajuda do `ssh`,
+sem dizer o que realmente estava faltando.
+
 A chave `dev.pem` **nunca entra no repositório** — `*.pem` está no `.gitignore`.
 Na sua máquina, `chmod 400 dev.pem`.
 
