@@ -34,7 +34,21 @@ inputs:
 runs:
   using: composite
   steps:
-    - id: validar
+    # `required: true` num input de ação composta NÃO falha quando o valor chega
+    # vazio — ele só falha quando o `with:` omite a chave, e aqui as cinco chaves
+    # sempre existem: o que falta é o secret ou a variable por trás delas.
+    #
+    # Sem esta guarda o job seguia adiante e morria no `ssh`, que imprime o
+    # próprio `usage` quando o usuário do destino é vazio (`ssh "@"`). Medido:
+    # `@` e `@host` saem em usage; `usuario@` e destino vazio saem em "Could not
+    # resolve hostname". O usage manda a investigação para a sintaxe da linha,
+    # que está certa, e não para o cadastro que falta.
+    #
+    # Pior que o erro ilegível: `CAMINHO_REMOTO` vazio faria o passo seguinte
+    # sincronizar para `/wp-content/` e `/scripts/` na RAIZ do servidor — e com
+    # `--rsync-path="sudo rsync"`, portanto como root e com `--delete`.
+    - name: Conferir que os secrets e variables existem
+      id: validar
       shell: bash
       env:
         CHAVE_PRIVADA: ${{ inputs.chave-privada }}
@@ -43,29 +57,28 @@ runs:
         USUARIO: ${{ inputs.usuario }}
         CAMINHO_REMOTO: ${{ inputs.caminho-remoto }}
       run: |
-        faltando=()
+        faltou=0
 
-        [ -n "$CHAVE_PRIVADA" ] || faltando+=(SSH_CHAVE_PRIVADA)
-        [ -n "$HOST_KEY" ] || faltando+=(SSH_HOST_KEY)
-        [ -n "$HOST" ] || faltando+=(SSH_HOST)
-        [ -n "$USUARIO" ] || faltando+=(SSH_USUARIO)
-        [ -n "$CAMINHO_REMOTO" ] || faltando+=(CAMINHO_REMOTO)
+        # "Falta", e não "$2 não está cadastrado": o segundo argumento já traz o
+        # artigo, e o particípio concordaria errado com metade da lista.
+        exigir() {
+          if [ -z "$1" ]; then
+            echo "::error::Falta $2 nas configurações do repositório"
+            faltou=1
+          fi
+        }
 
-        if [ "${#faltando[@]}" -gt 0 ]; then
+        exigir "$CHAVE_PRIVADA"  "o secret SSH_CHAVE_PRIVADA"
+        exigir "$HOST_KEY"       "a variable SSH_HOST_KEY"
+        exigir "$HOST"           "a variable SSH_HOST"
+        exigir "$USUARIO"        "a variable SSH_USUARIO"
+        exigir "$CAMINHO_REMOTO" "a variable CAMINHO_REMOTO"
+
+        if [ "$faltou" -eq 1 ]; then
           echo "configurado=false" >> "$GITHUB_OUTPUT"
-
-          {
-            echo "### Acesso SSH não configurado"
-            echo
-            echo "Os workflows remotos foram pulados porque faltam as configurações abaixo em Settings → Secrets and variables → Actions:"
-            echo
-            for variavel in "${faltando[@]}"; do
-              echo "- \`$variavel\`"
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          echo "::warning title=Acesso SSH não configurado::Faltam ${faltando[*]}; os passos remotos serão pulados."
-          exit 0
+          echo "Cadastre em Settings → Secrets and variables → Actions." >&2
+          echo "A lista completa, com os valores, está em docs/DEPLOY.md." >&2
+          exit 1
         fi
 
         echo "configurado=true" >> "$GITHUB_OUTPUT"

@@ -164,6 +164,12 @@ Cole a linha inteira. Ela é o que dispensa o `StrictHostKeyChecking=no`:
 desligar a verificação faria a esteira aceitar qualquer servidor que
 respondesse naquele endereço, numa sessão que carrega uma chave de produção.
 
+Se algum dos cinco faltar, o primeiro passo da ação composta interrompe o
+workflow nomeando exatamente o que não está cadastrado. A guarda existe porque
+o `required: true` do input **não** barra valor vazio — ele só exige que o
+`with:` traga a chave — e a falha sem ela acontecia adiante, como o `usage` do
+`ssh`, que parece erro de sintaxe do comando.
+
 ### O environment `producao`
 
 Os dois workflows que falam com o servidor declaram `environment: producao`.
@@ -181,9 +187,9 @@ arquivo do workflow.
 
 Se alguma dessas cinco entradas (`SSH_CHAVE_PRIVADA`, `SSH_HOST`, `SSH_USUARIO`,
 `SSH_HOST_KEY`, `CAMINHO_REMOTO`) estiver ausente, os workflows remotos param
-antes do primeiro `ssh` e registram no resumo do job quais valores faltam. O
-erro antigo era pior: o job seguia com `ALVO=@` e falhava com a ajuda do `ssh`,
-sem dizer o que realmente estava faltando.
+antes do primeiro `ssh` e nomeiam exatamente o que não está cadastrado. O erro
+antigo era pior: o job seguia com `ALVO=@` e falhava com a ajuda do `ssh`, sem
+dizer o que realmente estava faltando.
 
 A chave `dev.pem` **nunca entra no repositório** — `*.pem` está no `.gitignore`.
 Na sua máquina, `chmod 400 dev.pem`.

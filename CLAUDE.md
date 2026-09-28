@@ -720,6 +720,31 @@ variáveis mudam depois. `WP_URL`, senha de banco e porta têm de estar certas
 **antes** do primeiro `up`; consertar depois é derrubar o volume, o que apaga o
 banco.
 
+### `required: true` num input de ação composta não barra valor vazio
+
+Ele exige que o `with:` **traga a chave**, não que o valor chegue preenchido. Os
+workflows sempre trazem as cinco; o que falta é o secret ou a variable por trás
+delas, e a ação recebia string vazia sem reclamar.
+
+O sintoma é o `usage` do `ssh`. Medido:
+
+```
+ssh "@"                  → usage
+ssh "@exemplo.invalido"  → usage
+ssh "ec2-user@"          → Could not resolve hostname
+ssh ""                   → Could not resolve hostname
+```
+
+Com `SSH_USUARIO` ausente, `ALVO` vira `@` e o `ssh` imprime o próprio modo de
+uso — o que manda a investigação para a sintaxe da linha, que está correta, e
+não para o cadastro que falta. `SSH_HOST` vazio nem chega a ser olhado.
+
+Pior que o erro ilegível: `CAMINHO_REMOTO` vazio faria o passo seguinte
+sincronizar para `/wp-content/` e `/scripts/` na **raiz do servidor** — com
+`--rsync-path="sudo rsync"`, portanto como root e com `--delete`. Quem barra é
+o passo "Conferir que os secrets e variables existem", em
+`.github/actions/preparar-ssh/action.yml`.
+
 ## Convenções
 
 **Idioma.** Todo código autoral é escrito em português: nomes de função,
