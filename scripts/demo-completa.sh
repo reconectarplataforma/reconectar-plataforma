@@ -105,7 +105,7 @@ if command -v wp >/dev/null 2>&1; then
 
     if [ -n "${logins// /}" ]; then
       if [ "$papel" = "seller" ]; then
-        echo "Vendedores (senha: $senha_demo):"
+        echo "Lojas (senha: $senha_demo):"
       else
         echo "Clientes (senha: $senha_demo):"
       fi

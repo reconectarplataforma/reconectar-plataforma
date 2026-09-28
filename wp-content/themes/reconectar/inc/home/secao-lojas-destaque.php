@@ -36,7 +36,10 @@ function reconectar_home_lojas_destaque() {
 		array(
 			'id'     => 'rc-lojas-destaque',
 			'titulo' => __( 'Lojas em destaque', 'reconectar' ),
-			'link'   => reconectar_url_base_da_vitrine(),
+			// `reconectar_url_base_da_vitrine()` estava aqui e devolvia a própria
+			// home: o "Ver todos" existia, era clicável e recarregava a mesma
+			// página. O destino certo é a listagem completa de lojas.
+			'link'   => reconectar_url_das_lojas(),
 			'classe' => 'rc-carrossel__faixa--destaque',
 		)
 	);
@@ -47,4 +50,4 @@ function reconectar_home_lojas_destaque() {
 
 	reconectar_fechar_carrossel();
 }
-add_action( 'reconectar_home', 'reconectar_home_lojas_destaque', 30 );
+add_action( 'reconectar_home', 'reconectar_home_lojas_destaque', 20 );

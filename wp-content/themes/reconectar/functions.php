@@ -24,9 +24,16 @@ $reconectar_modulos = array(
 	 */
 	'inc/marketplace/consultas.php',
 	'inc/marketplace/componentes.php',
+	// Depois de `componentes.php`: a listagem reaproveita
+	// `reconectar_card_categoria()`.
+	'inc/marketplace/categorias.php',
 	'inc/marketplace/filtros.php',
+	'inc/marketplace/vitrine.php',
+	'inc/marketplace/busca-sugestoes.php',
+	'inc/marketplace/loja.php',
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',
+	'inc/marketplace/barra-inferior.php',
 
 	// Seções da home. Cada arquivo se registra sozinho na action
 	// `reconectar_home`, com a prioridade que define sua posição na página.
@@ -36,6 +43,12 @@ $reconectar_modulos = array(
 	'inc/home/secao-ofertas.php',
 	'inc/home/secao-lojas.php',
 	'inc/home/secao-comunidade-transparencia.php',
+	// O fórum vem depois da home porque `listagem.php` e `sidebar.php` dependem
+	// das funções de `consultas.php`, e esta lista é a ordem de carga.
+	'inc/forum/consultas.php',
+	'inc/forum/componentes.php',
+	'inc/forum/listagem.php',
+	'inc/forum/sidebar.php',
 );
 
 foreach ( $reconectar_modulos as $reconectar_modulo ) {

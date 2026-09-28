@@ -2,6 +2,15 @@
 .env
 *.env.local
 
+# Chaves e certificados de desenvolvimento (o dev.pem do HTTPS local já esteve
+# na raiz como arquivo não rastreado, a um `git add -A` de distância do
+# repositório público)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
 # WordPress core (baixado via imagem Docker, não versionado)
 wp-content/uploads/
 wp-content/upgrade/
@@ -24,6 +33,13 @@ docker/db-data/
 # Dumps de banco gerados localmente (rede de segurança antes de migrações;
 # contêm dados de instalação e não devem ir para o repositório público)
 docker/backup-*.sql
+
+# Artefatos intermediários da tradução: extraídos do .po do Dokan pelo
+# po_ferramenta.py e consumidos pelo lote.py. São derivados — o entregável é o
+# .po final em reconectar-core/languages/, e versionar o intermediário faria o
+# diff de uma revisão de tradução aparecer duas vezes, em 600 KB de JSON.
+scripts/i18n/po_entradas.json
+scripts/i18n/lotes/
 
 # Logs
 *.log

@@ -41,10 +41,10 @@ justamente para não subir junto com o resto.
 ```
 
 Só a carga, na instalação que já existe. Cria 6 categorias de produto, 5 lojas
-(vendedores Dokan), 15 produtos, as imagens de todos eles, 16 avaliações, 3
-clientes e 6 pedidos. A operação é **idempotente**: rodar
+(contas `seller` do Dokan), 15 produtos, as imagens de todos eles, 16
+avaliações, 3 clientes e 6 pedidos. A operação é **idempotente**: rodar
 duas vezes não duplica nada — cada registro é procurado antes de ser criado,
-pelo slug (categorias, produtos), pelo login (vendedores e clientes) ou por uma
+pelo slug (categorias, produtos), pelo login (lojas e clientes) ou por uma
 chave determinística gravada na meta `_reconectar_demo_chave`: avaliações usam
 `{login-da-loja}-{posição}`; pedidos usam a chave declarada (`ped-001` e
 seguintes).
@@ -78,7 +78,7 @@ quatro lugares independentes, e qualquer um deles basta para reconhecê-la:
 ### 1. Meta `_reconectar_demo` em cada registro
 
 Todo registro criado pela carga recebe a meta `_reconectar_demo = 1`: os
-produtos, os usuários (vendedores e clientes), os termos de categoria, os
+produtos, os usuários (lojas e clientes), os termos de categoria, os
 arquivos de mídia, as avaliações e os pedidos. É essa marca que a remoção usa como critério — ela
 procura por ela em cada um desses tipos e não toca em mais nada. Conteúdo
 cadastrado por pessoas reais nunca tem essa meta e, portanto, nunca é
@@ -115,7 +115,7 @@ A classe correspondente é
 
 ### 3. E-mails no domínio `exemplo.invalid`
 
-Todos os e-mails da carga — dos vendedores e dos autores das avaliações —
+Todos os e-mails da carga — das lojas e dos autores das avaliações —
 usam o domínio `exemplo.invalid`.
 
 O TLD `.invalid` é **reservado pela RFC 2606, seção 2**, o que significa que
@@ -186,16 +186,47 @@ de pagamento:
 `wc-preparacao` e `wc-enviado` são status autorais, registrados por
 `class-reconectar-status-pedido.php`. O `ped-006` tem itens de **três lojas
 diferentes**, e é o caso que demonstra o carrinho multi-vendedor: o Dokan o
-divide em um sub-pedido por vendedor, cada qual visível apenas para o seu dono.
+divide em um sub-pedido por loja, cada qual visível apenas para o seu dono.
 
 As idades em dias existem para que a coluna de data do painel sirva para algo.
 Um histórico em que tudo aconteceu hoje não se parece com uma loja em operação.
 
-**Vendedores e clientes entram com a mesma senha**, `reconectar-demo`, definida
+**4 categorias de fórum**, **6 perguntas**, **6 respostas** e **13 tags**. As
+categorias são post types `forum` do bbPress e ficam ao lado do "Fórum Geral"
+que o provisionamento cria — este último não é da demonstração e não sai na
+remoção.
+
+| Categoria | Perguntas |
+|---|---|
+| Produção e matéria-prima | 1 |
+| Vendas e precificação | 2 |
+| Entrega e logística | 2 |
+| A plataforma | 1 |
+
+**Quatro das seis têm melhor resposta marcada** e **duas ficam sem resposta
+nenhuma**, de propósito: a aba "Sem resposta" precisa ter o que mostrar, e uma
+listagem em que toda pergunta já foi respondida não se parece com uma
+comunidade em atividade. Votos (de 1 a 5) e visualizações (de 23 a 184) são
+declarados no catálogo e variam entre as perguntas para que as abas "Votos" e
+"Recentes" produzam ordens visivelmente diferentes — com todos os saldos
+iguais, não haveria como ver se a ordenação funciona.
+
+O número de visualizações é o único desses valores que **muda depois da
+carga**: o contador é real e sobe a cada leitura, uma vez por sessão e nunca
+para o próprio autor. Se o banco mostrar 24 onde o catálogo declara 23, alguém
+abriu a pergunta — é o contador funcionando, não divergência.
+
+Os autores são **lojas e administradores de empresa**, nunca clientes: o
+fórum é fechado a quem não participa da comunidade, e a ausência do cliente no
+catálogo é parte da demonstração da regra. Os votos são atribuídos a eleitores
+que não são o autor do conteúdo — ninguém vota em si mesmo, no catálogo como no
+endpoint.
+
+**Lojas e clientes entram com a mesma senha**, `reconectar-demo`, definida
 em `demo.php` e substituível pela variável de ambiente
 `RECONECTAR_DEMO_SENHA`. São contas de ambiente local, não credenciais de
 sistema — antes elas recebiam senha aleatória, o que tornava impossível
-demonstrar o painel do vendedor sem redefinir cada uma à mão. Os logins estão
+demonstrar o painel do Dokan sem redefinir cada uma à mão. Os logins estão
 em [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md).
 
 ## As imagens
@@ -225,16 +256,29 @@ limpeza das tabelas paralelas do Dokan, **depois** dos pedidos e não antes,
 porque ela decide pelo que sobrou: uma linha só é reconhecida como órfã quando
 o pedido dela já não existe. Depois os produtos (cujos comentários e metas de
 nota vão junto); então as referências de banner e avatar são limpas do
-`dokan_profile_settings` de cada vendedor **antes** de os arquivos de mídia
+`dokan_profile_settings` de cada loja **antes** de os arquivos de mídia
 serem apagados (caso contrário o perfil ficaria apontando para anexos
-inexistentes); depois os anexos, os usuários — vendedores e clientes saem
+inexistentes); depois os anexos, os usuários — lojas e clientes saem
 juntos, porque recebem a mesma meta —, os termos e, por fim, a opção
 `reconectar_demo_ativo`, o que faz a faixa de aviso desaparecer.
+
+O fórum sai entre os produtos e os usuários, de baixo para cima: respostas,
+depois perguntas, depois categorias. **Uma categoria com conteúdo que não é da
+demonstração fica de pé**, ainda que ela própria tenha a meta: o bbPress apaga
+em cascata o que estiver dentro de um fórum, e uma pergunta feita por alguém de
+verdade durante a apresentação sairia junto sem nunca ter recebido a marcação.
+Preservar um agrupador vazio de dado fictício custa uma linha no seletor;
+apagar a pergunta de outra pessoa não tem desfazer.
+
+As tags do fórum saem pelo mesmo caminho das categorias de produto — a consulta
+ao `termmeta` —, mas a taxonomia é lida do banco e não assumida:
+`wp_delete_term()` com a taxonomia errada devolve `false` **em silêncio**, e o
+sintoma seria uma coluna de tags que sobrevive à remoção e leva a listas vazias.
 
 ### As tabelas paralelas do Dokan
 
 `wp_dokan_orders`, `wp_dokan_vendor_balance` e companhia guardam as vendas, e é
-delas — não dos pedidos do WooCommerce — que o painel do vendedor lê o
+delas — não dos pedidos do WooCommerce — que o painel do Dokan lê o
 faturamento. Apagar o pedido **não** limpa essas linhas: o plugin as remove a
 partir dos seus próprios hooks de estorno e cancelamento, não da exclusão
 definitiva que esta carga usa.

@@ -45,6 +45,7 @@ function reconectar_obter_lojas( $args = array() ) {
 			'pagina'    => 1,
 			'categoria' => '',
 			'cidade'    => '',
+			'busca'     => '',
 			'so_gratis' => false,
 			'ordenar'   => 'avaliacao',
 		)
@@ -62,7 +63,15 @@ function reconectar_obter_lojas( $args = array() ) {
 	 * evita refazer o trabalho a cada visita. Se um dia forem milhares de lojas,
 	 * o caminho é uma tabela de índice própria — não remendar esta função.
 	 */
-	$chave_cache = 'reconectar_lojas_' . md5( wp_json_encode( $args ) );
+	/*
+	 * O host entra na chave porque cada item da lista carrega a URL absoluta da
+	 * loja, e a mesma instalação responde por `localhost:8090` e pelo IP da
+	 * máquina na rede — `WP_HOME` é calculada a partir do `Host` da requisição.
+	 * Sem o host aqui, o cache gravado num acesso serviria links do outro, e o
+	 * sintoma seria dos piores de diagnosticar: intermitente, porque desaparece
+	 * sozinho quando o transient de um minuto expira.
+	 */
+	$chave_cache = 'reconectar_lojas_' . md5( wp_json_encode( $args ) . home_url() );
 	$cache       = get_transient( $chave_cache );
 
 	if ( is_array( $cache ) ) {
@@ -107,6 +116,10 @@ function reconectar_loja_passa_nos_filtros( $loja, $args ) {
 		return false;
 	}
 
+	if ( ! empty( $args['busca'] ) && ! reconectar_nome_casa_com_busca( $loja['nome'], $args['busca'] ) ) {
+		return false;
+	}
+
 	if ( ! empty( $args['cidade'] ) && sanitize_title( $args['cidade'] ) !== sanitize_title( $loja['cidade'] ) ) {
 		return false;
 	}
@@ -123,6 +136,30 @@ function reconectar_loja_passa_nos_filtros( $loja, $args ) {
 	}
 
 	return true;
+}
+
+/**
+ * Diz se o nome de uma loja atende ao termo buscado.
+ *
+ * A comparação ignora caixa e acento nos dois lados. Não é preciosismo: quem
+ * digita "raizes" no celular, sem parar para achar o til, está procurando o
+ * "Ateliê Raízes" — e uma busca que devolve vazio nesse caso é lida como "a
+ * loja não existe", não como "faltou um acento".
+ *
+ * `remove_accents()` é do núcleo do WordPress e trabalha sobre a tabela de
+ * caracteres do idioma ativo, o que a torna mais confiável aqui que qualquer
+ * transliteração escrita à mão. `mb_strtolower()` vem depois porque a função do
+ * núcleo preserva a caixa.
+ *
+ * @param string $nome  Nome da loja.
+ * @param string $termo Termo buscado.
+ * @return bool
+ */
+function reconectar_nome_casa_com_busca( $nome, $termo ) {
+	$nome  = mb_strtolower( remove_accents( $nome ) );
+	$termo = mb_strtolower( remove_accents( $termo ) );
+
+	return '' !== $termo && false !== mb_strpos( $nome, $termo );
 }
 
 /**
@@ -335,6 +372,11 @@ function reconectar_dados_de_entrega( $vendedor_id ) {
 /**
  * Categorias de produto para o carrossel da home.
  *
+ * Só as de primeiro nível. O catálogo passou a ter subcategorias — é delas que a
+ * página de loja monta as seções —, e sem o recorte por `parent` elas subiriam
+ * para o carrossel da home misturadas às suas próprias mães: "Doces" ao lado de
+ * "Alimentos e Bebidas", como se fossem escolhas do mesmo nível.
+ *
  * @param int $numero Quantidade máxima. Padrão 14.
  * @return WP_Term[]
  */
@@ -346,6 +388,7 @@ function reconectar_obter_categorias( $numero = 14 ) {
 			'number'     => (int) $numero,
 			'orderby'    => 'count',
 			'order'      => 'DESC',
+			'parent'     => 0,
 		)
 	);
 
@@ -404,4 +447,191 @@ function reconectar_obter_produtos_destaque( $numero = 8 ) {
 	);
 
 	return array_merge( $destaques, $complemento );
+}
+
+/**
+ * Teto de produtos carregados de uma vez na página de loja.
+ *
+ * Acima dele a página abandona o agrupamento por categoria e volta à lista
+ * paginada do Dokan: agrupar um catálogo que não cabe na página produziria
+ * seções truncadas sem nenhum aviso de que faltam itens.
+ */
+const RECONECTAR_PRODUTOS_POR_LOJA = 200;
+
+/**
+ * Produtos publicados de uma loja.
+ *
+ * `WP_Query` e não `wc_get_products()`: as APIs de alto nível do WooCommerce
+ * reconhecem uma lista fechada de argumentos e descartam em silêncio o que está
+ * fora dela — o defeito que já custou caro aqui com `wc_get_orders()` (veja o
+ * CLAUDE.md).
+ *
+ * O `tax_query` de visibilidade precisa ser explícito pelo mesmo motivo já
+ * registrado em `reconectar_sugerir_produtos()`: quem aplicaria a exclusão é o
+ * `WC_Query`, e ele só age na consulta principal do frontend. Esta não é.
+ *
+ * @param int    $vendedor_id ID do vendedor, que no Dokan é o autor do produto.
+ * @param string $busca       Termo digitado na busca do catálogo. Opcional.
+ * @return WC_Product[] Vazio quando o WooCommerce está fora ou a loja não vende nada.
+ */
+function reconectar_produtos_da_loja( $vendedor_id, $busca = '' ) {
+	if ( ! function_exists( 'wc_get_product' ) ) {
+		return array();
+	}
+
+	$argumentos = array(
+		'post_type'           => 'product',
+		'post_status'         => 'publish',
+		'author'              => (int) $vendedor_id,
+		'posts_per_page'      => RECONECTAR_PRODUTOS_POR_LOJA,
+		'orderby'             => 'title',
+		'order'               => 'ASC',
+		'no_found_rows'       => true,
+		'ignore_sticky_posts' => true,
+	);
+
+	if ( '' !== trim( (string) $busca ) ) {
+		$argumentos['s'] = trim( (string) $busca );
+	}
+
+	if ( function_exists( 'wc_get_product_visibility_term_ids' ) ) {
+		$visibilidade = wc_get_product_visibility_term_ids();
+
+		if ( ! empty( $visibilidade['exclude-from-catalog'] ) ) {
+			$argumentos['tax_query'] = array(
+				array(
+					'taxonomy' => 'product_visibility',
+					'field'    => 'term_taxonomy_id',
+					'terms'    => array( $visibilidade['exclude-from-catalog'] ),
+					'operator' => 'NOT IN',
+				),
+			);
+		}
+	}
+
+	$consulta = new WP_Query( $argumentos );
+	$produtos = array();
+
+	foreach ( $consulta->posts as $post ) {
+		$produto = wc_get_product( $post->ID );
+
+		if ( $produto ) {
+			$produtos[] = $produto;
+		}
+	}
+
+	return $produtos;
+}
+
+/**
+ * Agrupa os produtos da loja em seções de catálogo.
+ *
+ * Cada produto cai na sua **subcategoria** — o termo com `parent > 0` —, porque
+ * é ela que descreve o item dentro daquela loja: numa padaria, "Doces" e
+ * "Salgados" separam o cardápio, enquanto "Alimentos e Bebidas" vale para tudo
+ * que está à venda e não separa nada. A carga atribui as duas a cada produto
+ * (veja `reconectar_demo_criar_produto()`), e é justamente a mãe que mantém o
+ * filtro por categoria da vitrine funcionando.
+ *
+ * Produto que só tem a categoria-mãe forma um grupo com o nome dela, colocado
+ * por último — é o resto do cardápio, não a primeira coisa a mostrar.
+ *
+ * Quando o produto está em mais de uma subcategoria, vale a primeira em ordem
+ * alfabética: repeti-lo em cada seção faria o mesmo item aparecer duas vezes na
+ * mesma página, e quem rolasse leria como se fossem produtos diferentes.
+ *
+ * @param WC_Product[] $produtos Produtos da loja.
+ * @return array[] Grupos com `nome`, `slug` e `produtos`, prontos para o template.
+ */
+function reconectar_agrupar_produtos_por_categoria( $produtos ) {
+	$secoes = array();
+	$restos = array();
+
+	foreach ( $produtos as $produto ) {
+		$termos = wp_get_post_terms( $produto->get_id(), 'product_cat' );
+
+		if ( is_wp_error( $termos ) ) {
+			$termos = array();
+		}
+
+		$subcategorias = array_filter(
+			$termos,
+			static function ( $termo ) {
+				return $termo->parent > 0;
+			}
+		);
+
+		if ( ! $subcategorias ) {
+			$mae = reset( $termos );
+
+			$chave = $mae ? $mae->slug : 'sem-categoria';
+
+			if ( ! isset( $restos[ $chave ] ) ) {
+				$restos[ $chave ] = array(
+					'nome'     => $mae ? $mae->name : __( 'Outros produtos', 'reconectar' ),
+					'slug'     => $chave,
+					'produtos' => array(),
+				);
+			}
+
+			$restos[ $chave ]['produtos'][] = $produto;
+			continue;
+		}
+
+		usort(
+			$subcategorias,
+			static function ( $a, $b ) {
+				return strnatcasecmp( $a->name, $b->name );
+			}
+		);
+
+		$escolhida = reset( $subcategorias );
+
+		if ( ! isset( $secoes[ $escolhida->slug ] ) ) {
+			$secoes[ $escolhida->slug ] = array(
+				'nome'     => $escolhida->name,
+				'slug'     => $escolhida->slug,
+				'produtos' => array(),
+			);
+		}
+
+		$secoes[ $escolhida->slug ]['produtos'][] = $produto;
+	}
+
+	/*
+	 * Ordem alfabética, e não por quantidade: assim a posição de uma seção não
+	 * muda quando a loja cadastra um produto novo, e quem já visitou a página
+	 * encontra "Bebidas" onde encontrou da última vez.
+	 */
+	uasort(
+		$secoes,
+		static function ( $a, $b ) {
+			return strnatcasecmp( $a['nome'], $b['nome'] );
+		}
+	);
+
+	return array_values( array_merge( $secoes, $restos ) );
+}
+
+/**
+ * Produtos da loja que merecem a faixa de destaques.
+ *
+ * O recorte é objetivo: em promoção ou marcado como destaque no WooCommerce.
+ * Loja sem nenhum dos dois devolve lista vazia e a seção inteira não é impressa
+ * — eleger um produto qualquer como "destaque" seria inventar uma curadoria que
+ * a loja não fez.
+ *
+ * @param WC_Product[] $produtos Produtos da loja.
+ * @return WC_Product[]
+ */
+function reconectar_destaques_da_loja( $produtos ) {
+	$destaques = array();
+
+	foreach ( $produtos as $produto ) {
+		if ( $produto->is_on_sale() || $produto->is_featured() ) {
+			$destaques[] = $produto;
+		}
+	}
+
+	return $destaques;
 }

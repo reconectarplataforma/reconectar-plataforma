@@ -75,4 +75,4 @@ function reconectar_home_comunidade_transparencia() {
 	</section>
 	<?php
 }
-add_action( 'reconectar_home', 'reconectar_home_comunidade_transparencia', 50 );
+add_action( 'reconectar_home', 'reconectar_home_comunidade_transparencia', 60 );
