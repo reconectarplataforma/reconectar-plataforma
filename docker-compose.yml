@@ -29,7 +29,11 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-reconectar}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-reconectar}
       WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
-      WORDPRESS_DEBUG: "1"
+      # Default "1" para quem desenvolve; o servidor desliga pelo .env. Ligado
+      # em produção, um aviso do PHP impresso antes de um wp_redirect() derruba
+      # os header() de pluggable.php e a ação simplesmente não acontece — e o
+      # provision.sh só alcança WP_DEBUG_DISPLAY, não esta variável.
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-1}
     volumes:
       - wordpress-data:/var/www/html
       - ./wp-content:/var/www/html/wp-content

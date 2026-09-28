@@ -148,6 +148,27 @@ return array(
 	),
 
 	/*
+	 * Moderadores de Conteúdo (papel `content_moderator`).
+	 *
+	 * Um só basta: ao contrário do Administrador de Empresas, este perfil não tem
+	 * escopo — não existe "moderador da Nosso Chão" —, então uma segunda conta
+	 * mostraria exatamente a mesma tela que a primeira.
+	 *
+	 * Note que não há campo de papel aqui, nem em nenhum outro bloco deste
+	 * arquivo: quem é o papel está escrito em `demo.php`, no código. Um catálogo
+	 * de dados que declarasse `'papel' => '…'` seria uma escalada de privilégio
+	 * esperando por um descuido de revisão.
+	 */
+	'moderadores_de_conteudo' => array(
+		array(
+			'login'    => 'demo-moderador',
+			'email'    => 'rita.albuquerque@exemplo.invalid',
+			'primeiro' => 'Rita',
+			'ultimo'   => 'Albuquerque',
+		),
+	),
+
+	/*
 	 * Lojas (usuários com papel `seller` no Dokan) e seus produtos.
 	 *
 	 * `empresa` casa com o slug de uma das empresas acima e é o que coloca a
@@ -184,6 +205,22 @@ return array(
 	 * faz a loja entrar no filtro correspondente); `tempo` e `distancia` são
 	 * texto livre, porque a unidade muda conforme a loja entregue no mesmo dia
 	 * ou pelos Correios.
+	 *
+	 * `pagamento` é o que a loja cadastraria em Configurações → Pagamento da
+	 * dashboard do Dokan, e vai inteiro para a chave `payment` do
+	 * `dokan_profile_settings`. As chaves de dentro são as dos meios: `pix`
+	 * (`tipo_chave`, `chave`, `beneficiario`, `cidade`) e `bank` (os nomes são
+	 * do Dokan e por isso ficam em inglês). Nem toda loja declara os dois, e
+	 * uma delas não declara nenhum **de propósito**: é o que faz a tela de
+	 * agradecimento exercitar o caminho em que uma loja do carrinho não recebe
+	 * por aquele meio. Uma carga em que todas recebessem esconderia justamente
+	 * o caso que a interface precisa dizer em voz alta.
+	 *
+	 * A chave PIX é gravada já na forma canônica — CPF e CNPJ só com dígitos,
+	 * telefone com `+55` —, que é a mesma que
+	 * `Reconectar_Pagamento_Pix::normalizar_chave()` produz no cadastro. Uma
+	 * chave pontuada geraria um BR Code com CRC válido que só o app do banco
+	 * recusaria, longe de qualquer tela que pudesse explicar o motivo.
 	 */
 	'lojas'      => array(
 
@@ -208,6 +245,21 @@ return array(
 				'tempo'     => '30-45 min',
 				'taxa'      => '0',
 				'distancia' => '2,4 km',
+			),
+			'pagamento' => array(
+				'pix'  => array(
+					'tipo_chave'   => 'cnpj',
+					'chave'        => '12345678000190',
+					'beneficiario' => 'Sabor da Terra Agroecolog',
+					'cidade'       => 'Maceió',
+				),
+				'bank' => array(
+					'ac_name'        => 'Cooperativa Sabor da Terra',
+					'bank_name'      => 'Banco do Brasil',
+					'routing_number' => '1234-5',
+					'ac_number'      => '98765-4',
+					'ac_type'        => 'Conta corrente',
+				),
 			),
 			'subcategorias' => array(
 				'farinaceos'        => 'Farináceos',
@@ -299,6 +351,16 @@ return array(
 				'tempo'     => '45-60 min',
 				'taxa'      => '9.90',
 				'distancia' => '4,6 km',
+			),
+			// Só PIX: é a loja que mostra, no checkout, um meio disponível e o
+			// outro não.
+			'pagamento' => array(
+				'pix' => array(
+					'tipo_chave'   => 'email',
+					'chave'        => 'atelie.raizes@exemplo.invalid',
+					'beneficiario' => 'Ateliê Raízes',
+					'cidade'       => 'Maceió',
+				),
 			),
 			'subcategorias' => array(
 				'bordados'        => 'Bordados',
@@ -395,6 +457,16 @@ return array(
 				'taxa'      => '14.90',
 				'distancia' => '18,2 km',
 			),
+			// Só transferência, o espelho da loja acima.
+			'pagamento' => array(
+				'bank' => array(
+					'ac_name'        => 'Moda Reconecta Confecções',
+					'bank_name'      => 'Caixa Econômica Federal',
+					'routing_number' => '0347',
+					'ac_number'      => '00012345-6',
+					'ac_type'        => 'Conta corrente',
+				),
+			),
 			'subcategorias' => array(
 				'roupas'             => 'Roupas',
 				'bolsas-e-mochilas'  => 'Bolsas e mochilas',
@@ -485,6 +557,21 @@ return array(
 				'tempo'     => '3-5 dias',
 				'taxa'      => '0',
 				'distancia' => '22,7 km',
+			),
+			'pagamento' => array(
+				'pix'  => array(
+					'tipo_chave'   => 'telefone',
+					'chave'        => '+5582900000004',
+					'beneficiario' => 'Marcelo Nunes',
+					'cidade'       => 'Penedo',
+				),
+				'bank' => array(
+					'ac_name'        => 'Marcelo Nunes',
+					'bank_name'      => 'Banco Cooperativo Sicredi',
+					'routing_number' => '0710',
+					'ac_number'      => '45678-9',
+					'ac_type'        => 'Conta poupança',
+				),
 			),
 			'subcategorias' => array(
 				'iluminacao'           => 'Iluminação',
@@ -578,6 +665,12 @@ return array(
 				'taxa'      => '7.50',
 				'distancia' => '8,3 km',
 			),
+			// Sem `pagamento`, e isto não é esquecimento: esta é a loja que
+			// ainda não cadastrou meio nenhum. É ela que prova que o checkout
+			// recusa o pedido dizendo o nome de quem não recebe, em vez de
+			// deixar passar um pedido que ninguém consegue pagar por inteiro.
+			// Preencher os dados dela apagaria o único caso de demonstração
+			// desse caminho.
 			'subcategorias' => array(
 				'sabonetes'           => 'Sabonetes',
 				'oleos-e-hidratantes' => 'Óleos e hidratantes',
@@ -731,10 +824,20 @@ return array(
 	 * Pedidos.
 	 *
 	 * A lista cobre de propósito os cinco status do fluxo da plataforma
-	 * (realizado → pago → preparação → enviado → entregue) e os três meios de
-	 * pagamento previstos, de modo que quem abrir o painel encontre pelo menos
-	 * um pedido em cada situação — inclusive um pedido com itens de três lojas
-	 * diferentes, que o Dokan divide em um sub-pedido por vendedor.
+	 * (realizado → pago → preparação → enviado → entregue) e os dois meios de
+	 * pagamento que a plataforma oferece, de modo que quem abrir o painel
+	 * encontre pelo menos um pedido em cada situação — inclusive um pedido com
+	 * itens de três lojas diferentes, que o Dokan divide em um sub-pedido por
+	 * vendedor.
+	 *
+	 * O meio de cada pedido não é escolha livre: ele tem de ser um que **todas**
+	 * as lojas do pedido aceitem, conforme a chave `pagamento` declarada em cada
+	 * loja. Um pedido por PIX de uma loja sem chave PIX é um pedido que o
+	 * checkout teria recusado — `Reconectar_Gateway_Direto::validar_checkout()`
+	 * barra exatamente isso —, e gravá-lo no seed ensinaria um fluxo que a
+	 * plataforma não permite. É por esse motivo que Bem Viver Natural, a loja
+	 * que de propósito não cadastrou meio nenhum, não aparece em pedido algum:
+	 * não vender é a consequência verdadeira de não ter dito como receber.
 	 *
 	 * `itens` referencia produtos pelo nome exato declarado acima; `demo.php`
 	 * resolve o nome para o produto pelo mesmo slug usado na criação. Um nome
@@ -760,7 +863,8 @@ return array(
 			'chave'     => 'ped-002',
 			'cliente'   => 'demo-cliente-joao',
 			'status'    => 'wc-enviado',
-			'pagamento' => 'cartao',
+			// Moda Reconecta só declara conta bancária.
+			'pagamento' => 'transferencia',
 			'dias'      => 6,
 			'itens'     => array(
 				array( 'produto' => 'Camiseta de algodão orgânico', 'quantidade' => 2 ),
@@ -771,7 +875,7 @@ return array(
 			'chave'     => 'ped-003',
 			'cliente'   => 'demo-cliente-marina',
 			'status'    => 'wc-preparacao',
-			'pagamento' => 'boleto',
+			'pagamento' => 'transferencia',
 			'dias'      => 3,
 			'itens'     => array(
 				array( 'produto' => 'Luminária de mesa em madeira', 'quantidade' => 1 ),
@@ -792,10 +896,10 @@ return array(
 			'chave'     => 'ped-005',
 			'cliente'   => 'demo-cliente-joao',
 			'status'    => 'wc-pending',
-			'pagamento' => 'boleto',
+			'pagamento' => 'pix',
 			'dias'      => 1,
 			'itens'     => array(
-				array( 'produto' => 'Kit cuidado diário', 'quantidade' => 1 ),
+				array( 'produto' => 'Bandeja de servir em madeira', 'quantidade' => 1 ),
 			),
 		),
 
@@ -803,17 +907,22 @@ return array(
 		 * Pedido multi-vendedor. É o caso que justifica o `maybe_split_orders()`
 		 * do Dokan: o cliente fecha uma compra só e cada loja recebe, no painel
 		 * dela, apenas a parte que lhe cabe.
+		 *
+		 * É também o pedido que demonstra a tela de agradecimento do pagamento
+		 * direto, com uma instrução por loja: três blocos cujos valores são os
+		 * dos sub-pedidos e somam o total do pai. As três lojas aceitam PIX —
+		 * Ateliê Raízes só aceita esse —, então o meio não é escolha estética.
 		 */
 		array(
 			'chave'     => 'ped-006',
 			'cliente'   => 'demo-cliente-marina',
 			'status'    => 'wc-processing',
-			'pagamento' => 'cartao',
+			'pagamento' => 'pix',
 			'dias'      => 1,
 			'itens'     => array(
 				array( 'produto' => 'Doce de banana em barra 300 g', 'quantidade' => 3 ),
 				array( 'produto' => 'Jogo americano em fibra natural', 'quantidade' => 1 ),
-				array( 'produto' => 'Sabonete de argila e erva-doce', 'quantidade' => 2 ),
+				array( 'produto' => 'Porta-retratos artesanal', 'quantidade' => 2 ),
 			),
 		),
 	),
@@ -821,24 +930,71 @@ return array(
 	/*
 	 * Rótulos dos meios de pagamento.
 	 *
-	 * PIX e boleto não têm gateway instalado nesta plataforma — a definição do
-	 * provedor de pagamento é decisão do projeto, não do seed. O que se grava
-	 * aqui é o registro de qual meio foi usado, que é o que o painel exibe e o
-	 * que o fluxo de pedido precisa saber. Quando um gateway real entrar, a
-	 * chave `id` passa a ser a dele e nada mais muda.
+	 * São os dois que a plataforma oferece de fato — `Reconectar_Gateway_Pix` e
+	 * `Reconectar_Gateway_Transferencia`, ambos registrados em
+	 * `woocommerce_payment_gateways`. O `id` é o do gateway, e não um nome
+	 * inventado: o painel do pedido imprime esse identificador e, se ele não
+	 * casar com gateway nenhum, o rótulo gravado promete ao comprador um meio
+	 * de pagamento que a plataforma não tem. Cartão e boleto já estiveram aqui
+	 * por isso mesmo — pareciam plausíveis e não existiam.
+	 *
+	 * O corolário está no catálogo de pedidos acima: o meio declarado em cada
+	 * pedido precisa ser um que **todas** as lojas dele aceitem, porque é isso
+	 * que o checkout permitiria.
 	 */
 	'pagamentos' => array(
-		'pix'    => array(
+		'pix'           => array(
 			'id'     => 'reconectar_pix',
 			'titulo' => 'PIX',
 		),
-		'cartao' => array(
-			'id'     => 'reconectar_cartao',
-			'titulo' => 'Cartão de crédito',
+		'transferencia' => array(
+			'id'     => 'reconectar_transferencia',
+			'titulo' => 'Transferência bancária',
 		),
-		'boleto' => array(
-			'id'     => 'reconectar_boleto',
-			'titulo' => 'Boleto bancário',
+	),
+
+	/*
+	 * Campanhas da home (CPT `reconectar_campanha`).
+	 *
+	 * São duas de propósito, e a segunda é a que importa: uma campanha **já
+	 * expirada** é o que prova que a vigência funciona. Com só a vigente no
+	 * banco, uma regressão que ignorasse as datas passaria despercebida — a
+	 * home continuaria certa, porque não haveria nada de errado para aparecer.
+	 *
+	 * `inicio` e `fim` são deslocamentos em dias a partir de hoje, não datas
+	 * absolutas: uma data fixa escrita aqui expiraria sozinha com o tempo, e a
+	 * campanha "vigente" da demonstração sumiria da home sem ninguém ter mexido
+	 * em nada. `null` significa sem limite daquele lado — a campanha vale desde
+	 * sempre, ou não tem prazo para acabar.
+	 *
+	 * `alt` é obrigatório porque o banner é imagem com função: quem navega por
+	 * leitor de tela precisa saber para onde o link leva. Ele descreve o destino,
+	 * não a arte — "Conheça as feiras" serve; "banner colorido" não serve.
+	 *
+	 * `link` aponta para caminho relativo, nunca URL absoluta: a instalação
+	 * atende `localhost:8090` e o IP da máquina na rede, e um endereço gravado
+	 * com host manda o celular de volta para o próprio celular.
+	 */
+	'campanhas'  => array(
+		array(
+			'chave'  => 'feira-da-safra',
+			'titulo' => 'Feira da Safra',
+			'alt'    => 'Feira da Safra: produtos da colheita direto de quem planta',
+			'link'   => '/categorias/',
+			'cor'    => '#CF6442',
+			'inicio' => -15,
+			'fim'    => 45,
+			'ordem'  => 10,
+		),
+		array(
+			'chave'  => 'mutirao-de-inverno',
+			'titulo' => 'Mutirão de Inverno',
+			'alt'    => 'Mutirão de Inverno: campanha encerrada',
+			'link'   => '/lojas/',
+			'cor'    => '#663191',
+			'inicio' => -120,
+			'fim'    => -60,
+			'ordem'  => 20,
 		),
 	),
 

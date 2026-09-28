@@ -35,8 +35,9 @@ class Reconectar_Migracoes {
 	 * novo na próxima carga de página.
 	 *
 	 * 1 — renomeia `_reconectar_vendedor_ativo` para `_reconectar_loja_ativa`.
+	 * 2 — promove Moderadores e Administradores a `bbp_moderator` no fórum.
 	 */
-	const VERSAO = 1;
+	const VERSAO = 2;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -76,8 +77,44 @@ class Reconectar_Migracoes {
 		}
 
 		self::renomear_meta_de_loja_ativa();
+		self::promover_moderadores_no_forum();
 
 		update_option( self::OPCAO_VERSAO, self::VERSAO );
+	}
+
+	/**
+	 * Põe os perfis administrativos no papel de fórum que a moderação exige.
+	 *
+	 * `Reconectar_Permissoes::sincronizar_papel_no_forum()` cuida de quem mudar
+	 * de papel daqui para frente; quem já está gravado no banco não passa por
+	 * `set_user_role` nunca mais. É a assimetria de sempre: o gancho resolve o
+	 * futuro, a migração resolve o passado.
+	 *
+	 * Roda antes das capacidades (`init` 5 contra 10) e isso não é problema: o
+	 * papel do WordPress pode ainda ser o da versão anterior, mas a chave dele
+	 * — `content_moderator`, `company_admin` — não muda, e é só por ela que a
+	 * consulta filtra.
+	 *
+	 * @return void
+	 */
+	public static function promover_moderadores_no_forum() {
+		if ( ! function_exists( 'bbp_set_user_role' ) ) {
+			return;
+		}
+
+		$usuarios = get_users(
+			array(
+				'role__in' => array(
+					Reconectar_Permissoes::PAPEL_MODERADOR,
+					Reconectar_Permissoes::PAPEL_ADMIN_EMPRESAS,
+				),
+				'fields'   => 'ID',
+			)
+		);
+
+		foreach ( $usuarios as $usuario_id ) {
+			Reconectar_Permissoes::aplicar_moderacao_no_forum( (int) $usuario_id );
+		}
 	}
 
 	/**

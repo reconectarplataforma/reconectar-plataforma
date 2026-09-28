@@ -1,0 +1,194 @@
+# Esteira de integração e entrega da plataforma Reconectar.
+#
+#   verificar     — lint de PHP e de shell, em toda branch e todo merge request.
+#   implantar     — sincroniza o código autoral com a instância EC2 e provisiona.
+#   demonstracao  — carga de dados de demonstração, manual.
+#
+# O deploy é `rsync` por SSH a partir do próprio runner: ele já tem o checkout e
+# já tem a chave, então o servidor não precisa de credencial do GitLab nenhuma.
+#
+# Preparação do servidor e lista de variáveis: `docs/DEPLOY.md`.
+
+stages:
+  - verificar
+  - implantar
+  - demonstracao
+
+# Sem este bloco, um push numa branch com merge request aberto gera dois
+# pipelines idênticos — um do push e outro do MR — e os dois consomem minuto de
+# runner para dizer a mesma coisa.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS == null
+
+# ---------------------------------------------------------------------------
+# Verificação
+# ---------------------------------------------------------------------------
+
+# O lint de PHP existe hoje só como comando manual, e com uma armadilha: no
+# ambiente de desenvolvimento `scripts/` é montado em `/var/www/scripts`, fora de
+# `html/`, e o comando "óbvio" falha por arquivo inexistente — um erro que parece
+# de sintaxe e não é. Aqui os caminhos são os do repositório, sem montagem
+# nenhuma para errar.
+lint-php:
+  stage: verificar
+  image: php:8.2-cli
+  variables:
+    CAMINHOS_PHP: wp-content/plugins/reconectar-core wp-content/themes/reconectar scripts
+  script:
+    # A contagem vem antes do lint de propósito. `find` sobre caminho renomeado
+    # não casa nada e sai com status 0 — o job passaria em verde tendo conferido
+    # zero arquivo, que é o pior resultado possível: verde que não significa nada.
+    - encontrados=$(find $CAMINHOS_PHP -name '*.php' | wc -l)
+    - echo "Arquivos PHP encontrados:$encontrados"
+    - '[ "$encontrados" -gt 0 ]'
+    # `xargs` devolve 123 se qualquer invocação falhar, então um único arquivo
+    # com erro de sintaxe reprova o job inteiro.
+    - find $CAMINHOS_PHP -name '*.php' -print0 | xargs -0 -n1 php -l
+
+lint-shell:
+  stage: verificar
+  image: alpine:3.20
+  before_script:
+    # A imagem não traz bash, e os scripts do projeto são bash — `sh -n` não
+    # reconheceria a sintaxe deles.
+    - apk add --no-cache bash
+  script:
+    - for arquivo in scripts/*.sh; do echo "-- $arquivo"; bash -n "$arquivo"; done
+
+# ---------------------------------------------------------------------------
+# Base comum às tarefas que falam com o servidor
+# ---------------------------------------------------------------------------
+
+.remoto:
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client rsync
+    - install -d -m 700 ~/.ssh
+    # `SSH_CHAVE_PRIVADA` é variável do tipo *File*: o valor dela é o caminho do
+    # arquivo temporário que o runner criou, não o conteúdo da chave.
+    - install -m 400 "$SSH_CHAVE_PRIVADA" ~/.ssh/id_deploy
+    # A chave do host vem por variável, e não de `StrictHostKeyChecking=no`:
+    # desligar a verificação aceitaria qualquer servidor que respondesse naquele
+    # endereço, e esta sessão carrega uma chave privada de produção.
+    - echo "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+    - chmod 600 ~/.ssh/known_hosts
+    - export OPCOES_SSH="-i $HOME/.ssh/id_deploy -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+    - export ALVO="$SSH_USUARIO@$SSH_HOST"
+    # `--project-directory` e `-f` juntos: o primeiro sozinho não muda onde o
+    # Compose procura o arquivo. É o par que faz os bind-mounts relativos do
+    # `docker-compose.yml` (`./wp-content`, `./scripts`) resolverem a partir da
+    # raiz do projeto no servidor, e o `.env` de lá ser lido.
+    - export COMPOSE="docker compose --project-directory $CAMINHO_REMOTO -f $CAMINHO_REMOTO/docker-compose.yml"
+
+# ---------------------------------------------------------------------------
+# Implantação
+# ---------------------------------------------------------------------------
+
+implantar:
+  stage: implantar
+  extends: .remoto
+  environment:
+    name: producao
+    url: http://$SSH_HOST
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - ssh $OPCOES_SSH "$ALVO" "mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts"
+
+    # ATENÇÃO — o recorte abaixo não é arbitrário e não pode ser "simplificado"
+    # para um `rsync wp-content/`.
+    #
+    # Só `wp-content/themes/reconectar/` e `wp-content/plugins/reconectar-core/`
+    # são versionados (confira com `git ls-files wp-content/`). O núcleo do
+    # WordPress, o Storefront, o WooCommerce, o Dokan, o bbPress, o BuddyPress e
+    # TODO o `uploads/` chegam pelo `provision.sh` no destino e não existem aqui.
+    #
+    # Um `--delete` no nível de `wp-content/` apagaria os cinco plugins de
+    # terceiros, o tema pai e os uploads — que não têm origem nenhuma para serem
+    # restaurados. Dentro de cada diretório listado o `--delete` é justamente o
+    # que se quer: arquivo removido do tema tem de sumir do servidor.
+    #
+    # `--rsync-path="sudo rsync"` porque os arquivos do bind-mount pertencem ao
+    # UID 33 (a imagem Apache é Debian) e o `ec2-user` é 1000. Sem isso a escrita
+    # falha em arquivo que já existe.
+    - |
+      rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+        wp-content/themes/reconectar/ \
+        "$ALVO:$CAMINHO_REMOTO/wp-content/themes/reconectar/"
+    - |
+      rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+        wp-content/plugins/reconectar-core/ \
+        "$ALVO:$CAMINHO_REMOTO/wp-content/plugins/reconectar-core/"
+    - |
+      rsync -az --delete --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+        scripts/ \
+        "$ALVO:$CAMINHO_REMOTO/scripts/"
+    - |
+      rsync -az --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+        docker-compose.yml \
+        "$ALVO:$CAMINHO_REMOTO/docker-compose.yml"
+
+    # Os serviços são nomeados de propósito, e é assim que o phpMyAdmin fica fora
+    # do ar sem precisar de arquivo de override: um `docker-compose.prod.yml`
+    # declarando `ports` não substituiria a lista do arquivo base — o Compose
+    # CONCATENA listas de portas, e a 8090 continuaria aberta, em silêncio.
+    # O `wpcli` sobe sob demanda no passo seguinte; o `demo` já está atrás de
+    # profile.
+    - ssh $OPCOES_SSH "$ALVO" "$COMPOSE up -d db wordpress"
+
+    # O WP-CLI que chega antes de o núcleo terminar de ser copiado para o volume
+    # falha com "This does not seem to be a WordPress installation" — erro que
+    # descreve o instante, não o problema. Mesmo laço de `scripts/demo-completa.sh`.
+    # `$COMPOSE` expande aqui; `\$decorrido` fica para o shell do servidor.
+    - |
+      ssh $OPCOES_SSH "$ALVO" "
+        decorrido=0
+        until $COMPOSE exec -T wordpress test -f /var/www/html/wp-config.php; do
+          if [ \$decorrido -ge 120 ]; then
+            echo 'wp-config.php não apareceu em 120s'
+            exit 1
+          fi
+          sleep 2
+          decorrido=\$(( decorrido + 2 ))
+        done
+      "
+    - ssh $OPCOES_SSH "$ALVO" "$COMPOSE run --rm wpcli bash /var/www/scripts/provision.sh"
+
+# ---------------------------------------------------------------------------
+# Dados de demonstração
+# ---------------------------------------------------------------------------
+
+# Fora do fluxo automático: a carga é idempotente e não duplica nada, mas RECRIA
+# no servidor o que tiver sido apagado à mão. Rodá-la a cada push desfaria, sem
+# aviso, uma limpeza feita de propósito antes de uma apresentação.
+carga-demonstracao:
+  stage: demonstracao
+  extends: .remoto
+  needs: ["implantar"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  script:
+    # Chama o `seed-demo.sh`, e não o `demo.php` direto: o script resolve a raiz
+    # do projeto pelo próprio caminho, então funciona por caminho absoluto, e é
+    # nele que mora a guarda de confirmação da remoção — o caminho pelo PHP a
+    # contornaria.
+    - ssh $OPCOES_SSH "$ALVO" "bash $CAMINHO_REMOTO/scripts/seed-demo.sh instalar"
+
+# O `-y` não é cosmético: sem terminal interativo o `seed-demo.sh` recusa a
+# remoção em vez de perguntar (`scripts/seed-demo.sh:67`). O gesto humano que a
+# pergunta pedia é, aqui, o clique no job manual.
+remover-demonstracao:
+  stage: demonstracao
+  extends: .remoto
+  needs: ["implantar"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  script:
+    - ssh $OPCOES_SSH "$ALVO" "bash $CAMINHO_REMOTO/scripts/seed-demo.sh remover -y"

@@ -3667,6 +3667,545 @@
 }
 
 /* ==========================================================================
+   Campanhas da home
+   ========================================================================== */
+
+.rc-campanhas {
+  margin: 0 0 32px;
+}
+
+.rc-campanhas__faixa {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Rolável só a partir de duas campanhas — a classe é posta pelo PHP, que é
+   quem sabe quantas há. `position: relative` não é enfeite: um scroll container
+   estático não clipa descendente absoluto, que sobe até o viewport e passa a
+   rolar o documento inteiro na horizontal. O preço aparece longe da causa — a
+   barra inferior do celular deixa de acompanhar a tela —, e já custou uma
+   rodada de investigação no componente errado. Ver o CLAUDE.md. */
+.rc-campanhas__faixa--rolavel {
+  grid-auto-columns: minmax(280px, 1fr);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  position: relative;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.rc-campanhas__item {
+  margin: 0;
+  scroll-snap-align: start;
+}
+
+.rc-campanha {
+  border-radius: var(--rc-raio);
+  display: block;
+  overflow: hidden;
+}
+
+/* A proporção é declarada no contêiner, e não deduzida da imagem: sem ela, a
+   altura muda quando a arte carrega e a home inteira salta — a métrica de
+   estabilidade de layout piora, e o clique erra o alvo de quem já estava
+   mirando. Uma arte fora da proporção é cortada pelo centro, que é o
+   comportamento previsível a anunciar a quem produz a peça. */
+.rc-campanha__imagem {
+  aspect-ratio: 3 / 1;
+  display: block;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rc-campanha:focus-visible {
+  outline: 2px solid var(--reconectar-cor-institucional, #663191);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  /* No celular a arte larga fica com texto ilegível. A proporção mais alta é o
+     que sobra quando não há segunda arte por campanha — e inventar um campo de
+     "versão mobile" obrigaria o moderador a produzir duas peças por campanha. */
+  .rc-campanha__imagem {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* ==========================================================================
+   Carrinho
+   ==========================================================================
+   A página `/cart/` passou a servir o shortcode `[woocommerce_cart]` quando o
+   bloco `woocommerce/checkout` se mostrou incapaz de desenhar gateway clássico
+   (a armadilha está no CLAUDE.md e a decisão em `docs/PAGAMENTOS.md`). Com isso
+   ela caiu no layout de tabela do Storefront, que nenhuma regra autoral tocava.
+
+   O medido antes destas regras, em 1280×900 com dois itens:
+
+   - miniatura de 59×59px dentro de linha de 139px — o produto, que é o motivo
+     de a página existir, era o menor elemento dela;
+   - nome do produto em `#31BEB1`, o azul de link do tema: **2,30:1** sobre
+     branco, reprovando o critério 1.4.3 da WCAG 2.1 exigido pelo edital, no
+     texto mais importante da tela. É a mesma armadilha dos cartões da home;
+   - `.cart_totals` com `float: right` e 629px de 1188 — 559px de faixa vazia à
+     esquerda, e nada indicando que os dois blocos se relacionam;
+   - "Continuar para Finalização" em 629×65px com fonte de 22,652px, e o `<h2>`
+     em 25,888px: valores da escala modular do Storefront, que não é a escala
+     `--rc-fonte-*` deste projeto.
+
+   E em 375px, que é o pior dos dois: cada item ocupava **318px de altura** para
+   mostrar quatro dados, no layout genérico de `shop_table_responsive` — rótulo
+   em negrito à esquerda, valor à direita, miniatura sozinha numa faixa
+   centralizada e o nome do produto encostado na margem direita. Com dois itens
+   o botão de finalizar nascia a 1564px do topo.
+
+   A tabela **continua sendo tabela** no desktop: produto × preço × quantidade ×
+   subtotal é dado tabular de verdade, e trocar isso por `display: grid` faria o
+   navegador descartar os papéis implícitos de linha e célula — o Chrome e o
+   Firefox computam o papel a partir do `display`. Abaixo de 768px a semântica
+   já está perdida de qualquer forma, porque é o próprio WooCommerce que quebra
+   a tabela em blocos; ali, e só ali, cada linha vira cartão. */
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart {
+  border: 1px solid var(--rc-borda);
+  border-collapse: collapse;
+  border-radius: var(--rc-raio);
+  margin: 0 0 32px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart thead th {
+  background: var(--rc-fundo);
+  border: 0;
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  padding: 12px 16px;
+  text-align: left;
+}
+
+/* O Storefront pinta as células de `#fdfdfd` e desenha a separação por
+   `border-bottom` de cada `<td>`. Uma linha só, na `<tr>`, é o que mantém o
+   traço contínuo sob a miniatura e sob o botão de remover. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td {
+  background: var(--rc-superficie);
+  border: 0;
+  border-top: 1px solid var(--rc-borda);
+  padding: 16px;
+  vertical-align: middle;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-thumbnail {
+  width: 104px;
+}
+
+/* O `max-width` é obrigatório aqui, e a razão custou uma medição: o
+   `woocommerce.css` do Storefront declara `table.cart .product-thumbnail img
+   { max-width: 3.70633em }`. Uma regra de `width` sozinha ganha a cascata, é
+   aplicada — e o resultado na tela continua sendo 59,3px, porque o teto não
+   veio da mesma propriedade. É o sintoma caro deste repositório outra vez: o
+   código está no lugar certo e não faz nada. O mesmo vale para `.qty` abaixo. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-thumbnail img {
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  display: block;
+  height: auto;
+  max-width: 88px;
+  object-fit: cover;
+  width: 88px;
+}
+
+/* A classe repetida leva o seletor a (0,5,3) — `.woocommerce a` do `style.css`
+   e o azul de link do Storefront vinham vencendo uma regra de classe simples. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name.product-name a {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+  text-decoration: none;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name.product-name a:hover,
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name.product-name a:focus-visible {
+  text-decoration: underline;
+}
+
+/* O Dokan pendura o nome da loja no mecanismo de variação do item do carrinho:
+   um `<dl class="variation">` com `<dt>` rótulo e `<dd><p>` valor. O tema pai
+   empilha os três em blocos, e o resultado eram duas linhas para dizer de quem
+   é o produto. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name .variation {
+  color: var(--rc-texto);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--rc-fonte-sm);
+  gap: 0 4px;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 4px 0 0;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name .variation dt,
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name .variation dd,
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-name .variation p {
+  float: none;
+  font-weight: 400;
+  margin: 0;
+  padding: 0;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-price,
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-subtotal {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  white-space: nowrap;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-subtotal {
+  font-weight: 600;
+}
+
+/* 44×44 é o alvo mínimo de toque. O campo media 58×36 e ficava perto do limite
+   com o dedo, numa tela onde errar o alvo altera a conta do pedido. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart .quantity .qty.qty {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  height: 44px;
+  /* `table.cart .qty { max-width: 3.632em }` — o teto do tema pai, medido em
+     58,1px. Ver a nota da miniatura acima. */
+  max-width: 72px;
+  padding: 0 8px;
+  text-align: center;
+  width: 72px;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-remove {
+  width: 56px;
+}
+
+/* O "×" do WooCommerce é um caractere de texto de 26px sem área própria. Vira
+   botão redondo com 36px de alvo — e ganha a cor secundária, porque remover é a
+   única ação destrutiva da tela e não deveria ter o mesmo peso visual do resto. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-remove .remove.remove {
+  align-items: center;
+  background: var(--rc-fundo);
+  border-radius: 50%;
+  color: var(--reconectar-cor-secundaria, #cf6442);
+  display: inline-flex;
+  font-size: var(--rc-fonte-lg);
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  text-decoration: none;
+  width: 36px;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-remove .remove.remove:hover {
+  background: var(--reconectar-cor-secundaria, #cf6442);
+  color: var(--rc-superficie);
+}
+
+/* A barra de ações segue em `float`, e não em flex, por uma razão medida: um
+   `<td>` em `display: flex` deixa de ser célula, e com o papel vai embora o
+   `colspan="6"` — a barra encolheu para 331px numa tabela de 1187, e as duas
+   ações empilharam em três linhas. Como célula, ela já estabelece um bloco de
+   formatação próprio, então contém os floats sem clearfix nenhum. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions {
+  background: var(--rc-fundo);
+  border-top: 1px solid var(--rc-borda);
+  padding: 16px;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .coupon {
+  display: flex;
+  float: left;
+  gap: 8px;
+  margin: 0;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions > .button {
+  float: right;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .coupon .input-text.input-text {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  height: 44px;
+  padding: 0 12px;
+  width: 200px;
+}
+
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .button {
+  border-radius: var(--rc-raio);
+  float: none;
+  font-size: var(--rc-fonte-sm);
+  min-height: 44px;
+  padding: 0 20px;
+}
+
+/* O botão nasce `disabled` e só liga quando a quantidade muda. O Storefront o
+   entrega com `opacity` sobre o turquesa, o que levava o rótulo branco a 2,1:1 —
+   um controle ilegível não fica mais honesto por estar desligado. */
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .button:disabled,
+.woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .button[disabled] {
+  background: var(--rc-fundo);
+  border: 1px solid var(--rc-borda);
+  color: var(--rc-texto);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Os totais eram um bloco flutuante de 629px encostado à direita, e a faixa de
+   559px que sobrava à esquerda não era espaço em branco de composição: era o
+   lugar de onde os cross-sells do WooCommerce foram removidos. Como cartão de
+   largura declarada, o bloco deixa de depender de uma coluna irmã que não
+   existe. */
+.woocommerce-cart .cart-collaterals {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  float: none;
+  max-width: 420px;
+  padding: 20px;
+  width: 100%;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals h2 {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-lg);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 12px;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table {
+  border: 0;
+  margin: 0 0 16px;
+  width: 100%;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table th,
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table td {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rc-borda);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-base);
+  padding: 10px 0;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table th {
+  font-weight: 400;
+  text-align: left;
+  width: 50%;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table td {
+  text-align: right;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table tr.order-total th,
+.woocommerce-cart .cart-collaterals .cart_totals table.shop_table tr.order-total td {
+  border-bottom: 0;
+  font-size: var(--rc-fonte-md);
+  font-weight: 600;
+}
+
+.woocommerce-cart .cart-collaterals .wc-proceed-to-checkout {
+  padding: 0;
+}
+
+.woocommerce-cart .cart-collaterals .wc-proceed-to-checkout a.checkout-button {
+  align-items: center;
+  border-radius: var(--rc-raio);
+  display: flex;
+  font-size: var(--rc-fonte-md);
+  justify-content: center;
+  /* "Continuar para Finalização" quebra em duas linhas a partir de ~300px de
+     largura, e com a entrelinha de 1,618 do tema pai o botão chegava a 82px. */
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0;
+  min-height: 52px;
+  padding: 12px 20px;
+  text-align: center;
+}
+
+/* O aviso de "seu carrinho está vazio" é a página inteira quando não há item, e
+   sem moldura ele fica como uma frase solta no alto de uma tela em branco. */
+.woocommerce-cart .cart-empty {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-md);
+  margin: 0 0 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.woocommerce-cart .return-to-shop {
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  /* Cada linha vira cartão. A `<tr>` já está em `display: block` por conta do
+     `shop_table_responsive` do WooCommerce; o que se acrescenta é a grade, para
+     que miniatura, nome e valores parem de ocupar uma faixa cada. */
+  /* A `<table>` precisa deixar de ser tabela junto com as linhas. O
+     `shop_table_responsive` do WooCommerce põe as `<td>` em bloco e esconde o
+     `<thead>`, mas mantém `display: table` no elemento — e o algoritmo de
+     tabela continua dimensionando pela largura mínima do conteúdo, ignorando o
+     contêiner. Medido: cartões de 473px numa tela de 375. */
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart,
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody,
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody > tr {
+    display: block;
+    width: 100%;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item {
+    background: var(--rc-superficie);
+    border: 1px solid var(--rc-borda);
+    border-radius: var(--rc-raio);
+    column-gap: 12px;
+    display: grid;
+    grid-template-areas:
+      "thumb nome  nome"
+      "thumb preco preco"
+      "qtd   qtd   subtotal";
+    /* A terceira coluna se dimensiona pelo subtotal, que é a informação que não
+       pode quebrar; o resto da largura sobra para a quantidade, cujo rótulo
+       quebrava em duas linhas quando a área valia só os 72px da miniatura. */
+    grid-template-columns: 72px 1fr auto;
+    margin: 0 0 12px;
+    padding: 12px;
+    /* O "×" é posicionado no canto do cartão, e sem isto ele subiria até o
+       primeiro ancestral posicionado — no limite, o viewport. É a armadilha do
+       `overflow` registrada no CLAUDE.md, na sua forma mais barata de evitar. */
+    position: relative;
+    row-gap: 8px;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td {
+    border: 0;
+    padding: 0;
+    text-align: left;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-thumbnail {
+    grid-area: thumb;
+    width: 72px;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart td.product-thumbnail img {
+    max-width: 72px;
+    width: 72px;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-name {
+    grid-area: nome;
+    /* Reserva a coluna do botão de remover, que está fora do fluxo. Sem isso o
+       nome longo passa por baixo dele. */
+    padding-right: 40px;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-price {
+    color: var(--rc-texto);
+    font-size: var(--rc-fonte-sm);
+    grid-area: preco;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-quantity {
+    align-items: center;
+    display: flex;
+    grid-area: qtd;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-subtotal {
+    align-self: center;
+    grid-area: subtotal;
+    text-align: right;
+  }
+
+  /* O `a.remove` já nasce `position: absolute` pelo tema pai. Tirar a célula do
+     fluxo sem devolver o link ao fluxo dela faz o link se posicionar contra a
+     própria célula, que passa a ter 6px de largura: medido, o "×" foi parar em
+     x=474 numa tela de 375. */
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-remove {
+    height: auto;
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    width: auto;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-remove .remove.remove {
+    position: static;
+  }
+
+  /* O WooCommerce imprime o rótulo da coluna em `::before`, a partir do
+     `data-title` — traduzido, ao contrário de um texto escrito aqui em
+     `content`. O nome do produto dispensa o dele; os outros três viram rótulo
+     de apoio, no lugar do negrito de mesmo tamanho do valor. */
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td.product-name::before {
+    content: none;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart tbody tr.cart_item td::before {
+    color: var(--rc-texto);
+    font-size: var(--rc-fonte-xs);
+    font-weight: 400;
+    margin-right: 6px;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions {
+    border: 0;
+    border-radius: var(--rc-raio);
+    margin: 0 0 24px;
+  }
+
+  /* Sem float não há o que alinhar em 343px de largura: cupom e "Atualizar"
+     empilham, cada um ocupando a linha inteira. */
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .coupon,
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions > .button {
+    float: none;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .woocommerce-cart .woocommerce-cart-form table.cart.cart td.actions .coupon .input-text.input-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+  }
+
+  .woocommerce-cart .cart-collaterals .cart_totals {
+    max-width: none;
+  }
+}
+
+/* ==========================================================================
    Impressão
    ========================================================================== */
 
@@ -3677,6 +4216,11 @@
     display: grid;
     grid-auto-flow: row;
     grid-template-columns: repeat(3, 1fr);
+    overflow: visible;
+  }
+
+  .rc-campanhas__faixa--rolavel {
+    grid-auto-flow: row;
     overflow: visible;
   }
 

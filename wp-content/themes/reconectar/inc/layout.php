@@ -275,3 +275,43 @@ function reconectar_reposicionar_paginacao_do_catalogo() {
 	add_action( 'woocommerce_after_shop_loop', 'woocommerce_pagination', 40 );
 }
 add_action( 'after_setup_theme', 'reconectar_reposicionar_paginacao_do_catalogo', 20 );
+
+/**
+ * Chama a loja de "Loja" na linha do carrinho, onde o Dokan escreve "Vendedor".
+ *
+ * `dokan_product_seller_info()` está pendurado em `woocommerce_get_item_data` na
+ * prioridade 10 e acrescenta ao item uma entrada com o nome da loja, que o
+ * WooCommerce imprime como `<dl class="variation">` — o mesmo mecanismo das
+ * variações de produto. O rótulo sai de `__( 'Vendor', 'dokan-lite' )`, que a
+ * tradução do plugin entrega como "Vendedor".
+ *
+ * O vocabulário do projeto reserva "vendedor" ao que é nome do Dokan: o papel
+ * `seller`, a capacidade `dokandar`, as metas `dokan_*`. Nada disso aparece para
+ * quem compra — para o comprador a entidade é a **Loja**, como em toda a
+ * vitrine, e a linha do carrinho era o último lugar onde o termo antigo
+ * sobrevivia na interface.
+ *
+ * A comparação é contra a string traduzida **e** contra o literal em inglês: o
+ * mesmo item muda de rótulo conforme o idioma ativo, e casar só com um dos dois
+ * deixaria o outro passar sem erro nenhum — a falha seria uma palavra na tela,
+ * que nenhum teste apanha.
+ *
+ * @param array $dados_do_item Entradas que o WooCommerce imprime sob o nome do produto.
+ * @return array Entradas com o rótulo do Dokan renomeado.
+ */
+function reconectar_renomear_vendedor_no_carrinho( $dados_do_item ) {
+	if ( ! is_array( $dados_do_item ) ) {
+		return $dados_do_item;
+	}
+
+	$rotulos_do_dokan = array( 'Vendor', __( 'Vendor', 'dokan-lite' ) );
+
+	foreach ( $dados_do_item as $indice => $entrada ) {
+		if ( isset( $entrada['name'] ) && in_array( $entrada['name'], $rotulos_do_dokan, true ) ) {
+			$dados_do_item[ $indice ]['name'] = __( 'Loja', 'reconectar' );
+		}
+	}
+
+	return $dados_do_item;
+}
+add_filter( 'woocommerce_get_item_data', 'reconectar_renomear_vendedor_no_carrinho', 11 );

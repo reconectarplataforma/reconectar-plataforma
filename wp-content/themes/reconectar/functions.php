@@ -38,6 +38,7 @@ $reconectar_modulos = array(
 	// Seções da home. Cada arquivo se registra sozinho na action
 	// `reconectar_home`, com a prioridade que define sua posição na página.
 	'inc/home/secao-hero.php',
+	'inc/home/secao-campanhas.php',
 	'inc/home/secao-categorias.php',
 	'inc/home/secao-lojas-destaque.php',
 	'inc/home/secao-ofertas.php',

@@ -10,7 +10,8 @@ completo (fases, cronograma do edital, indicadores),
 [DIARIO_DESENVOLVIMENTO.md](DIARIO_DESENVOLVIMENTO.md) para o histórico
 cronológico de cada etapa concluída, e
 [docs/PAGAMENTOS.md](docs/PAGAMENTOS.md) para a estrutura do módulo de
-pagamentos (Pix/Cartão/Boleto).
+pagamentos (Pix/Cartão/Boleto) e [docs/DEPLOY.md](docs/DEPLOY.md) para a esteira
+de publicação no GitLab CI.
 
 ## Stack técnica
 

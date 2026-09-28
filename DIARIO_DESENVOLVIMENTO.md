@@ -2342,3 +2342,527 @@ monitor ultrawide. As telas de texto corrido têm teto próprio, mas as páginas
 WooCommerce e do Dokan não — se isso incomodar, o ajuste é de uma linha
 (`max-width` generoso em `.col-full`, na casa de 1600px), e não o retorno a
 1200, que traria o desalinho de volta.
+
+## 2026-09-28 — Três perfis administrativos e pagamento direto à loja
+
+Dois pedidos independentes, feitos juntos: um degrau de permissão que faltava
+entre o `administrator` e o `company_admin`, e um meio de a loja receber por
+PIX ou transferência sem que a plataforma toque no dinheiro. Um terceiro eixo
+veio junto porque o pedido o exigia — banners de campanha na home, como conteúdo
+com vigência.
+
+### O que decidiu o eixo dos perfis
+
+`restringir_gestao_de_plugins()` barrava as capacidades de plugin **acrescentando
+`manage_options` ao conjunto exigido**, e `eh_administracao_tecnica()` — o portão
+do `/wp-admin` — era exatamente `manage_options || manage_woocommerce`. Dar
+`manage_options` ao Administrador restrito para que ele entrasse no painel
+devolveria a ele, pela mesma linha, a instalação de plugins: precisamente o que
+o pedido proibia.
+
+`manage_woocommerce` abriria a porta sem quebrar a trava, e tinha outro preço: os
+menus de WooCommerce e Dokan apareceriam, e as listagens do `/wp-admin` **não
+têm escopo por empresa**. O `company_admin` só é limitado às empresas dele dentro
+do `/painel-empresas/`; no painel ele veria produtos e pedidos de todas.
+
+A saída foi uma capacidade própria, `CAP_ADMIN_WP =
+'reconectar_acessar_wp_admin'`, consultada em **dois lugares só** —
+`bloquear_area_administrativa()` e `ocultar_barra_administrativa()`.
+`eh_administracao_tecnica()` não mudou uma linha: os outros dois lugares que a
+consultam falam de isolamento entre vendedores, e ali a resposta certa para os
+perfis novos continua sendo "não é administração técnica".
+
+Medido, é essa capacidade que separa quem entra de quem não entra:
+
+```
+customer           manage_options=nao manage_woocommerce=nao wp_admin=nao total=1
+seller             manage_options=nao manage_woocommerce=nao wp_admin=nao total=67
+content_moderator  manage_options=nao manage_woocommerce=nao wp_admin=SIM total=31
+company_admin      manage_options=nao manage_woocommerce=nao wp_admin=SIM total=40
+administrator      manage_options=SIM manage_woocommerce=SIM wp_admin=SIM total=166
+```
+
+### A escalada que `edit_users` abria
+
+"Configurar os usuários das lojas" exige `edit_users`, e em single-site **não
+existe** "editar usuário abaixo de mim": quem a tem pode abrir a ficha de um
+`administrator`, trocar a senha e entrar com a conta. Com `promote_users`, pode
+promover a si mesmo. As duas juntas transformavam o Administrador restrito em
+Super Administrador com dois cliques, e a proibição de instalar plugin virava
+decoração.
+
+`negar_gestao_de_usuarios_superiores()` fecha as duas rotas em `map_meta_cap`:
+alvo com `manage_options` é intocável para quem não a tem, e `promote_user` recusa
+papel de destino que contenha capacidade que o ator não possua — o que cobre o
+`administrator` e qualquer papel futuro criado por cima.
+
+Ao conferir isso pela primeira vez a resposta veio errada, e o erro merece
+registro: `current_user_can( 'promote_user', $id )` devolve `true` sozinha. O
+papel de destino é o **terceiro** argumento, e omiti-lo dá por segura uma trava
+que não chegou a ser consultada.
+
+### O filtro que teria negado o conteúdo em silêncio
+
+`negar_escrita_ao_admin_de_empresas()` vigiava `edit_post`, `delete_post` e
+`publish_post` genéricos e liberava **só** o CPT `reconectar_empresa`. Com o
+Administrador passando a moderar conteúdo, ele passaria a negar a edição de post
+e de página sem uma linha de mudança — o sintoma pior deste repositório: código
+no lugar certo, correto para o que fora escrito, impedindo em silêncio o que a
+especificação nova pedia.
+
+A exceção virou allowlist de post types que o ator **pode** escrever: empresa,
+`post`, `page`, campanha e os três do bbPress. Produto e pedido continuam de
+fora, de propósito.
+
+### A lacuna do fórum, que só a medição encontrou
+
+Os dois perfis recebiam as capacidades de fórum, a sincronização as gravava, e
+no `/wp-admin` nada funcionava. A causa são **duas**, e nenhuma aparece lendo o
+papel:
+
+O bbPress mantém uma segunda camada de papéis — `bbp_keymaster`,
+`bbp_moderator`, `bbp_participant` — gravada como papel **adicional** do usuário,
+e ela se sobrepõe às capacidades de fórum do papel do WordPress. Todo cadastro
+nasce em `bbp_participant`.
+
+E `bbp_map_forum_meta_caps()` troca `edit_forums` e `edit_others_forums` por
+`do_not_allow` para quem não tem `keep_gate`, independentemente do papel:
+
+```
+allcaps[edit_forums] = true
+map_meta_cap( 'edit_forums' ) = do_not_allow
+```
+
+`publish_forums` **não** sofre isso — essa o bbPress mapeia para `moderate`. A
+assimetria é dele.
+
+`restaurar_gestao_de_foruns()` devolve as duas em `map_meta_cap` **prioridade
+11**, e só para quem o papel já tinha autorizado. Ele lê
+`$usuario->allcaps[$cap]` direto, e não com `user_can()`: a segunda reentraria em
+`map_meta_cap` com a mesma capacidade e entraria em recursão infinita.
+`aplicar_moderacao_no_forum()` põe os dois perfis em `bbp_moderator`, pendurado
+em **`set_user_role`** — `bbp_set_user_role()` troca o papel com `remove_role()`
+e `add_role()`, que disparam `add_user_role`, e o método chamaria a si mesmo.
+
+`keep_gate` fica fora de alcance de propósito: ele abre as Configurações do
+bbPress e a ferramenta de **redefinição**, que apaga o fórum inteiro da
+instalação.
+
+Quem já estava gravado no banco não passa por `set_user_role` nunca mais, então
+`Reconectar_Migracoes::promover_moderadores_no_forum()` resolve o passado, com a
+`VERSAO` em 2. A assimetria de sempre: o gancho cuida do futuro, a migração do
+que já existe.
+
+### Campanhas
+
+CPT `reconectar_campanha` com capacidades próprias, no molde de
+`Reconectar_Empresa`: imagem destacada, link, vigência, ordem e texto
+alternativo **obrigatório** — banner é imagem com função.
+
+A vigência é o que justifica o post type em vez de um widget: campanha tem data
+de fim, e o moderador não deveria precisar lembrar de apagar. Sem campanha
+vigente a seção **não imprime nada** — nem título, nem moldura vazia.
+
+A carga declara duas, e a segunda é a que importa: uma já **expirada**, que é o
+que prova que a vigência funciona. Com só a vigente no banco, uma regressão que
+ignorasse as datas passaria despercebida, porque não haveria nada de errado para
+aparecer. As datas são deslocamentos em dias, não absolutas: uma data fixa
+expiraria sozinha e levaria a campanha "vigente" embora sem ninguém ter mexido
+em nada.
+
+### Pagamento direto à loja
+
+A plataforma não toca no dinheiro. A loja cadastra chave PIX e conta bancária em
+**Configurações → Pagamento** da dashboard do Dokan, e o comprador paga direto.
+Nenhum provedor a escolher, nenhuma credencial para vazar, e o split — que é o
+que exigiria o Dokan Pro — deixa de ser necessário, porque o dinheiro nunca é
+agregado.
+
+A única lacuna do Dokan era a gravação. `insert_settings_info()` tem `bank` e
+`paypal` escritos à mão no ramo do nonce `dokan_payment_settings_nonce`; um
+`$_POST['settings']['pix']` chega e não é lido. O único gancho que alcança é
+`dokan_store_profile_settings_args`, que dispara em **todos** os caminhos de
+salvamento do perfil — por isso a injeção é guardada por `wp_verify_nonce()`.
+Sem essa guarda, salvar a loja em outra aba apagaria os dados de pagamento, sem
+erro e sem aviso.
+
+Dois gateways autorais, `reconectar_pix` e `reconectar_transferencia`, ambos
+sobre `Reconectar_Gateway_Direto`. Nenhum processa transação: `process_payment()`
+marca o pedido como aguardando pagamento e devolve a tela de agradecimento. A
+confirmação é manual, feita pela loja — que é o que acontece de fato quando
+alguém paga numa chave PIX pessoal. Inventar confirmação automática seria
+fabricar um dado.
+
+**A regra da interseção** é o que o carrinho multi-vendedor exige: o meio
+oferecido tem de ser um que *todas* as lojas do carrinho aceitem. `is_available()`
+esconde o que nenhuma aceita; `validar_checkout()` recusa com o **nome** de quem
+não recebe por ali. Uma lista vazia sem explicação mandaria o comprador embora
+sem saber o que fazer.
+
+A tela de agradecimento e o e-mail imprimem **um bloco por loja**, com o valor do
+sub-pedido correspondente. Um bloco só, com a soma, mandaria o comprador pagar
+tudo para uma das lojas.
+
+`reconectar_pix_br_code()` monta o payload EMV MPM — TLV mais CRC16-CCITT/FALSE
+—, cálculo puro, sem dependência, sem build e sem rede. A conferência que vale é
+colar o código no app de um banco real: um código que o banco recusa é pior que
+nenhum código.
+
+E `provision.sh` ganhou a linha sem a qual nada disso aparece:
+
+```bash
+wp option patch update dokan_withdraw withdraw_methods --format=json '["pix","bank"]'
+```
+
+O padrão é `["paypal"]`, e com ele **toda loja vê "No withdraw method is
+available"** — a tela existe, está vazia, e nada indica o porquê. O menu
+**Withdraw** foi ocultado pelo motivo oposto: a plataforma não retém saldo, e um
+menu de saque prometeria um repasse que não existe.
+
+### Verificação
+
+`scripts/verificar-acessos.sh` passou de 114 para **127 casos**, verde. Os novos
+cobrem os dois perfis item a item. As negações medidas, para o Moderador:
+
+| Tentativa | Resposta |
+| --- | --- |
+| `plugins.php` | 403 |
+| `theme-install.php` | 500 |
+| `theme-editor.php` | 403 |
+| `edit.php?post_type=product` | 403 |
+| `admin.php?page=wc-orders` | 301 → 403 |
+| `admin.php?page=dokan` | 403 |
+| `options-general.php` | 403 |
+| `users.php` | 403 |
+| `edit.php?post_type=reconectar_empresa` | 403 |
+| `/painel-empresas/` | 403 |
+| `nav-menus.php` | **200** |
+| `customize.php` | **200** |
+| `post-new.php?post_type=forum` | **200** |
+
+Três dessas linhas custaram tempo e viraram armadilha registrada no `CLAUDE.md`.
+`plugins.php` morre num `wp_die( …, 403 )` explícito de `menu.php:384`, enquanto
+`theme-install.php` **passa** por esse portão — ele pendura em `themes.php` — e
+bate num `wp_die()` sem argumento de status, cujo padrão é **500**. Um
+verificador que espere 403 em toda negação acusa falha onde não há.
+
+`admin.php?page=wc-orders` devolve **301** para `edit.php?post_type=shop_order`
+com o HPOS desligado, e é lá que a negação acontece. Ler só o primeiro código
+leria 301 como sucesso.
+
+E o menu **Produtos** aparece na lateral do Moderador resolvendo para
+`admin.php?page=product-reviews` — as avaliações, que o WooCommerce registra sob
+aquele menu. Quem vir o rótulo e concluir que o perfil administra o catálogo terá
+lido o rótulo, não o destino.
+
+`edit_theme_options` abre a Aparência inteira porque é a **única** capacidade que
+o WordPress oferece para editar menus, e ela vem grudada ao Customizer e aos
+widgets. Não há granularidade menor no núcleo: ou o Moderador cria menus e
+alcança o Customizer, ou não cria menus. O pedido é explícito, então ela entra —
+e a amplitude é do WordPress, não uma escolha nossa.
+
+Uma nota sobre como medir: `wp eval` com `wp_set_current_user()` roda **depois**
+do `init` e não tem o papel dinâmico que o bbPress aplica ali; capacidades de
+fórum respondem "SIM" onde o navegador responde 403. O que vale é
+`wp --user=<login> eval …` — ou o próprio `curl` com a sessão.
+
+### O que ficou fora, e anotado
+
+Split automático de comissão, confirmação automática de pagamento, conciliação e
+estorno pela plataforma: nenhum é possível neste cenário, e cada um está na
+tabela de `docs/PAGAMENTOS.md` com o que exigiria. QR Code em imagem exigiria
+biblioteca nova, e o copia-e-cola cobre o caso no celular. "Super Admin" no
+sentido literal do WordPress é vocabulário de Multisite — o rótulo mudou, a
+arquitetura não, e a chave do papel `administrator` continua a mesma.
+
+### Os dois avisos que o painel do Dokan cobrava para sempre
+
+Depois da entrega, o painel abria com a faixa **"Complete your marketplace setup
+in minutes"** sobre as Configurações e, logo abaixo, com **"Vendor Onboarding
+page is not published!"**. Nenhum dos dois é resolvível seguindo o que eles
+pedem, e os dois passaram a ser estado declarado no `provision.sh` e no plugin.
+
+A faixa é o assistente de configuração (`Admin\OnboardingSetup\AdminSetupGuide`),
+com duas das quatro etapas pendentes: `basic` e `commission`, as que dependem da
+opção `dokan_selling`. A opção nunca existiu nesta instalação, e aí está a
+armadilha — os passos escutam **`updated_option`**, e uma opção ausente é criada
+por `add_option`, que dispara `added_option`. Gravar `dokan_selling` pela
+primeira vez não marca etapa nenhuma; na segunda execução o valor é igual e
+também não dispara nada. (As outras duas etapas já apareciam concluídas por
+efeito colateral: o provisionamento regrava `dokan_withdraw` e
+`dokan_appearance`, que já existiam.)
+
+Marcar as quatro ainda não bastou: medido, `is_setup_complete()` seguia `false`,
+porque a conclusão do assistente mora em opção **separada**,
+`dokan_admin_setup_guide_steps_completed`. O bloco novo do `provision.sh` grava
+as cinco à mão, que é também o único caminho idempotente.
+
+A comissão foi a **zero** no mesmo bloco, e essa é a decisão que não podia ser
+copiada do padrão da tela. O assistente propõe 10% mais R$10 fixos; medido em
+`wp_dokan_orders`, `net_amount` é igual ao `order_total` em todos os pedidos —
+a plataforma não retém nada, porque o comprador paga a loja direto. Aceitar o
+padrão faria a dashboard de cada loja exibir um desconto que ninguém cobra.
+
+O segundo aviso acusa como erro de configuração exatamente a decisão da
+plataforma: a página `/vendor-onboarding/` fica em rascunho porque o shortcode
+dela sai do ar em `Reconectar_Cadastro_De_Lojas::ajustar_formularios()`.
+Publicá-la para calar o aviso reabriria a terceira das quatro portas de
+autocadastro que aquela classe existe para fechar. `remover_aviso_de_onboarding()`
+tira o callback do filtro `dokan_admin_notices`, no molde já usado por
+`remover_virar_vendedor()`: a instância tem de ser a do container, porque o
+WordPress compara identidade de objeto ao remover.
+
+Suprimir importa mais do que parece — um alerta permanente que ninguém pode
+resolver ensina o administrador a ignorar os alertas que importam.
+
+Uma nota sobre como medir isto: a tela continuou exibindo o aviso depois da
+mudança, e a resposta REST recém-buscada já vinha vazia. Era **cache do
+navegador**. O que vale é refazer a chamada com `cache: 'no-store'` — conferir
+pela tela recarregada leria o estado de antes.
+
+---
+
+## 2026-09-28 — O checkout não oferecia meio de pagamento nenhum
+
+Com a chave PIX cadastrada na dashboard do Dokan, a tela de finalização dizia
+**"Não há métodos de pagamento disponíveis. Entre em contato conosco para obter
+ajuda na realização do seu pedido."**
+
+### O defeito estava onde não se procura
+
+Toda medição pelo lado do servidor respondia que estava tudo certo. Com o
+carrinho simulado em `wp eval`: `lojas_do_carrinho = 27`,
+`reconectar_pix is_available = true`, `get_available_payment_gateways()`
+devolvendo `reconectar_pix`. A opção `woocommerce_reconectar_pix_settings` nem
+existe no banco — e isso é inofensivo, porque `WC_Settings_API::init_settings()`
+cai nos defaults do `form_fields`, onde `enabled` já é `yes`.
+
+Três conferências seguidas dizendo "correto" são o sinal de que a pergunta está
+errada. O que faltava medir era o **HTML entregue ao navegador**:
+
+```
+paymentMethodSortOrder: ["reconectar_pix","reconectar_transferencia"]
+paymentMethodData:      []
+payment_methods:        ["reconectar_pix"]   (Store API do carrinho)
+```
+
+A página `/checkout/` usava o bloco `woocommerce/checkout`, que desenha apenas
+os métodos registrados em
+`woocommerce_blocks_payment_method_type_registration` — classe
+`AbstractPaymentMethodType` mais script chamando `registerPaymentMethod`. Os
+gateways autorais são clássicos e não têm essa integração. O servidor sabia que
+o PIX estava disponível; o bloco não tinha como desenhá-lo.
+
+### A correção, e por que o clássico não é um retrocesso
+
+`provision.sh` ganhou o bloco `== Carrinho e checkout clássicos ==`, que converte
+as duas páginas aos shortcodes `[woocommerce_cart]` e `[woocommerce_checkout]`,
+com guarda de idempotência.
+
+Trocar o caminho não é só fazer o gateway aparecer. `payment_fields()` — onde o
+aviso de **qual loja** não recebe por aquele meio é impresso — e
+`woocommerce_after_checkout_validation`, onde `validar_checkout()` recusa um
+pedido que nenhuma loja conseguiria receber por inteiro, **não rodam** no bloco.
+Os dois são requisito registrado em `docs/PAGAMENTOS.md`, e o caminho de blocos
+exigiria reescrever ambos contra o Store API.
+
+Uma conclusão minha teve de ser corrigida no meio do caminho: ao ver
+`woocommerce_store_api_checkout_update_order_meta` vazio, dei o Dokan como sem
+integração com o Store API — e a divisão em sub-pedidos como motivo da troca. A
+varredura ampla de `$wp_filter` mostrou o contrário:
+`woocommerce_store_api_checkout_order_processed` tem `split_vendor_orders` [10] e
+`dokan_sync_insert_order` [20]. A divisão funcionaria nos dois caminhos; o motivo
+é outro, e está escrito acima.
+
+### A lista vazia que ainda podia acontecer
+
+Nenhuma loja da demonstração está hoje sem meio algum, mas se estivesse, a
+lista ficaria vazia e o WooCommerce imprimiria de novo a frase genérica —
+exatamente a tela que originou o chamado. `explicar_ausencia_de_meios()`, no
+filtro `woocommerce_no_available_payment_methods_message`, passa a nomear as
+lojas. A relação sai dos gateways instanciados, não de uma lista de meios
+escrita à mão: um meio novo conta sozinho, e não há duas listas para divergirem.
+
+Exercitado com a leitura da meta interceptada, sem tocar no banco — uma loja sem
+meio produz o singular com o nome dela; duas produzem o plural com as duas; e com
+o meio no lugar o filtro devolve a frase de fábrica intacta, sem sequestrar a
+mensagem de outra situação.
+
+### Medições
+
+- `provision.sh` rodado duas vezes: a primeira converteu as duas páginas
+  (`Success: Updated post 6/7`), a segunda imprimiu "já usa o shortcode
+  clássico" nas duas. Idempotente nos dois caminhos.
+- `./scripts/verificar-acessos.sh` — **127 casos, nenhuma falha**.
+- Carrinho misto (Moda Reconecta sem PIX, Bem Viver Natural sem banco): os dois
+  meios aparecem, cada um com o aviso da loja certa embaixo.
+- `/cart/` clássico em 375px: `scrollWidth - clientWidth === 0` e
+  `window.scrollTo( 600, 0 ); window.scrollX === 0`. A barra inferior fica.
+- **Pedido 428 fechado de verdade** pelo checkout clássico, com produtos de duas
+  lojas: a tela de agradecimento traz dois blocos PIX, R$ 38,00 e R$ 54,00,
+  somando o total de R$ 92,00, cada um com o `txid` do sub-pedido correspondente
+  (430 e 429, criados pelo Dokan).
+- Os dois BR Codes decodificados por um percorredor de TLV escrito do zero, com
+  CRC16 por implementação diferente da do plugin: estrutura íntegra, CRC
+  conferindo, valor e moeda corretos nos dois.
+
+Falta a conferência que nenhuma medição substitui: **colar o copia-e-cola no app
+de um banco real**. Um código que o banco recusa é pior que nenhum código — se
+não passar, a entrega sai com os dados da chave em texto e sem o copia-e-cola.
+
+O pedido 428 e os sub-pedidos 429/430 são lixo de teste e ficaram no banco de
+propósito, para não apagar dado sem pedir. `./scripts/seed-demo.sh remover` e
+`instalar` limpam a instalação inteira e convergem a demonstração.
+
+## 2026-09-28 — O carrinho ganha camada autoral
+
+A troca do bloco `woocommerce/cart` pelo shortcode `[woocommerce_cart]`, feita
+para que o gateway clássico voltasse a aparecer, teve um efeito colateral que a
+entrada anterior não mediu: a página passou a exibir a tabela crua do
+WooCommerce vestida pelo Storefront, **sem nenhuma regra `rc-`**. Nada estava
+quebrado; estava tudo fora da identidade, e duas coisas reprovavam.
+
+### O que a medição encontrou
+
+Em 1280×900: miniatura de **59×59** dentro de linha de 139px; nome do produto no
+azul de link do tema, `#31BEB1` — **2,30:1** sobre o branco, reprovando o
+critério 1.4.3 da WCAG 2.1, que é requisito do edital; `.cart_totals` com
+`float: right` ocupando 629 de 1188 e deixando 559px de vazio; botão de
+finalização de 629×65 com fonte de 22,652px e `<h2>` de 25,888px — dois valores
+que não existem na escala tipográfica.
+
+Em 375px: **318px de altura por item**, com o botão de finalizar em y=1564.
+
+### A regra que era escrita, aplicada, e não fazia nada
+
+`width: 88px` na miniatura não mudou um pixel. A varredura do CSSOM — refeita
+depois que a primeira versão devolveu listas vazias para regras que eu mesmo
+acabara de escrever, inconsistência que denunciou o bug na varredura, não no CSS
+— achou a causa: `woocommerce.css` declara `max-width: 3.70633em` na miniatura e
+`max-width: 3.632em` no campo de quantidade. A regra autoral vencia a cascata; o
+teto vinha de outra propriedade. Corrigido declarando `max-width` ao lado de
+`width` nas duas.
+
+Sem essa varredura eu teria concluído "nenhuma regra concorrente" e ido mexer na
+especificidade, que não era o problema.
+
+### A tabela fica no desktop, e vira cartão no celular
+
+Produto × preço × quantidade × subtotal é dado tabular. `display: grid` no
+desktop faria o navegador descartar os papéis implícitos de linha e célula, e o
+leitor de tela perderia a associação entre valor e coluna. Abaixo de 768px a
+semântica já está perdida pelo próprio WooCommerce, que esconde o `<thead>` — e
+ali cada linha vira cartão em grade, com os `::before` gerados a partir de
+`data-title` fazendo o papel dos cabeçalhos. Mantê-los é melhor que injetar
+texto por `content`: eles já vêm traduzidos pelo WordPress ("Preço: ",
+"Quantidade: ", "Subtotal: ").
+
+Duas correções vieram de medição e não de leitura. `display: flex` em
+`td.actions` descartou o `colspan="6"` e encolheu a célula de 1187 para 331px;
+pôr a `<tr>` em `display: block` não resolveu (seguiu 331), e a saída foi manter
+`table-cell` com float nos filhos. E a `<table>` continuava `display: table` sob
+a classe `shop_table_responsive`, produzindo cartões de 473px numa tela de 375.
+
+### Duas traduções que eram dado gravado, não string
+
+O rótulo do Dokan saía como "Vendedor:" na linha de cada item — vocabulário que
+esta plataforma aposentou. `reconectar_renomear_vendedor_no_carrinho()`, em
+`woocommerce_get_item_data` prioridade 11, troca por "Loja:" depois que o
+`dokan_product_seller_info` escreveu.
+
+E as páginas se chamavam **Cart** e **Checkout**: o WooCommerce as cria ao
+ativar, antes de o pacote de idioma estar de pé, e o título fica gravado como
+dado — nenhuma tradução posterior o alcança. O sintoma aparecia longe da causa,
+na trilha de navegação ("Início › Cart") de um site inteiramente em português. O
+`provision.sh` passa a gravar "Carrinho" e "Finalizar compra", com guarda de
+idempotência. O `post_name` não é tocado de propósito: `/cart/` e `/checkout/`
+continuam valendo, e mudar a rota quebraria todo link já publicado.
+
+### Medições, depois
+
+| Elemento | Antes | Depois |
+| --- | --- | --- |
+| miniatura | 59×59 | 88×88 |
+| nome do produto | `#31BEB1`, 2,30:1 | `rgb(113,113,113)`, peso 600, 16px |
+| `.qty` | 58px, fundo `#f2f2f2` | 72×44, branco, borda 1px, raio 8px |
+| `td.actions` | 331px em três linhas | 1187×77, cupom à esquerda e "Atualizar" à direita |
+| `.cart_totals` | `float: right`, 629 de 1188 | cartão de 420px |
+| `<h2>` / botão | 25,888px / 22,652px | 20px / 18px, da escala |
+| altura da página | 1566 | 1508 |
+| item em 375px | 318px de altura, cartão de 473px | 184px, cartão de 343px |
+| botão remover em 375px | h=0, x=474 | 36×36 em x=314 |
+
+Em 375px e em 1280×900: `scrollWidth - clientWidth === 0` e
+`window.scrollTo( 600, 0 ); window.scrollX === 0`. Nenhum `font-size` literal
+entrou — a seção inteira consome os degraus `--rc-fonte-*`.
+
+Toda a investigação foi por medição de DOM, `getComputedStyle`, varredura do
+CSSOM e `wp eval`. Os templates do carrinho e o CSS do WooCommerce e do
+Storefront são de terceiros e gitignorados, e a autorização de leitura concedida
+nesta série valia para um arquivo só. É também por isso que a correção é CSS
+sobre o markup existente, e não override de template: o que não se lê, não se
+copia.
+
+---
+
+## 2026-09-28 — Esteira de deploy no GitLab CI
+
+**O que foi feito**
+- Criado `.gitlab-ci.yml` com três estágios: `verificar` (lint de PHP e de
+  shell, em toda branch e todo merge request), `implantar` (push na `main`) e
+  `demonstracao` (carga e remoção dos dados fictícios, em jobs manuais).
+- `docker-compose.yml`: `WORDPRESS_DEBUG` deixa de ser literal `"1"` e passa a
+  `${WORDPRESS_DEBUG:-1}` — mesmo default para quem desenvolve, desligável pelo
+  `.env` do servidor.
+- Criado `docs/DEPLOY.md` com a preparação única do servidor, a tabela de
+  variáveis CI/CD, o roteiro de verificação e a lista do que a esteira **não**
+  faz.
+- Duas armadilhas novas no `CLAUDE.md`.
+
+**Decisões técnicas**
+
+O código vai por `rsync` a partir do runner, e não por `git pull` no servidor: o
+runner já tem o checkout e já tem a chave, então a instância não precisa de
+nenhuma credencial do GitLab.
+
+O recorte da sincronização é o ponto de risco da entrega, e o comentário que o
+protege é a parte mais importante do arquivo. Só
+`wp-content/themes/reconectar/` e `wp-content/plugins/reconectar-core/` são
+versionados; o núcleo, o Storefront, os cinco plugins de terceiros e **todo** o
+`uploads/` chegam pelo `provision.sh` no destino. Um `--delete` no nível de
+`wp-content/` apagaria a instalação inteira, e os uploads não teriam origem
+nenhuma para serem restaurados. Dentro de cada diretório versionado o `--delete`
+é justamente o comportamento desejado.
+
+Não há `docker-compose.prod.yml`. Listas de `ports` no Compose **concatenam** em
+vez de substituir — um override declarando `80:80` deixaria a 8090 aberta
+também, em silêncio. A porta vem do `.env` do servidor, e o phpMyAdmin fica fora
+do ar porque o job nomeia os serviços no `up` (`db wordpress`).
+
+A chave do host vai numa variável (`SSH_HOST_KEY`, colhida com `ssh-keyscan`), e
+não se usa `StrictHostKeyChecking=no`: desligar a verificação faria a esteira
+aceitar qualquer servidor que respondesse naquele endereço, numa sessão que
+carrega chave privada de produção. E `SSH_CHAVE_PRIVADA` é *File* + *Protected*,
+nunca *Masked* — o GitLab só mascara valores de linha única, e uma chave privada
+tem várias.
+
+O job de demonstração chama `seed-demo.sh`, não o `demo.php` direto: a guarda de
+confirmação da remoção mora no script, e o caminho pelo PHP a contornaria. O
+gesto humano que a pergunta pedia é, na esteira, o clique no job manual.
+
+O lint de PHP conta os arquivos antes de conferi-los. Um `find` sobre caminho
+renomeado não casa nada e sai com status 0 — o job passaria em verde tendo
+conferido zero arquivo, que é o pior resultado possível.
+
+**Pendências que dependem de ação humana**
+- `chmod 400 dev.pem`; criar o projeto no GitLab e o remote (o atual é GitHub).
+- Security Group liberando 80/tcp e 22/tcp; Docker e o plugin `compose` na
+  instância.
+- O `.env` do servidor, criado à mão **antes do primeiro `up`** — o
+  `wp-config.php` nasce uma vez e não é reescrito depois. As regras de segurança
+  do projeto bloqueiam qualquer ferramenta de tocar em `.env*`; o trecho foi
+  entregue no chat e está em `docs/DEPLOY.md`.
+- `WP_URL` tem de ser o DNS público: a allowlist de `Host` não conhece endereço
+  da AWS, e com o default o site sobe carimbando todo asset com `localhost`.
+- A esteira ainda não rodou uma vez — nada aqui foi verificado contra a
+  instância. O roteiro de verificação está em `docs/DEPLOY.md`.

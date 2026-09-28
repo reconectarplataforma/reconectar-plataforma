@@ -1,15 +1,16 @@
 # Perfis e permissões
 
-Os três atores da plataforma, o que cada um pode fazer e **onde exatamente no
-código a regra é aplicada**. Implementação em
+Os atores da plataforma, o que cada um pode fazer e **onde exatamente no código
+a regra é aplicada**. Implementação em
 `wp-content/plugins/reconectar-core/includes/class-reconectar-permissoes.php`.
 
 ## Os atores
 
 | Ator | Papel WP | Onde trabalha |
 | --- | --- | --- |
-| **Administrador** | `administrator` | `/wp-admin` |
-| **Administrador de Empresas** | `company_admin` | `/painel-empresas/` |
+| **Super Administrador** | `administrator` | `/wp-admin` |
+| **Administrador** | `company_admin` | `/wp-admin` e `/painel-empresas/` |
+| **Moderador de Conteúdo** | `content_moderator` | `/wp-admin` |
 | **Vendedor** | `seller` | painel do Dokan, no front-end |
 | **Usuário Comum** | `customer` | loja e "Minha conta" |
 
@@ -20,9 +21,23 @@ loja é um negócio cadastrado por ela. Este documento continua dizendo
 fora e mudá-lo quebraria o plugin. Onde se lê "vendedor" aqui, entenda "a conta
 que o painel de empresas lista como loja".
 
-**Administrador.** Gestão técnica e operacional da plataforma inteira. É o único
-que instala, ativa, atualiza, configura ou remove plugins, e o único que
-administra a comunidade e os fóruns.
+**Super Administrador.** Gestão técnica da instalação. É o único que instala,
+ativa, atualiza, configura ou remove **plugins e temas**, o único que edita
+arquivo e o único que atualiza o núcleo. A chave do papel continua sendo
+`administrator`: em WordPress single-site não existe nada acima dele, e "Super
+Admin" no sentido literal é vocabulário de Multisite. O que mudou foi só o
+rótulo, por `renomear_papel()` — remover e recriar o `administrator` seria
+irreversível se algo falhasse no meio.
+
+**Administrador.** Cadastra empresas e lojas, configura as contas das lojas,
+modera o conteúdo da plataforma e cria menus. Não tem nenhuma capacidade de
+desenvolvimento: **não instala plugin nem tema, não edita arquivo, não atualiza
+o núcleo**. É a evolução do antigo Administrador de Empresas — mesmo papel,
+mesma chave `company_admin`, competências novas.
+
+**Moderador de Conteúdo.** Publica e modera post, página e comentário, gere as
+campanhas da home, cria menus e participa do fórum. Não administra empresa, não
+configura conta de usuário e não toca em produto nem em pedido.
 
 **Vendedor.** Uma loja própria e isolada: produtos, estoque, pedidos,
 pagamentos, entrega. Participa dos fóruns, mas não os administra. **Nunca**
@@ -32,31 +47,64 @@ acessa dado de outro vendedor.
 pagar → acompanhar a entrega. Sem fóruns, sem painel administrativo, sem painel
 de vendedor.
 
+As chaves `company_admin` e `content_moderator` ficam em inglês por serem
+gravadas no banco, na convenção dos papéis nativos do WordPress. Os rótulos, em
+português como todo o resto.
+
 ## Como a plataforma decide
 
 A autorização é por **capacidade**, não por papel. A distinção parece sutil e
 não é: papel é rótulo, capacidade é permissão. Código que pergunta "esta pessoa
 é vendedora?" para decidir o que ela pode fazer confunde identidade com
-autorização, e quebra no dia em que aparece um quarto papel ou em que um usuário
+autorização, e quebra no dia em que aparece um papel novo ou em que um usuário
 recebe uma permissão avulsa.
 
-Por isso o acesso à comunidade tem capacidade própria — 
-`reconectar_participar_comunidade` — concedida aos papéis `administrator` e
-`seller` em `sincronizar_capacidades()`. Quem checa acesso pergunta pela
+Por isso o acesso à comunidade tem capacidade própria —
+`reconectar_participar_comunidade` — concedida em `sincronizar_capacidades()`
+aos papéis listados em `PAPEIS_DA_COMUNIDADE`. Quem checa acesso pergunta pela
 capacidade; quem concede sabe dos papéis.
 
 `sincronizar_capacidades()` roda em `init`, não na ativação do plugin: o papel
 `seller` é criado pelo **Dokan**, e se o `reconectar-core` for ativado antes
 dele o papel ainda não existe — a concessão se perderia em silêncio. Uma
-constante de versão (`VERSAO_CAPACIDADES`) evita reescrever as capacidades a
-cada carregamento; para forçar a ressincronização, incremente-a.
+constante de versão (`VERSAO_CAPACIDADES`, hoje em **4**) evita reescrever as
+capacidades a cada carregamento; para forçar a ressincronização, incremente-a.
+É ela que faz uma instalação provisionada meses atrás receber os papéis novos
+sozinha, no primeiro `init` depois da atualização.
 
-### O portão
+### Por que o acesso ao `/wp-admin` não passa por `manage_options`
 
-Duas capacidades funcionam como portão em várias travas: `manage_options` e
-`manage_woocommerce`. Quem as tem passa. Isso só é seguro porque **o papel
-`seller` não tem nenhuma das duas** — verificado na instalação: 67 capacidades,
-nenhuma delas. O `customer` tem exatamente uma (`read`).
+Este é o ponto que decide o desenho inteiro, e é contraintuitivo.
+
+`restringir_gestao_da_tecnologia()` barra as capacidades de plugin e tema
+**acrescentando `manage_options` ao conjunto exigido**. E
+`eh_administracao_tecnica()` é exatamente `manage_options || manage_woocommerce`.
+Dar `manage_options` ao Administrador para que ele entrasse no painel devolveria
+a ele, pela mesma linha, a instalação de plugins — precisamente o que a
+especificação proíbe.
+
+`manage_woocommerce` abriria a porta sem quebrar a trava de plugin, mas tem
+outro preço: os menus de WooCommerce e Dokan aparecem, e **as listagens do
+`/wp-admin` não têm escopo por empresa**. O Administrador só é limitado às
+empresas dele dentro do `/painel-empresas/`; no painel técnico veria produtos e
+pedidos de todas as lojas, desfazendo o isolamento em silêncio.
+
+A porta é uma capacidade própria, `CAP_ADMIN_WP`
+(`reconectar_acessar_wp_admin`), consultada **só** em
+`bloquear_area_administrativa()` e `ocultar_barra_administrativa()`, como
+terceira alternativa ao lado de `eh_administracao_tecnica()`.
+`eh_administracao_tecnica()` **não mudou**: os outros dois lugares que a
+consultam — `restringir_por_vendedor()` e `restringir_listagens_do_vendedor()` —
+falam de isolamento entre vendedores, e ali a resposta certa para os papéis
+novos continua sendo "não é administração técnica".
+
+### O portão do isolamento
+
+Duas capacidades funcionam como portão nas travas de isolamento:
+`manage_options` e `manage_woocommerce`. Quem as tem passa. Isso só é seguro
+porque **nenhum dos papéis restritos tem qualquer uma das duas** — verificado no
+script de acessos, e é o caso mais importante dele. O `customer` tem exatamente
+uma capacidade (`read`).
 
 Se um dia o Dokan ou outro plugin conceder `manage_woocommerce` ao vendedor, o
 isolamento cai inteiro, sem erro e sem aviso. Confira com o comando na seção
@@ -64,46 +112,58 @@ isolamento cai inteiro, sem erro e sem aviso. Confira com o comando na seção
 
 ## Matriz de permissões
 
-| Funcionalidade | Admin | Vendedor | Cliente |
-| --- | :---: | :---: | :---: |
-| **Catálogo e compra** | | | |
-| Navegar pela vitrine, buscar, filtrar | ✅ | ✅ | ✅ |
-| Adicionar ao carrinho e comprar | ✅ | ✅ | ✅ |
-| Acompanhar os próprios pedidos | ✅ | ✅ | ✅ |
-| Avaliar produto comprado | ✅ | ✅ | ✅ |
-| **Loja do vendedor** | | | |
-| Criar e editar produtos da própria loja | ✅ | ✅ | ❌ |
-| Gerir estoque da própria loja | ✅ | ✅ | ❌ |
-| Ver e processar pedidos da própria loja | ✅ | ✅ | ❌ |
-| Configurar pagamento e entrega da própria loja | ✅ | ✅ | ❌ |
-| Ver faturamento da própria loja | ✅ | ✅ | ❌ |
-| **Dados de outro vendedor** | | | |
-| Ver produtos, pedidos, estoque ou receita de outro vendedor | ✅ | ❌ | ❌ |
-| **Comunidade** | | | |
-| Ler e participar de fóruns | ✅ | ✅ | ❌ |
-| Perguntar, responder e marcar tags no fórum | ✅ | ✅ | ❌ |
-| Votar em pergunta ou resposta | ✅ | ✅ | ❌ |
-| Marcar a melhor resposta | ✅ | só nas próprias perguntas | ❌ |
-| Moderar e administrar a comunidade | ✅ | ❌ | ❌ |
-| **Plataforma** | | | |
-| Acessar `/wp-admin` | ✅ | ❌ | ❌ |
-| Instalar, ativar, atualizar ou remover plugins | ✅ | ❌ | ❌ |
-| Gerir usuários e papéis | ✅ | ❌ | ❌ |
-| Configurações técnicas da plataforma | ✅ | ❌ | ❌ |
-| Ver todos os pedidos e todas as lojas | ✅ | ❌ | ❌ |
+Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderator`.
+
+| Funcionalidade | Super Adm. | Adm. | Moder. | Vendedor | Cliente |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| **Catálogo e compra** | | | | | |
+| Navegar pela vitrine, buscar, filtrar | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Adicionar ao carrinho e comprar | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Acompanhar os próprios pedidos | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Loja do vendedor** | | | | | |
+| Criar e editar produtos da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Ver e processar pedidos da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Configurar pagamento e entrega da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Ver produtos ou pedidos de outro vendedor | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Empresas e lojas** | | | | | |
+| Acessar `/painel-empresas/` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Cadastrar empresa e loja | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Ver a operação de empresa alheia | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Conteúdo** | | | | | |
+| Publicar e editar post e página | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Moderar comentários | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Publicar e programar campanhas da home | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Criar e editar menus de navegação | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Enviar arquivos para a biblioteca de mídia | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Comunidade** | | | | | |
+| Ler e participar de fóruns | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Votar em pergunta ou resposta | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Marcar a melhor resposta | ✅ | ✅ | ✅ | só nas próprias perguntas | ❌ |
+| **Contas** | | | | | |
+| Listar, criar e editar contas de loja | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Editar a conta de um Super Administrador | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Promover alguém a um papel acima do seu | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Plataforma** | | | | | |
+| Acessar `/wp-admin` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Instalar, ativar, atualizar ou remover plugins | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Instalar, trocar, atualizar ou editar temas | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Editar arquivo, atualizar o núcleo | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Configurações técnicas da instalação | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 ## Onde cada regra é aplicada
 
 | Regra | Método | Hook |
 | --- | --- | --- |
 | Concede/revoga capacidades por papel | `sincronizar_capacidades()` | `init` |
-| Nega gestão de plugins a não-admin | `restringir_gestao_de_plugins()` | `map_meta_cap` |
+| Nega plugin, tema, arquivo e núcleo a não-admin | `restringir_gestao_da_tecnologia()` | `map_meta_cap` |
+| Impede escalada por `edit_users`/`promote_users` | `negar_gestao_de_usuarios_superiores()` | `map_meta_cap` |
+| Nega produto e pedido a quem administra empresa | `negar_escrita_ao_admin_de_empresas()` | `map_meta_cap` |
 | Isola registro de outro vendedor | `restringir_por_vendedor()` | `map_meta_cap` |
 | Filtra listagens de produto do vendedor | `restringir_listagens_do_vendedor()` | `pre_get_posts` |
 | Bloqueia comunidade para o cliente | `bloquear_comunidade()` | `template_redirect` |
 | Nega escrita no fórum a quem não participa | `negar_escrita_no_forum()` | `map_meta_cap` |
 | Esconde links da comunidade | `ocultar_itens_da_comunidade()` | `wp_nav_menu_objects` |
-| Mantém não-admin fora do `/wp-admin` | `bloquear_area_administrativa()` | `admin_init` |
+| Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
 | Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
 
 **Interface e backend são camadas distintas, e ambas existem.** Esconder o link
@@ -118,6 +178,66 @@ primitiva `publish_topics`, que todo usuário tem por causa do papel
 `bbp_participant` atribuído no registro. Sem `negar_escrita_no_forum()`, o gate
 de leitura não alcançaria a escrita. O nonce do formulário ainda barraria, mas
 uma única barreira não é uma trava: é a última que sobrou.
+
+## A escalada que `edit_users` abre
+
+"Configura os usuários das lojas" exige `edit_users`. Em single-site, quem tem
+`edit_users` **pode editar um `administrator`** — trocar a senha dele e entrar
+com a conta. E `promote_users` permite promover a si mesmo. As duas juntas
+transformariam o Administrador restrito no Super Administrador em dois cliques,
+e a proibição de acesso de desenvolvedor viraria decoração. Nada na tela
+pareceria quebrado.
+
+`negar_gestao_de_usuarios_superiores()`, em `map_meta_cap`, fecha essa porta com
+duas regras:
+
+- `edit_user`, `delete_user` e `promote_user` sobre um alvo que tenha
+  `manage_options` recebem `do_not_allow`, salvo se quem age também a tiver.
+- Em `promote_user`, o papel de destino não pode conter capacidade que o ator
+  não possua. Isso cobre a promoção a `administrator` e qualquer papel futuro
+  que alguém crie por cima.
+
+O filtro decide **caso a caso, com alvo**, e é por isso que a lista
+`CAPS_DE_USUARIOS` continua concedida: as primitivas estão lá de propósito, e a
+meta capacidade é que nega. O contorno também é testado — sobre a própria conta
+e sobre uma loja, as mesmas capacidades precisam continuar funcionando, ou o
+filtro teria fechado o perfil inteiro.
+
+## Aparência → Temas responde 200, e isso não é trava frouxa
+
+`edit_theme_options` é a **única** capacidade que o WordPress oferece para
+editar menus de navegação, e ela vem grudada ao Customizer e aos widgets. Não há
+granularidade menor no núcleo: ou o moderador cria menus e alcança essas telas,
+ou não cria menus. A amplitude é do WordPress, não uma escolha nossa.
+
+`wp-admin/themes.php` abre para quem tem `switch_themes` **ou**
+`edit_theme_options`, então a tela responde 200 para os dois papéis restritos.
+Ela fica **só de leitura**, e isso foi medido: o JSON que o núcleo imprime nela
+traz `"activate":null`, `"delete":null` e `"autoupdate":null` para cada tema, e
+`theme-editor.php` responde 403.
+
+`theme-install.php` também nega — "Sem permissão para instalar temas neste site"
+—, mas com status **500**, e vale registrar por quê, porque é a diferença entre
+uma negação e um erro de servidor aos olhos de qualquer verificação automatizada.
+As duas negações são do núcleo, em pontos distintos:
+
+| Tela | Onde morre | Status |
+| --- | --- | --- |
+| `plugins.php`, `options-general.php`, `edit.php?post_type=product` | `wp-admin/includes/menu.php:384`, `wp_die( …, 403 )` | `403` |
+| `theme-install.php` | `wp-admin/theme-install.php:16`, `wp_die()` **sem status** | `500` |
+
+`user_can_access_admin_page()` reprova a página inteira no primeiro grupo. O
+`theme-install.php` **passa** por esse portão, porque pendura em `themes.php`, que
+o perfil pode abrir — e só então encontra a verificação de `install_themes` do
+próprio arquivo. Como essa chamada de `wp_die()` não passa argumento de status, o
+padrão de `_default_wp_die_handler()` entra em cena e é **500**. Esperar 403 em
+toda negação faria um verificador acusar falha onde a trava está funcionando.
+
+Fechá-la à força custaria mais do que resolve — seria um desvio por tela em
+`admin_init`, e `nav-menus.php`, a tela que o perfil existe para usar, depende
+exatamente da mesma capacidade. **A trava que vale é a da lista de capacidades,
+não a da URL**, e é por isso que o script de acessos confere `switch_themes` e
+`install_themes` por WP-CLI em vez de se contentar com o código HTTP.
 
 ## O isolamento entre vendedores
 
@@ -154,6 +274,19 @@ O filtro age **apenas** em área de gestão (`is_admin()` ou `REST_REQUEST`). A
 vitrine pública precisa continuar mostrando o catálogo completo, inclusive para
 um vendedor logado — ele também é comprador.
 
+### Produto e pedido continuam negados a quem administra
+
+`negar_escrita_ao_admin_de_empresas()` monitora `edit_post`, `delete_post` e
+`publish_post` genéricos e libera **só** os tipos que o ator pode escrever —
+empresa, post, página, campanha e os do bbPress. Produto e pedido ficam de fora
+de propósito: quem administra o produto é a loja dona dele, e a negação se
+mantém mesmo que um plugin de terceiro conceda `edit_products` por papel.
+
+Essa allowlist é recente e substituiu a exceção invertida, que liberava apenas o
+CPT de empresa. Com o Administrador passando a moderar conteúdo, a versão antiga
+teria negado post e página — o sintoma clássico deste repositório: código no
+lugar certo que impede em silêncio.
+
 ## Detalhes que não são óbvios
 
 **`admin-ajax.php` fica dentro de `/wp-admin`.** Ele atende requisições do
@@ -169,10 +302,19 @@ seria tecnicamente correto e inútil.
 simplesmente não ter entrado ainda. Só quem está logado *e* sem a capacidade
 recebe 403.
 
-**A revogação de plugins é dupla.** `sincronizar_capacidades()` remove as
-capacidades do papel, e `restringir_gestao_de_plugins()` checa de novo na hora
-da decisão. A primeira age sobre o papel; a segunda fecha a porta de uma
+**A revogação de tecnologia é dupla.** `sincronizar_capacidades()` remove as
+capacidades do papel, e `restringir_gestao_da_tecnologia()` checa de novo na
+hora da decisão. A primeira age sobre o papel; a segunda fecha a porta de uma
 capacidade concedida direto ao usuário ou por outro plugin via `user_has_cap`.
+
+**Os dois papéis autorais nascem de `remove_role()` + `add_role()`.** Não é
+redundância com o `add_role()` sozinho, que é inerte quando o papel já existe:
+sem a remoção, uma capacidade retirada da lista continuaria gravada no banco
+para sempre. Como a lista é justamente o registro do que o ator *não* pode, ela
+precisa ser a verdade, e não o teto histórico. O `administrator` **não** passa
+por esse caminho — remover o papel de quem instalou a plataforma é
+irreversível se algo falhar no meio. Ele recebe por `add_cap()`, e por isso só
+perde o que estiver em `CAPS_LEGADAS`.
 
 ## Como verificar
 
@@ -180,43 +322,66 @@ capacidade concedida direto ao usuário ou por outro plugin via `user_has_cap`.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 59 casos por HTTP: faz login como cliente, vendedor, administrador e
-administrador de empresas e bate em cada URL restrita, conferindo o código de
-resposta. Sai com status 1 se algum falhar.
+Verifica 114 casos por HTTP: faz login como cliente, vendedor, moderador,
+administrador e super administrador e bate em cada URL restrita, conferindo o
+código de resposta. Sai com status 1 se algum falhar.
 
 É por HTTP de propósito. A autorização precisa valer para a URL digitada à mão,
 que é o caminho que uma auditoria vai tentar; um teste que apenas consulta
 `current_user_can()` em PHP prova que a função responde o esperado quando
-alguém pergunta, não que a requisição foi barrada.
+alguém pergunta, não que a requisição foi barrada. Onde só o HTTP não basta —
+a escalada de privilégio, as capacidades de tema, o isolamento entre vendedores
+— o script complementa com WP-CLI, e o comentário de cada bloco diz por quê.
 
 Respostas medidas nesta instalação:
 
-| Perfil | `/wp-admin/` | `plugins.php` | `/dashboard/` | `/comunidade/` | `/forums/` | `/painel-empresas/` |
-| --- | --- | --- | --- | --- | --- | --- |
-| Deslogado | — | — | — | `302` → login | `302` → login | `302` → login |
-| Cliente | `302` → `/my-account/` | — | `302` → home | `403` | `403` | `403` |
-| Vendedor | `302` → `/dashboard/` | `403` | `200` | `200` | `200` | `403` |
-| Admin de Empresas | `302` → `/painel-empresas/` | — | — | `200` | `200` | `200` |
-| Administrador | `200` | `200` | — | `200` | `200` | `200` |
+| Perfil | `/wp-admin/` | `plugins.php` | `users.php` | `nav-menus.php` | `/painel-empresas/` | `/dashboard/` | `/comunidade/` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Deslogado | — | — | — | — | `302` → login | — | `302` → login |
+| Cliente | `302` → `/my-account/` | — | — | — | `403` | `302` | `403` |
+| Vendedor | `302` → `/dashboard/` | `403` | — | — | `403` | `200` | `200` |
+| Moderador | `200` | `403` | `403` | `200` | `403` | `302` | `200` |
+| Administrador | `200` | `403` | `200` | `200` | `200` | `302` | `200` |
+| Super Administrador | `200` | `200` | — | — | `200` | — | `200` |
 
-Note a diferença entre as duas colunas do vendedor: `/wp-admin/` redireciona —
-ele tem para onde ir — e `plugins.php` nega. São travas distintas, e o código
-de resposta mostra qual delas agiu.
+Cada célula preenchida é um caso do script, e o travessão marca o que ele não
+cobre — não uma permissão indefinida.
+
+Note a diferença entre as duas primeiras colunas do vendedor: `/wp-admin/`
+redireciona — ele tem para onde ir — e `plugins.php` nega. São travas distintas,
+e o código de resposta mostra qual delas agiu.
 
 Capacidades efetivas de cada papel:
 
 ```bash
-docker compose run --rm wpcli wp eval 'foreach(array("seller","customer","administrator") as $p){$o=wp_roles()->get_role($p); $c=array_keys(array_filter($o->capabilities)); printf("%-14s manage_options=%s manage_woocommerce=%s comunidade=%s total=%d\n",$p,in_array("manage_options",$c,true)?"SIM":"nao",in_array("manage_woocommerce",$c,true)?"SIM":"nao",in_array("reconectar_participar_comunidade",$c,true)?"SIM":"nao",count($c));}'
+docker compose run --rm wpcli wp eval 'foreach(array("seller","customer","content_moderator","company_admin","administrator") as $p){$o=wp_roles()->get_role($p); if(!$o){printf("%-18s ausente\n",$p);continue;} $c=array_keys(array_filter($o->capabilities)); printf("%-18s manage_options=%s manage_woocommerce=%s install_plugins=%s wp_admin=%s total=%d\n",$p,in_array("manage_options",$c,true)?"SIM":"nao",in_array("manage_woocommerce",$c,true)?"SIM":"nao",in_array("install_plugins",$c,true)?"SIM":"nao",in_array("reconectar_acessar_wp_admin",$c,true)?"SIM":"nao",count($c));}'
 ```
 
-Resultado esperado: `SIM` nas três colunas só para `administrator`; `seller` com
-`SIM` apenas em comunidade; `customer` com `nao` em tudo e `total=1`.
+Resultado esperado: `SIM` nas três primeiras colunas **só** para
+`administrator`; `company_admin` e `content_moderator` com `SIM` apenas em
+`wp_admin`; `customer` com `nao` em tudo e `total=1`.
 
 Um vendedor consegue editar produto de outro?
 
 ```bash
 docker compose run --rm wpcli wp eval '$a=get_user_by("login","demo-sabor-da-terra")->ID; $b=get_user_by("login","demo-bem-viver")->ID; $p=get_posts(array("post_type"=>"product","author"=>$b,"numberposts"=>1)); if(!$p){echo "sem produto para testar\n";exit;} $id=$p[0]->ID; wp_set_current_user($a); printf("vendedor A editar produto de B: %s\n", current_user_can("edit_post",$id)?"PERMITIDO (FALHA)":"negado (ok)");'
 ```
+
+O Administrador consegue promover a si mesmo?
+
+```bash
+docker compose run --rm wpcli wp eval '$a=get_user_by("login","demo-admin-nosso-chao")->ID; $s=get_user_by("login","admin")->ID; wp_set_current_user($a); printf("editar o super admin: %s\npromover a si mesmo a administrator: %s\n", current_user_can("edit_user",$s)?"PERMITIDO (FALHA)":"negado (ok)", current_user_can("promote_user",$a,"administrator")?"PERMITIDO (FALHA)":"negado (ok)");'
+```
+
+**O papel de destino é argumento, e omiti-lo inverte a resposta.**
+`current_user_can( "promote_user", $id )` sem ele devolve `true` — corretamente,
+porque promover *a alguma coisa* é uma capacidade que o perfil tem; o que o
+filtro nega é promover **a um papel acima do seu**, e sem o destino não há o que
+comparar. Quem só rodar a forma curta vai achar que encontrou um buraco.
+
+Na tela, o destino chega por dois campos diferentes: `role` no `user-edit.php` e
+`new_role` na ação em massa do `users.php`. O filtro lê os dois, e o script de
+acessos exercita ambos — ler só um deixaria o outro caminho sem regra nenhuma.
 
 O teste de mesa não substitui o navegador. O roteiro de
 [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md) exercita os mesmos limites pela
@@ -225,14 +390,18 @@ interface, que é onde eles serão avaliados.
 ## Limites conhecidos
 
 **A verificação é um script, não uma suíte de testes.**
-`verificar-acessos.sh` cobre as travas de acesso por URL e o isolamento de
-produto entre dois vendedores, e depende de a carga de demonstração estar
-instalada — não roda em CI nem antecede um commit. Cobre o que quebrou até
-hoje; não cobre o que ainda não foi imaginado.
+`verificar-acessos.sh` cobre as travas de acesso por URL, as capacidades de
+tecnologia, a escalada de privilégio e o isolamento entre vendedores, e depende
+de a carga de demonstração estar instalada — não roda em CI nem antecede um
+commit. Cobre o que quebrou até hoje; não cobre o que ainda não foi imaginado.
 
 Em especial, nada dispara alarme se um plugin novo conceder
 `manage_woocommerce` ao papel `seller`. O script detectaria a consequência
 (`/wp-admin/` deixaria de redirecionar), mas só quando alguém o rodasse.
+
+**Aparência → Temas continua acessível de leitura** aos dois papéis restritos,
+pelo motivo explicado acima. A capacidade de trocar, instalar ou editar tema
+está negada; a tela, não.
 
 **`restringir_listagens_do_vendedor()` filtra apenas `product`.** Listagem de
 pedidos não passa por ela: hoje o vendedor não entra no `/wp-admin`, e a coleção

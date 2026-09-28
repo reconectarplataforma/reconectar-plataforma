@@ -5,9 +5,10 @@ Reconectar: o que ela cria, como identificá-la, e como removê-la por
 completo.
 
 > **Nada do que a carga cria representa pessoa, empresa ou produto real.**
-> As lojas, os produtos, os preços, os endereços, os telefones e as
-> avaliações são inventados e existem apenas para que as telas do sistema
-> possam ser vistas e avaliadas com conteúdo na tela.
+> As lojas, os produtos, os preços, os endereços, os telefones, as chaves PIX,
+> os dados bancários e as avaliações são inventados e existem apenas para que
+> as telas do sistema possam ser vistas e avaliadas com conteúdo na tela.
+> **Nenhum BR Code gerado a partir deles cobra de ninguém.**
 
 ## Por que a carga existe
 
@@ -143,16 +144,59 @@ Artesanato, Moda e Acessórios, Casa e Decoração, Beleza e Cuidados, e
 Cultura e Educação. A última fica propositalmente **sem produtos**, para
 exercitar o comportamento de `hide_empty` nas consultas da home.
 
+**2 empresas** (CPT `reconectar_empresa`): Cooperativa Nosso Chão (Maceió, três
+lojas) e Rede Bem Viver (Arapiraca, duas). A distribuição desigual é de
+propósito — sem duas empresas povoadas não há como demonstrar o isolamento, que
+é a regra de negócio central desse ator. Os CNPJ são fictícios com base zerada e
+passam nos dígitos verificadores, porque `Reconectar_Empresa::normalizar_campo()`
+os confere: um CNPJ que o formulário recusaria, gravado por baixo pela carga,
+seria um dado que só existe na demonstração.
+
+**3 Administradores** (papel `company_admin`) e **1 Moderador de Conteúdo**
+(papel `content_moderator`):
+
+| Login | Nome | Alcance |
+|---|---|---|
+| `demo-admin-nosso-chao` | Teresa Nogueira | Cooperativa Nosso Chão |
+| `demo-admin-bem-viver` | Otávio Meireles | Rede Bem Viver |
+| `demo-admin-rede` | Clara Viana | todas, por `reconectar_gerir_todas_as_empresas` |
+| `demo-moderador` | Rita Albuquerque | sem escopo — conteúdo, comunidade e campanha |
+
+São três administradores e não dois porque o terceiro é o caso de alcance
+global previsto na especificação: sem ele a capacidade existiria no código sem
+ninguém para exercê-la, e uma regressão nela passaria despercebida. O Moderador
+é um só pelo motivo oposto — o perfil **não tem escopo**, então uma segunda
+conta mostraria exatamente a mesma tela.
+
+Nenhum bloco deste catálogo declara o papel do usuário: quem é o papel está
+escrito em `demo.php`, no código. Um catálogo de dados com `'papel' => '…'`
+seria uma escalada de privilégio esperando por um descuido de revisão.
+
 **5 lojas** (usuários com papel `seller` do Dokan), todas em municípios de
 Alagoas, cada uma com 3 produtos:
 
-| Loja | Categoria | Município |
-|---|---|---|
-| Sabor da Terra | Alimentos e Bebidas | Maceió |
-| Ateliê Raízes | Artesanato | Maceió |
-| Moda Reconecta | Moda e Acessórios | Arapiraca |
-| Casa Viva | Casa e Decoração | Penedo |
-| Bem Viver Natural | Beleza e Cuidados | Marechal Deodoro |
+| Loja | Categoria | Município | Aceita |
+|---|---|---|---|
+| Sabor da Terra | Alimentos e Bebidas | Maceió | PIX (CNPJ) e transferência |
+| Ateliê Raízes | Artesanato | Maceió | só PIX (e-mail) |
+| Moda Reconecta | Moda e Acessórios | Arapiraca | só transferência |
+| Casa Viva | Casa e Decoração | Penedo | PIX (telefone) e transferência |
+| Bem Viver Natural | Beleza e Cuidados | Marechal Deodoro | **nenhum** |
+
+A coluna "Aceita" é o catálogo de casos do pagamento direto à loja, e cada linha
+existe por um motivo. As três combinações possíveis aparecem — ambos, só PIX, só
+transferência —, e é isso que faz a regra da interseção ter o que demonstrar num
+carrinho de mais de uma loja. Os tipos de chave também variam, porque o BR Code
+monta um payload diferente para cada um.
+
+**Bem Viver Natural não cadastrou meio nenhum, e isso não é esquecimento.** É a
+loja que prova que o checkout recusa o pedido dizendo o nome de quem não recebe,
+em vez de deixar passar uma compra que ninguém consegue pagar por inteiro.
+Preencher os dados dela apagaria o único caso de demonstração desse caminho — e
+é também por isso que ela não aparece em pedido algum.
+
+As chaves PIX são fictícias: CNPJ de base zerada, e-mail em `exemplo.invalid`,
+telefone em faixa que não existe.
 
 **15 produtos**, 4 deles com preço promocional, e **16 avaliações**
 distribuídas entre os produtos de cada loja em rodízio, com notas de 4 e 5
@@ -171,25 +215,66 @@ e Marina Costa (Penedo), com telefone e endereço de cobrança preenchidos.
 Existem para que o roteiro percorra a jornada de compra de verdade — entrar,
 ver o histórico, acompanhar um pedido — em vez de descrevê-la.
 
-**6 pedidos**, cobrindo de propósito os cinco status do fluxo e os três meios
-de pagamento:
+**6 pedidos**, cobrindo de propósito os cinco status do fluxo e os dois meios de
+pagamento que a plataforma oferece:
 
 | Chave | Cliente | Status | Pagamento | Idade |
 |---|---|---|---|---|
 | `ped-001` | Ana | Entregue (`wc-completed`) | PIX | 24 dias |
-| `ped-002` | João | Enviado (`wc-enviado`) | Cartão | 6 dias |
-| `ped-003` | Marina | Em preparação (`wc-preparacao`) | Boleto | 3 dias |
+| `ped-002` | João | Enviado (`wc-enviado`) | Transferência | 6 dias |
+| `ped-003` | Marina | Em preparação (`wc-preparacao`) | Transferência | 3 dias |
 | `ped-004` | Ana | Pagamento aprovado (`wc-processing`) | PIX | 2 dias |
-| `ped-005` | João | Pedido realizado (`wc-pending`) | Boleto | 1 dia |
-| `ped-006` | Marina | Pagamento aprovado (`wc-processing`) | Cartão | 1 dia |
+| `ped-005` | João | Pedido realizado (`wc-pending`) | PIX | 1 dia |
+| `ped-006` | Marina | Pagamento aprovado (`wc-processing`) | PIX | 1 dia |
+
+O meio de cada pedido **não é escolha estética**: é sempre um que todas as lojas
+daquele pedido aceitam, como o checkout exigiria de um comprador de verdade. O
+`ped-002` sai em transferência porque a Moda Reconecta só declara conta
+bancária; o `ped-006`, em PIX, porque o Ateliê Raízes só declara chave.
+
+> **Cartão e boleto já estiveram nesta tabela**, e é por isso que a observação
+> fica registrada: eram rótulos plausíveis de meios que a plataforma nunca
+> ofereceu. Os gateways que existem são dois — `reconectar_pix` e
+> `reconectar_transferencia` —, e um pedido de demonstração pago por um meio
+> inexistente é exatamente o tipo de dado que a regra de honestidade do projeto
+> proíbe.
 
 `wc-preparacao` e `wc-enviado` são status autorais, registrados por
 `class-reconectar-status-pedido.php`. O `ped-006` tem itens de **três lojas
 diferentes**, e é o caso que demonstra o carrinho multi-vendedor: o Dokan o
-divide em um sub-pedido por loja, cada qual visível apenas para o seu dono.
+divide em um sub-pedido por loja, cada qual visível apenas para o seu dono. É
+também o pedido que demonstra a tela de agradecimento do pagamento direto, com
+**três blocos de instrução** cujos valores são os dos sub-pedidos e somam o
+total do pai.
 
 As idades em dias existem para que a coluna de data do painel sirva para algo.
 Um histórico em que tudo aconteceu hoje não se parece com uma loja em operação.
+
+**2 campanhas** (CPT `reconectar_campanha`), para a faixa da home:
+
+| Campanha | Vigência | Ordem | Na home |
+|---|---|---|---|
+| Feira da Safra | de 15 dias atrás a 45 dias à frente | 10 | **aparece** |
+| Mutirão de Inverno | de 120 a 60 dias atrás | 20 | não aparece |
+
+São duas de propósito, e a segunda é a que importa: uma campanha **já expirada**
+é o que prova que a vigência funciona. Com só a vigente no banco, uma regressão
+que ignorasse as datas passaria despercebida — a home continuaria certa, porque
+não haveria nada de errado para aparecer.
+
+As datas são **deslocamentos em dias a partir de hoje**, não datas absolutas.
+Uma data fixa escrita no catálogo expiraria sozinha com o tempo, e a campanha
+"vigente" da demonstração sumiria da home sem ninguém ter mexido em nada.
+
+Ambas têm texto alternativo, que é campo obrigatório: banner é imagem com
+função, e o `alt` descreve **o destino do link**, não a arte. E o `link` aponta
+para caminho relativo — `/categorias/` e `/lojas/` —, nunca URL absoluta: a
+instalação atende `localhost:8090` e o IP da máquina na rede, e um endereço
+gravado com host manda o celular de volta para o próprio celular.
+
+Despublicar a Feira da Safra faz a seção **sumir inteira** da home, sem título
+nem moldura vazia. É a mesma regra de honestidade dos pedidos: campo vazio é
+melhor que placeholder.
 
 **4 categorias de fórum**, **6 perguntas**, **6 respostas** e **13 tags**. As
 categorias são post types `forum` do bbPress e ficam ao lado do "Fórum Geral"
@@ -222,7 +307,8 @@ catálogo é parte da demonstração da regra. Os votos são atribuídos a eleit
 que não são o autor do conteúdo — ninguém vota em si mesmo, no catálogo como no
 endpoint.
 
-**Lojas e clientes entram com a mesma senha**, `reconectar-demo`, definida
+**Lojas, clientes, Administradores e Moderador entram com a mesma senha**,
+`reconectar-demo`, definida
 em `demo.php` e substituível pela variável de ambiente
 `RECONECTAR_DEMO_SENHA`. São contas de ambiente local, não credenciais de
 sistema — antes elas recebiam senha aleatória, o que tornava impossível
@@ -244,8 +330,9 @@ reais.
 
 ## Sobre a remoção
 
-A remoção apaga pedidos, produtos, usuários, arquivos de mídia, termos de
-categoria e avaliações — permanentemente, sem passar pela lixeira. Ela é
+A remoção apaga pedidos, produtos, campanhas, empresas, usuários, arquivos de
+mídia, termos de categoria e avaliações — permanentemente, sem passar pela
+lixeira. Ela é
 restrita ao que carrega a meta `_reconectar_demo`, mas ainda assim é
 irreversível, e por isso pede confirmação.
 
@@ -258,9 +345,15 @@ o pedido dela já não existe. Depois os produtos (cujos comentários e metas de
 nota vão junto); então as referências de banner e avatar são limpas do
 `dokan_profile_settings` de cada loja **antes** de os arquivos de mídia
 serem apagados (caso contrário o perfil ficaria apontando para anexos
-inexistentes); depois os anexos, os usuários — lojas e clientes saem
-juntos, porque recebem a mesma meta —, os termos e, por fim, a opção
-`reconectar_demo_ativo`, o que faz a faixa de aviso desaparecer.
+inexistentes); depois os anexos, os usuários — lojas, clientes, Administradores
+e Moderador saem juntos, porque recebem a mesma meta —, as campanhas, as
+empresas, os termos e, por fim, a opção `reconectar_demo_ativo`, o que faz a
+faixa de aviso desaparecer.
+
+Campanhas e empresas estão nessa lista **porque estão escritas nela**:
+`reconectar_demo_remover()` enumera os post types um a um. Um tipo novo na carga
+não sai sozinho, e o sintoma seria um registro de demonstração sobrevivendo a
+uma remoção que se anunciou completa.
 
 O fórum sai entre os produtos e os usuários, de baixo para cima: respostas,
 depois perguntas, depois categorias. **Uma categoria com conteúdo que não é da
