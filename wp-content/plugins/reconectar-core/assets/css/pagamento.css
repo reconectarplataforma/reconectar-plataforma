@@ -1,0 +1,159 @@
+/**
+ * Instruções de pagamento direto à loja.
+ *
+ * Mesma postura do painel de empresas: as custom properties vêm do tema
+ * `reconectar` quando ele está ativo, e os valores de reserva existem porque o
+ * plugin não pode exigir tema nenhum. Pela mesma razão o `box-sizing` é
+ * declarado aqui — o reset do Storefront não alcança CSS de plugin, e sem ele
+ * o padding de cada bloco somaria por fora da largura.
+ *
+ * Sem build e sem CDN, como o resto do projeto.
+ */
+
+.rc-pagamento {
+	--rc-pg-primaria: var( --reconectar-cor-primaria, #31BEB1 );
+	--rc-pg-secundaria: var( --reconectar-cor-secundaria, #CF6442 );
+	--rc-pg-borda: #dfe3e6;
+	--rc-pg-texto-suave: #717171;
+	--rc-pg-fundo: #f5f7f8;
+
+	--rc-pg-fonte-xs: var( --rc-fonte-xs, 0.8125rem );
+	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-pg-fonte-base: var( --rc-fonte-base, 1rem );
+	--rc-pg-fonte-md: var( --rc-fonte-md, 1.125rem );
+	--rc-pg-fonte-xl: var( --rc-fonte-xl, 1.5rem );
+
+	box-sizing: border-box;
+	margin: 0 0 2rem;
+}
+
+.rc-pagamento *,
+.rc-pagamento *::before,
+.rc-pagamento *::after {
+	box-sizing: inherit;
+}
+
+.rc-pagamento__titulo {
+	font-size: var( --rc-pg-fonte-xl );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.5rem;
+}
+
+.rc-pagamento__aviso {
+	font-size: var( --rc-pg-fonte-sm );
+	color: var( --rc-pg-texto-suave );
+	margin: 0 0 1.5rem;
+}
+
+.rc-pagamento__loja {
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 8px;
+	padding: 1.25rem;
+	margin: 0 0 1rem;
+	background: #fff;
+}
+
+.rc-pagamento__nome {
+	font-size: var( --rc-pg-fonte-md );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.25rem;
+}
+
+.rc-pagamento__valor {
+	font-size: var( --rc-pg-fonte-base );
+	margin: 0 0 1rem;
+}
+
+/* Rótulo à esquerda e dado à direita em duas colunas; no celular a grade vira
+   uma coluna só, porque uma chave PIX aleatória tem 36 caracteres e não cabe
+   ao lado de um rótulo em 375px. */
+.rc-pagamento__dados {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.35rem 1rem;
+	margin: 0 0 1rem;
+}
+
+.rc-pagamento__rotulo {
+	font-size: var( --rc-pg-fonte-xs );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	color: var( --rc-pg-texto-suave );
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin: 0;
+}
+
+.rc-pagamento__valor-dado {
+	font-size: var( --rc-pg-fonte-base );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0;
+	/* A chave aleatória não tem espaço nenhum e estouraria a coluna sem isso. */
+	overflow-wrap: anywhere;
+}
+
+.rc-pagamento__codigo {
+	display: block;
+	font-size: var( --rc-pg-fonte-xs );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	background: var( --rc-pg-fundo );
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 6px;
+	padding: 0.75rem;
+	margin: 0.25rem 0 0.75rem;
+	overflow-wrap: anywhere;
+	/* O payload do BR Code é longo; limitar a altura evita que ele empurre o
+	   resto da tela para fora da primeira dobra no celular. */
+	max-height: 9rem;
+	overflow-y: auto;
+}
+
+.rc-pagamento__copiar {
+	font: inherit;
+	font-size: var( --rc-pg-fonte-sm );
+	background: var( --rc-pg-primaria );
+	/* #31BEB1 mede 2,30:1 com branco: o texto escuro é o que atinge 4,5:1. */
+	color: #1a1a1a;
+	border: 0;
+	border-radius: 6px;
+	padding: 0.6rem 1.1rem;
+	cursor: pointer;
+}
+
+.rc-pagamento__copiar:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+.rc-pagamento__retorno {
+	font-size: var( --rc-pg-fonte-sm );
+	color: var( --rc-pg-texto-suave );
+	margin: 0.5rem 0 0;
+	/* O elemento existe vazio desde a primeira cópia, e uma altura reservada
+	   evita que o bloco pule quando o texto aparece. */
+	min-height: 1.4em;
+}
+
+/* #CF6442 sobre branco mede 4,51:1— passa raspando no 4,5:1 do critério 1.4.3,
+   e é por isso que o alerta não usa nenhum tom mais claro que ele. */
+.rc-pagamento__alerta,
+.rc-pagamento__diferenca {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: var( --rc-pg-secundaria );
+	margin: 0.5rem 0 0;
+}
+
+@media ( max-width: 600px ) {
+	.rc-pagamento__dados {
+		grid-template-columns: 1fr;
+		gap: 0.1rem;
+	}
+
+	.rc-pagamento__valor-dado {
+		margin: 0 0 0.6rem;
+	}
+
+	.rc-pagamento__copiar {
+		width: 100%;
+	}
+}

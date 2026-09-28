@@ -25,6 +25,7 @@ get_header(); ?>
 			 * existentes sem renumerar as outras — o que foi preciso fazer
 			 * quando a vitrine coube num 45 espremido.
 			 *
+			 * @hooked reconectar_home_campanhas               - 5
 			 * @hooked reconectar_home_categorias               - 10
 			 * @hooked reconectar_home_lojas_destaque           - 20
 			 * @hooked reconectar_home_ofertas                  - 30

@@ -236,6 +236,170 @@ else
   echo "Página '/vendor-onboarding/' já não está publicada."
 fi
 
+echo "== Meios de pagamento =="
+# O comprador paga cada loja direto, por PIX ou transferência, com os dados que
+# a própria loja cadastrou. A loja cadastra isso em Configurações → Pagamento da
+# dashboard do Dokan, e essa tela só lista os métodos que estiverem nesta opção.
+#
+# `withdraw_methods` é um **mapa**, não uma lista: medido, o valor de fábrica é
+# `{"paypal":"","bank":"bank"}` — chave desligada guarda string vazia, ligada
+# repete o próprio nome. Gravar `["pix","bank"]` aqui não liga nada e ainda
+# apaga o `bank` que já estava de pé, e o sintoma é a tela existir vazia com
+# "No withdraw method is available", sem dizer por quê.
+if [ "$(wp option pluck dokan_withdraw withdraw_methods --format=json 2>/dev/null || true)" = '{"paypal":"","bank":"bank","pix":"pix"}' ]; then
+  echo "Métodos de recebimento da loja já configurados."
+else
+  wp option patch update dokan_withdraw withdraw_methods --format=json '{"paypal":"","bank":"bank","pix":"pix"}'
+fi
+
+# Os gateways de fábrica do WooCommerce competem com os autorais e mandariam o
+# dinheiro para o lugar errado: `bacs` é transferência para uma conta da
+# **plataforma** — que não existe neste arranjo e nunca foi preenchida — e tem o
+# mesmo rótulo do gateway autoral, de modo que o comprador veria duas
+# "Transferência bancária" e não teria como distinguir. `cod` promete pagamento
+# na entrega, que nenhuma loja se comprometeu a aceitar.
+#
+# A chave `enabled` só existe depois que o gateway é salvo ao menos uma vez:
+# medido, `woocommerce_cheque_settings` não a tem, e `wp option patch update`
+# sobre chave inexistente sai com erro — que num script sob `set -e` abortaria o
+# provisionamento inteiro. Ausente, o gateway está no padrão de fábrica dele,
+# que já é desligado; não há o que fazer.
+for gateway in bacs cheque cod; do
+  estado="$(wp option pluck "woocommerce_${gateway}_settings" enabled 2>/dev/null || true)"
+
+  if [ -z "$estado" ] || [ "$estado" = "no" ]; then
+    echo "Gateway padrão '$gateway' já desligado."
+  else
+    wp option patch update "woocommerce_${gateway}_settings" enabled no
+  fi
+done
+
+echo "== Carrinho e checkout clássicos =="
+# O WooCommerce cria estas duas páginas com os blocos `woocommerce/cart` e
+# `woocommerce/checkout`, e o bloco de checkout **não enxerga gateway clássico**.
+# Ele desenha apenas o que vier registrado em
+# `woocommerce_blocks_payment_method_type_registration`, um ponto de extensão que
+# exige uma classe `AbstractPaymentMethodType` mais um script chamando
+# `registerPaymentMethod` no navegador. Um `WC_Payment_Gateway` que não faça isso
+# some da tela — e some sem erro.
+#
+# Medido no HTML da página, com o carrinho montado e a loja com chave PIX
+# cadastrada:
+#
+#   paymentMethodSortOrder: ["reconectar_pix","reconectar_transferencia"]
+#   paymentMethodData:      []
+#   payment_methods:        ["reconectar_pix"]   (Store API do carrinho)
+#
+# O servidor sabia que o PIX estava disponível; o bloco não tinha como desenhá-lo.
+# O comprador via "Não há métodos de pagamento disponíveis", que é a pior forma
+# do defeito: a tela está correta, o gateway está ligado e nada indica a causa.
+#
+# O shortcode resolve os três problemas de uma vez. Além do gateway aparecer, é
+# o caminho clássico que chama `payment_fields()` — onde o aviso de qual loja não
+# recebe por aquele meio é impresso, requisito registrado em `docs/PAGAMENTOS.md`
+# — e `woocommerce_after_checkout_validation`, onde `validar_checkout()` recusa
+# um pedido que nenhuma loja conseguiria receber por inteiro. No bloco, os dois
+# simplesmente não rodam.
+#
+# A divisão em sub-pedidos do Dokan **não** é o motivo: medido, ele pendura
+# `split_vendor_orders` e `dokan_sync_insert_order` também em
+# `woocommerce_store_api_checkout_order_processed`, então ela funcionaria nos dois
+# caminhos.
+#
+# Escrever a integração de blocos continua possível, e seria o caminho se o
+# checkout em blocos virasse requisito. Ele custa uma classe por gateway, um
+# script sem etapa de compilação (o projeto não tem build) e um equivalente da
+# validação no Store API — e ainda esbarra em `paymentMethodData` ser resolvido
+# uma vez por carregamento, enquanto a lista de lojas sem chave muda com o
+# carrinho.
+#
+# O título em português vem junto porque as duas páginas nascem com o nome em
+# inglês: o WooCommerce as cria no ativar, antes de o pacote de idioma estar de
+# pé, e o texto fica gravado como dado — nenhuma tradução posterior o alcança. O
+# sintoma aparece longe da causa, na trilha de navegação ("Início › Cart") e na
+# aba do navegador, num site inteiramente em português.
+#
+# Trocar `post_title` é seguro: o `wp_update_post` só gera `post_name` quando ele
+# está vazio, então `/cart/` e `/checkout/` continuam valendo — e é por isso que
+# a rota não é traduzida junto. Mudá-la quebraria todo link já publicado, e o
+# `woocommerce_cart_page_id` aponta para o ID, não para o caminho.
+for par in \
+  "cart=woocommerce_cart=Carrinho" \
+  "checkout=woocommerce_checkout=Finalizar compra"
+do
+  chave="${par%%=*}"
+  resto="${par#*=}"
+  shortcode="${resto%%=*}"
+  titulo="${resto#*=}"
+  pagina="$(wp option get "woocommerce_${chave}_page_id" 2>/dev/null || true)"
+
+  if [ -z "$pagina" ] || [ "$pagina" -lt 1 ]; then
+    echo "Página de '$chave' ainda não existe; nada a converter."
+    continue
+  fi
+
+  if wp post get "$pagina" --field=post_content | grep -q "\[${shortcode}\]"; then
+    echo "Página de '$chave' já usa o shortcode clássico."
+  else
+    wp post update "$pagina" --post_content="<!-- wp:shortcode -->[${shortcode}]<!-- /wp:shortcode -->"
+  fi
+
+  if [ "$(wp post get "$pagina" --field=post_title)" = "$titulo" ]; then
+    echo "Página de '$chave' já se chama '$titulo'."
+  else
+    wp post update "$pagina" --post_title="$titulo"
+  fi
+done
+
+echo "== Assistente de configuração do Dokan =="
+# Sem este bloco o painel abre com a faixa "Complete your marketplace setup in
+# minutes" por cima das Configurações do Dokan, e ela não some sozinha: o
+# assistente considera pendentes as etapas `basic` e `commission`, que são as
+# duas que dependem da opção `dokan_selling`.
+#
+# A opção nasce ausente, e é por aí que a armadilha entra: os passos do
+# assistente escutam **`updated_option`**, nunca `added_option`. Uma opção que
+# ainda não existe é criada por `add_option`, que dispara o segundo — então
+# gravar `dokan_selling` pela primeira vez NÃO marca etapa nenhuma. (As outras
+# duas já apareciam marcadas nesta instalação por efeito colateral: o
+# provisionamento regrava `dokan_withdraw` e `dokan_appearance`, que já
+# existiam.) Depender desse efeito colateral seria pior ainda numa segunda
+# execução, quando o valor é igual ao gravado e `update_option` não dispara
+# nada. Por isso as opções de conclusão são escritas à mão, abaixo.
+#
+# A comissão vai a ZERO de propósito, e essa é a parte que não pode ser copiada
+# dos padrões da tela. O assistente propõe 10% mais R$10 fixos; medido em
+# `wp_dokan_orders`, hoje `net_amount` é igual ao `order_total` em todos os
+# pedidos — a plataforma não retém nada, porque o comprador paga a loja direto
+# (veja `docs/PAGAMENTOS.md`). Aceitar o padrão faria a dashboard de cada loja
+# passar a exibir um desconto que ninguém cobra: número plausível e falso, que é
+# exatamente o que a regra de honestidade de dados deste projeto proíbe.
+if wp option get dokan_selling --format=json >/dev/null 2>&1; then
+  echo "Regras de venda do Dokan já gravadas."
+else
+  wp option add dokan_selling --format=json '{"shipping_fee_recipient":"seller","tax_fee_recipient":"seller","shipping_tax_fee_recipient":"seller","order_status_change":"on","new_seller_enable_selling":"on","commission_type":"fixed","admin_commission":{"additional_fee":"0","admin_percentage":"0"},"commission_category_based_values":{"items":[],"all":{"flat":"","percentage":""}}}'
+fi
+
+# Cada etapa guarda a própria conclusão, e o assistente inteiro guarda a dele em
+# opção separada — marcar as quatro não marca o assistente. Medido: com as quatro
+# em `1`, `AdminSetupGuide::is_setup_complete()` continuava devolvendo `false` e
+# a faixa seguia na tela.
+for etapa in basic commission withdraw appearance; do
+  opcao="dokan_admin_onboarding_setup_step_${etapa}_completed"
+
+  if [ "$(wp option get "$opcao" 2>/dev/null || true)" = "1" ]; then
+    echo "Etapa '$etapa' do assistente já concluída."
+  else
+    wp option update "$opcao" 1
+  fi
+done
+
+if [ "$(wp option get dokan_admin_setup_guide_steps_completed 2>/dev/null || true)" = "1" ]; then
+  echo "Assistente de configuração do Dokan já concluído."
+else
+  wp option update dokan_admin_setup_guide_steps_completed 1
+fi
+
 echo "== Resíduos da instalação padrão do WordPress =="
 # O WordPress nasce com um post "Hello world!", um comentário de "A WordPress
 # Commenter" e uma sidebar de blog. Nada disso é invisível: o post e o

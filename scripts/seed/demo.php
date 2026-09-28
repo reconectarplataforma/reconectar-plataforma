@@ -661,6 +661,125 @@ function reconectar_demo_criar_admin_de_empresa( $admin, $empresas ) {
 }
 
 /**
+ * Cria um Moderador de Conteúdo.
+ *
+ * O papel é literal aqui pela mesma razão registrada em
+ * `reconectar_demo_criar_admin_de_empresa()`: o catálogo declara quem é a
+ * pessoa, nunca o que ela pode.
+ *
+ * Não há escopo a gravar — o moderador vale para a plataforma inteira —, então
+ * a função termina onde a do administrador de empresas apenas começa a sua
+ * parte mais longa.
+ *
+ * @param array $moderador Definição vinda de `dados-demo.php`.
+ * @return int ID do usuário, ou 0 em caso de falha.
+ */
+function reconectar_demo_criar_moderador( $moderador ) {
+	$existente = get_user_by( 'login', $moderador['login'] );
+
+	if ( $existente ) {
+		reconectar_demo_log( '  = Moderador de conteúdo já existia: ' . $moderador['primeiro'] . ' ' . $moderador['ultimo'] );
+		return (int) $existente->ID;
+	}
+
+	$usuario_id = wp_insert_user(
+		array(
+			'user_login'   => $moderador['login'],
+			'user_email'   => $moderador['email'],
+			'user_pass'    => RECONECTAR_DEMO_SENHA,
+			'display_name' => $moderador['primeiro'] . ' ' . $moderador['ultimo'],
+			'first_name'   => $moderador['primeiro'],
+			'last_name'    => $moderador['ultimo'],
+			'role'         => Reconectar_Permissoes::PAPEL_MODERADOR,
+		)
+	);
+
+	if ( is_wp_error( $usuario_id ) ) {
+		reconectar_demo_log( '  ! Moderador ' . $moderador['login'] . ': ' . $usuario_id->get_error_message() );
+		return 0;
+	}
+
+	update_user_meta( $usuario_id, RECONECTAR_DEMO_META, 1 );
+
+	reconectar_demo_log( '  + Moderador de conteúdo: ' . $moderador['primeiro'] . ' ' . $moderador['ultimo'] );
+
+	return (int) $usuario_id;
+}
+
+/**
+ * Cria uma campanha da home, com arte gerada.
+ *
+ * As datas chegam do catálogo como deslocamento em dias e saem daqui no formato
+ * `Y-m-d`, que é o único que `Reconectar_Campanha::esta_vigente()` compara —
+ * a comparação é textual, e uma data em outro formato devolveria a resposta
+ * errada sem erro nenhum. `null` vira string vazia, que a classe lê como
+ * "desde sempre" ou "sem prazo".
+ *
+ * A arte é 1200×400 porque a faixa da home declara `aspect-ratio: 3 / 1`: uma
+ * imagem fora dessa proporção seria recortada pelo centro, e a demonstração
+ * mostraria um corte que a campanha real não tem.
+ *
+ * @param array $campanha Definição vinda de `dados-demo.php`.
+ * @return int ID do post, ou 0 em caso de falha.
+ */
+function reconectar_demo_criar_campanha( $campanha ) {
+	$existente = reconectar_demo_post_por_chave( Reconectar_Campanha::POST_TYPE, $campanha['chave'] );
+
+	if ( $existente ) {
+		reconectar_demo_log( '  = Campanha já existia: ' . $campanha['titulo'] );
+		return $existente;
+	}
+
+	$post_id = wp_insert_post(
+		array(
+			'post_type'   => Reconectar_Campanha::POST_TYPE,
+			'post_title'  => $campanha['titulo'],
+			'post_status' => 'publish',
+		),
+		true
+	);
+
+	if ( is_wp_error( $post_id ) ) {
+		reconectar_demo_log( '  ! Campanha ' . $campanha['titulo'] . ': ' . $post_id->get_error_message() );
+		return 0;
+	}
+
+	$data = function ( $dias ) {
+		return null === $dias ? '' : gmdate( 'Y-m-d', time() + ( (int) $dias * DAY_IN_SECONDS ) );
+	};
+
+	update_post_meta( $post_id, Reconectar_Campanha::META_LINK, esc_url_raw( $campanha['link'] ) );
+	update_post_meta( $post_id, Reconectar_Campanha::META_ALT, $campanha['alt'] );
+	update_post_meta( $post_id, Reconectar_Campanha::META_INICIO, $data( $campanha['inicio'] ) );
+	update_post_meta( $post_id, Reconectar_Campanha::META_FIM, $data( $campanha['fim'] ) );
+	update_post_meta( $post_id, Reconectar_Campanha::META_ORDEM, (int) $campanha['ordem'] );
+	update_post_meta( $post_id, RECONECTAR_DEMO_CHAVE, $campanha['chave'] );
+	update_post_meta( $post_id, RECONECTAR_DEMO_META, 1 );
+
+	$anexo_id = reconectar_demo_criar_anexo(
+		'campanha-' . $campanha['chave'],
+		$campanha['titulo'],
+		$campanha['cor'],
+		1200,
+		400,
+		$campanha['alt']
+	);
+
+	if ( $anexo_id ) {
+		set_post_thumbnail( $post_id, $anexo_id );
+	}
+
+	// Campanha sem arte não é campanha: `Reconectar_Campanha::dados()` devolve
+	// `null` e a faixa a ignora em silêncio. O aviso é o que evita procurar o
+	// defeito na home quando a falha foi na geração do PNG.
+	$vigencia = $anexo_id ? '' : ' (sem arte — a faixa vai ignorá-la)';
+
+	reconectar_demo_log( '  + Campanha: ' . $campanha['titulo'] . $vigencia );
+
+	return (int) $post_id;
+}
+
+/**
  * Acerta o vínculo de uma loja que já existia com a empresa do catálogo.
  *
  * Idempotência aqui não é só "não duplicar": é convergir para o estado
@@ -737,6 +856,41 @@ function reconectar_demo_reconciliar_horario( $usuario_id, $horario ) {
 }
 
 /**
+ * Grava os meios de recebimento declarados numa loja que já existe.
+ *
+ * Irmã de `reconectar_demo_reconciliar_horario()`, pelo mesmo motivo: sem ela,
+ * uma instalação carregada antes desta entrega nunca receberia chave PIX
+ * nenhuma, e a tela de agradecimento diria que todas as lojas não recebem —
+ * um sintoma que parece defeito do gateway e é ausência de dado.
+ *
+ * Substitui a chave `payment` inteira em vez de mesclar por dentro: mesclar
+ * manteria de pé um meio que o catálogo deixou de declarar, e a loja sem
+ * pagamento nenhum — a que existe justamente para exercitar o caminho da
+ * recusa — voltaria a receber.
+ *
+ * @param int   $usuario_id ID da loja.
+ * @param array $pagamento  Meios declarados, no formato da chave `payment`.
+ * @return void
+ */
+function reconectar_demo_reconciliar_pagamento( $usuario_id, $pagamento ) {
+	$perfil = get_user_meta( $usuario_id, 'dokan_profile_settings', true );
+
+	if ( ! is_array( $perfil ) ) {
+		return;
+	}
+
+	$atual = isset( $perfil['payment'] ) ? $perfil['payment'] : array();
+
+	if ( $atual === $pagamento ) {
+		return;
+	}
+
+	$perfil['payment'] = $pagamento;
+
+	update_user_meta( $usuario_id, 'dokan_profile_settings', $perfil );
+}
+
+/**
  * Cria uma loja, como usuário do papel de vendedor do Dokan.
  *
  * O cadastro em si é delegado a `Reconectar_Lojas::criar()`, que é o
@@ -765,9 +919,26 @@ function reconectar_demo_criar_loja( $loja, $empresa_id = 0 ) {
 
 	$horario = reconectar_demo_horario_do_dokan( isset( $loja['horario'] ) ? $loja['horario'] : array() );
 
+	/*
+	 * Meios de recebimento da loja. `paypal` e `bank` entram sempre, mesmo
+	 * vazios, porque são as duas chaves que o Dokan Lite escreve à mão em
+	 * `insert_settings_info()` e espera encontrar; `pix` só existe quando a
+	 * loja o declara — a ausência da chave é o que `Reconectar_Pagamento_Pix`
+	 * lê como "esta loja não recebe por aqui".
+	 */
+	$pagamento = array(
+		'paypal' => array( 'email' => '' ),
+		'bank'   => array(),
+	);
+
+	if ( isset( $loja['pagamento'] ) && is_array( $loja['pagamento'] ) ) {
+		$pagamento = array_merge( $pagamento, $loja['pagamento'] );
+	}
+
 	if ( $existente ) {
 		reconectar_demo_reconciliar_vinculo( (int) $existente->ID, $empresa_id );
 		reconectar_demo_reconciliar_horario( (int) $existente->ID, $horario );
+		reconectar_demo_reconciliar_pagamento( (int) $existente->ID, $pagamento );
 
 		reconectar_demo_log( '  = Loja já existia: ' . $loja['nome'] );
 		return (int) $existente->ID;
@@ -830,10 +1001,7 @@ function reconectar_demo_criar_loja( $loja, $empresa_id = 0 ) {
 	$perfil = array(
 		'store_name'              => $loja['nome'],
 		'social'                  => array(),
-		'payment'                 => array(
-			'paypal' => array( 'email' => '' ),
-			'bank'   => array(),
-		),
+		'payment'                 => $pagamento,
 		'phone'                   => $loja['telefone'],
 		'show_email'              => 'no',
 		'address'                 => array(
@@ -1266,6 +1434,40 @@ function reconectar_demo_sincronizar_saldo_dokan( $pedido_id ) {
 }
 
 /**
+ * Grava no pedido existente o meio de pagamento que o catálogo declara hoje.
+ *
+ * Irmã de `reconectar_demo_reconciliar_pagamento()`, e nascida do mesmo modo:
+ * o catálogo já declarou meios que não existiam como gateway (`reconectar_cartao`,
+ * `reconectar_boleto`), e a criação de pedido é pulada quando ele já existe — o
+ * painel seguiria anunciando "Cartão de crédito" num pedido que a plataforma só
+ * sabe receber por PIX.
+ *
+ * Só o meio converge. Trocar item de pedido gravado mexeria em totais, nos
+ * sub-pedidos do Dokan e nas linhas de saldo; quando o catálogo mudar os itens,
+ * o caminho é `./scripts/seed-demo.sh remover` antes de instalar de novo.
+ *
+ * @param int   $pedido_id ID do pedido.
+ * @param array $pagamento Definição do meio (`id` e `titulo`).
+ * @return void
+ */
+function reconectar_demo_reconciliar_meio_de_pagamento( $pedido_id, $pagamento ) {
+	$objeto = wc_get_order( $pedido_id );
+
+	if ( ! $objeto ) {
+		return;
+	}
+
+	if ( $objeto->get_payment_method() === $pagamento['id']
+		&& $objeto->get_payment_method_title() === $pagamento['titulo'] ) {
+		return;
+	}
+
+	$objeto->set_payment_method( $pagamento['id'] );
+	$objeto->set_payment_method_title( $pagamento['titulo'] );
+	$objeto->save();
+}
+
+/**
  * Cria um pedido com os itens declarados no catálogo.
  *
  * Não há linha de frete. A taxa de entrega que o card da vitrine exibe é
@@ -1297,6 +1499,8 @@ function reconectar_demo_criar_pedido( $pedido, $cliente_id, $pagamento ) {
 		if ( function_exists( 'dokan' ) ) {
 			reconectar_demo_sincronizar_saldo_dokan( $existente );
 		}
+
+		reconectar_demo_reconciliar_meio_de_pagamento( $existente, $pagamento );
 
 		reconectar_demo_log( '  = Pedido já existia: ' . $pedido['chave'] );
 		return $existente;
@@ -1885,6 +2089,26 @@ function reconectar_demo_instalar( $dados ) {
 		}
 	}
 
+	reconectar_demo_log( 'Criando moderadores de conteúdo...' );
+
+	$total_moderadores = 0;
+
+	foreach ( $dados['moderadores_de_conteudo'] as $moderador ) {
+		if ( reconectar_demo_criar_moderador( $moderador ) ) {
+			$total_moderadores++;
+		}
+	}
+
+	reconectar_demo_log( 'Criando campanhas...' );
+
+	$total_campanhas = 0;
+
+	foreach ( $dados['campanhas'] as $campanha ) {
+		if ( reconectar_demo_criar_campanha( $campanha ) ) {
+			$total_campanhas++;
+		}
+	}
+
 	reconectar_demo_log( 'Criando lojas, produtos e avaliações...' );
 
 	$total_produtos   = 0;
@@ -2030,8 +2254,15 @@ function reconectar_demo_instalar( $dados ) {
 			$forum['respostas']
 		)
 	);
+	reconectar_demo_log(
+		sprintf(
+			'Conteúdo: %d moderadores, %d campanhas (uma delas já expirada, de propósito).',
+			$total_moderadores,
+			$total_campanhas
+		)
+	);
 	reconectar_demo_log( 'A faixa de aviso de dados de demonstração está ativa no site.' );
-	reconectar_demo_log( 'Senha de lojas, clientes e administradores de empresas: ' . RECONECTAR_DEMO_SENHA );
+	reconectar_demo_log( 'Senha de lojas, clientes, administradores de empresas e moderadores: ' . RECONECTAR_DEMO_SENHA );
 	reconectar_demo_log( 'Para remover: wp eval-file scripts/seed/demo.php remover' );
 }
 
@@ -2319,6 +2550,33 @@ function reconectar_demo_remover() {
 		);
 	}
 
+	/*
+	 * Campanhas antes dos anexos, pelo mesmo motivo do cabeçalho desta função: a
+	 * arte é a imagem destacada da campanha, e apagá-la primeiro deixaria a
+	 * campanha apontando para um anexo inexistente durante toda a remoção.
+	 *
+	 * Um tipo de post novo não sai sozinho daqui — esta lista é explícita, e
+	 * acrescentar o CPT à carga sem acrescentá-lo também a esta rotina deixaria a
+	 * demonstração impossível de desinstalar. O filtro continua sendo
+	 * `RECONECTAR_DEMO_META`: sem ele, a consulta devolveria também as campanhas
+	 * que o Moderador de Conteúdo tenha publicado de verdade.
+	 */
+	$campanhas = get_posts(
+		array(
+			'post_type'      => Reconectar_Campanha::POST_TYPE,
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_key'       => RECONECTAR_DEMO_META, // phpcs:ignore WordPress.DB.SlowDBQuery
+			'meta_value'     => 1,                     // phpcs:ignore WordPress.DB.SlowDBQuery
+		)
+	);
+
+	foreach ( $campanhas as $campanha_id ) {
+		wp_delete_post( $campanha_id, true );
+	}
+	reconectar_demo_log( sprintf( '- %d campanhas removidas.', count( $campanhas ) ) );
+
 	// Limpa as referências a anexos guardadas no perfil de cada loja. Clientes
 	// entram no laço e saem sem alteração: não têm perfil de loja, e o
 	// `is_array()` abaixo dá conta disso sem precisar separar as duas listas.
@@ -2351,7 +2609,7 @@ function reconectar_demo_remover() {
 	foreach ( $usuarios as $usuario_id ) {
 		wp_delete_user( $usuario_id );
 	}
-	reconectar_demo_log( sprintf( '- %d usuários removidos (lojas, clientes e administradores de empresas).', count( $usuarios ) ) );
+	reconectar_demo_log( sprintf( '- %d usuários removidos (lojas, clientes, administradores de empresas e moderadores).', count( $usuarios ) ) );
 
 	/*
 	 * Empresas depois dos usuários, e não antes: o vínculo mora na loja e
@@ -2435,7 +2693,7 @@ if ( ! class_exists( 'WooCommerce' ) ) {
 // lojas por conta própria voltaria a divergir do código real — que é o
 // defeito que a delegação existe para impedir. Abortar cedo, com a causa dita,
 // é melhor que um fatal de classe inexistente no meio da criação das lojas.
-if ( ! class_exists( 'Reconectar_Empresa' ) || ! class_exists( 'Reconectar_Lojas' ) ) {
+if ( ! class_exists( 'Reconectar_Empresa' ) || ! class_exists( 'Reconectar_Lojas' ) || ! class_exists( 'Reconectar_Campanha' ) ) {
 	reconectar_demo_abortar( 'O plugin Reconectar Core precisa estar ativo para rodar o seed.' );
 }
 

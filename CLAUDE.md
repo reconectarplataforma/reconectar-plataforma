@@ -1,8 +1,10 @@
 # Instruções para agentes — Plataforma Reconectar
 
 Marketplace multi-vendedor em WordPress do projeto "Reconectar" (edital
-FUNDEPES/UNOPS, "Nosso Chão Nossa História"). Quatro atores: Administrador,
-Administrador de Empresas, Vendedor e Usuário Comum. Licença GPL-2.0-or-later.
+FUNDEPES/UNOPS, "Nosso Chão Nossa História"). Cinco atores: Super Administrador
+(`administrator`), Administrador (`company_admin`), Moderador de Conteúdo
+(`content_moderator`), Loja (`seller`) e Usuário Comum (`customer`). Licença
+GPL-2.0-or-later.
 
 **Vocabulário.** A **empresa** é a Reconectar Incubadora Digital; cada negócio
 que ela cadastra é uma **Loja**. No painel de empresas e no código autoral dele,
@@ -27,7 +29,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/seed/demo.php` | motor da carga: cria e remove (só lógica) |
 | `scripts/demo-completa.sh` | ambiente + provisionamento + carga, em um comando |
 | `scripts/seed-demo.sh` | atalho para `instalar` / `remover` só a carga |
-| `scripts/verificar-acessos.sh` | testa as travas de RBAC por HTTP, nos quatro perfis |
+| `scripts/verificar-acessos.sh` | testa as travas de RBAC por HTTP, nos cinco perfis |
 | `scripts/configurar-url-dinamica.php` | grava no `wp-config.php` o bloco que resolve a URL pelo `Host` |
 | `scripts/normalizar-urls.php` | converte em caminho as URLs absolutas já gravadas no banco |
 | `wp-content/themes/reconectar/` | tema autoral (child theme do Storefront) |
@@ -38,7 +40,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
 | `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
-| `docs/PERFIS_E_PERMISSOES.md` | os quatro atores e a matriz de permissões |
+| `docs/PERFIS_E_PERMISSOES.md` | os cinco atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
 | `docs/DADOS_DEMONSTRACAO.md` | o que a carga cria, em detalhe |
 | `DIARIO_DESENVOLVIMENTO.md` | histórico cronológico das entregas |
@@ -72,7 +74,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-59 casos de permissão por HTTP, nos quatro perfis. Sai com status 1 se algum
+127 casos de permissão por HTTP, nos cinco perfis. Sai com status 1 se algum
 falhar. **Rode depois de mexer em qualquer coisa de RBAC** — as travas não têm
 teste automatizado além deste.
 
@@ -130,6 +132,78 @@ o painel do vendedor lê o faturamento. Apagar o pedido no WooCommerce **não**
 limpa essas linhas: o plugin as remove a partir dos seus próprios hooks de
 estorno, não da exclusão definitiva. Linhas órfãs viram faturamento fantasma no
 painel. Veja `reconectar_demo_limpar_tabelas_dokan()`.
+
+### O Dokan descarta em silêncio meio de pagamento que ele não conhece
+
+`Dashboard\Templates\Settings::insert_settings_info()` tem `bank` e `paypal`
+escritos à mão no ramo do nonce `dokan_payment_settings_nonce`. Um
+`$_POST['settings']['pix']` chega, não é lido, e a tela recarrega sem erro e sem
+o dado — o sintoma é o campo voltar vazio depois de salvar.
+
+O único gancho que alcança a gravação é `dokan_store_profile_settings_args`, e
+ele dispara em **todos** os caminhos de salvamento do perfil. Por isso a injeção
+do PIX é guardada por `wp_verify_nonce( …, 'dokan_payment_settings_nonce' )`:
+sem essa guarda, salvar a loja em outra aba apagaria os dados de pagamento, sem
+erro e sem aviso. Veja `Reconectar_Pagamento_Pix::gravar()`.
+
+E a opção `dokan_withdraw['withdraw_methods']` precisa ligar `pix` e `bank` —
+sem isso **toda loja vê "No withdraw method is available"**: a tela existe, está
+vazia, e nada indica o porquê. O `provision.sh` a ajusta.
+
+O formato é um **mapa**, não uma lista: medido, o valor de fábrica é
+`{"paypal":"","bank":"bank"}` — chave desligada guarda string vazia, ligada
+repete o próprio nome. Gravar `["pix","bank"]` não liga nada e ainda apaga o
+`bank` que já estava de pé, com o mesmo sintoma mudo. O valor correto é
+`{"paypal":"","bank":"bank","pix":"pix"}`.
+
+### O bloco `woocommerce/checkout` não enxerga gateway clássico
+
+Ele desenha **apenas** o que vier registrado em
+`woocommerce_blocks_payment_method_type_registration` — uma classe
+`AbstractPaymentMethodType` mais um script chamando `registerPaymentMethod` no
+navegador. Um `WC_Payment_Gateway` que não faça isso some da tela, e some sem
+erro: o comprador lê "Não há métodos de pagamento disponíveis", com o gateway
+ligado e `is_available()` devolvendo `true` no servidor.
+
+Medido, com o carrinho montado e a loja com chave PIX cadastrada:
+
+```
+paymentMethodSortOrder: ["reconectar_pix","reconectar_transferencia"]
+paymentMethodData:      []
+payment_methods:        ["reconectar_pix"]   (Store API do carrinho)
+```
+
+Conferir pelo servidor — `get_available_payment_gateways()`, `is_available()`,
+a opção `enabled` — responde "está tudo certo" três vezes seguidas. Só o HTML da
+página acusa.
+
+O `provision.sh` converte `cart` e `checkout` aos shortcodes
+`[woocommerce_cart]` / `[woocommerce_checkout]`. Não é só cosmético: `payment_fields()`
+e `woocommerce_after_checkout_validation` **não rodam** no caminho de blocos, e
+são eles que imprimem o aviso de qual loja não recebe e que recusam um pedido
+impossível. A divisão em sub-pedidos do Dokan não entra nessa conta — ele pendura
+`split_vendor_orders` também em `woocommerce_store_api_checkout_order_processed`,
+e olhar só para `woocommerce_store_api_checkout_update_order_meta`, que está
+vazio, leva à conclusão errada.
+
+### Os passos do assistente do Dokan escutam `updated_option`, não `added_option`
+
+O assistente de configuração (`Admin\OnboardingSetup\AdminSetupGuide`) põe a
+faixa "Complete your marketplace setup in minutes" sobre as Configurações
+enquanto houver etapa pendente, e cada etapa se marca sozinha ao ver a opção
+dela mudar. As etapas `basic` e `commission` observam `dokan_selling`, que
+**nasce ausente** — e opção ausente é criada por `add_option`, que dispara
+`added_option`. O primeiro `update_option( 'dokan_selling', … )` grava o valor e
+não marca etapa nenhuma; o segundo não dispara nada, porque o valor é igual.
+
+E marcar as quatro etapas ainda não conclui o assistente: `is_setup_complete()`
+lê uma opção **separada**, `dokan_admin_setup_guide_steps_completed`. Medido:
+com as quatro em `1`, a faixa seguia na tela.
+
+O caminho idempotente é gravar as cinco opções à mão, como faz o `provision.sh`.
+E a comissão tem de ir a **zero** no mesmo bloco: o padrão que o assistente
+propõe é 10% mais R$10, e aqui a plataforma não retém nada — aceitar o padrão
+exibiria na dashboard de cada loja um desconto que ninguém cobra.
 
 ### bbPress e BuddyPress estão ativos
 
@@ -200,6 +274,104 @@ próprio e `COALESCE( …, 0 )`, como em `Reconectar_Forum::ordenar_por_votos()`
 precisa gravar as metas à mão — e recontar: `bbp_update_reply_walker()` só refaz
 as contagens sob `bbp_deleted_reply` ou `save_post`, e em WP-CLI o resultado
 seria `_bbp_reply_count` em zero com respostas na tela.
+
+### O bbPress tem uma segunda camada de papéis, e ela **vence** a do WordPress
+
+`bbp_keymaster`, `bbp_moderator`, `bbp_participant`, `bbp_spectator`,
+`bbp_blocked`. São gravados como papel **adicional** do usuário e se sobrepõem às
+capacidades de fórum declaradas no papel do WordPress.
+
+Todo cadastro recebe `bbp_participant`. Foi por isso que um papel novo declarando
+`edit_topics` e `delete_others_topics` respondia "não" às duas: a capacidade era
+escrita no papel, aplicada pelo `sincronizar_capacidades()`, e perdida adiante —
+o sintoma mais caro deste repositório. Quem resolve é
+`Reconectar_Permissoes::aplicar_moderacao_no_forum()`.
+
+O gancho é **`set_user_role`**, nunca `add_user_role`: `bbp_set_user_role()` troca
+o papel com `WP_User::remove_role()` e `add_role()`, que disparam
+`add_user_role` — o método chamaria a si mesmo.
+
+### `bbp_map_forum_meta_caps()` reserva `edit_forums` ao `keep_gate`
+
+Sob `bbp_map_meta_caps`, em `map_meta_cap` prioridade 10, o bbPress troca
+`edit_forums` e `edit_others_forums` por `do_not_allow` para quem não é keymaster,
+**independentemente do papel**. Medido, com o papel declarando as duas:
+
+```
+allcaps[edit_forums] = true
+map_meta_cap( 'edit_forums' ) = do_not_allow
+```
+
+`publish_forums` **não** sofre isso — essa o bbPress mapeia para `moderate`. A
+assimetria é dele. `Reconectar_Permissoes::restaurar_gestao_de_foruns()` devolve
+as duas em **prioridade 11**, e só para quem o papel já tinha autorizado; a
+leitura é em `$usuario->allcaps[$cap]` e não com `user_can()`, que reentraria em
+`map_meta_cap` com a mesma capacidade e entraria em recursão infinita.
+
+`keep_gate` continua fora de alcance de propósito: ele abre as Configurações do
+bbPress e a ferramenta de **redefinição**, que apaga fóruns, tópicos e respostas
+da instalação inteira.
+
+### `promote_user` sem o papel de destino devolve `true`
+
+`current_user_can( 'promote_user', $id )` responde "sim" sozinha. O filtro que
+impede a escalada — `negar_gestao_de_usuarios_superiores()` — compara o papel de
+**destino** com o do ator, e o destino é o **terceiro** argumento. Conferir sem
+ele inverte a resposta e dá por segura uma trava que não foi consultada.
+
+### `wp eval` com `wp_set_current_user()` lê capacidade otimista
+
+O código do `eval` roda depois do `init`, então o papel dinâmico que o bbPress
+aplica naquele gancho não está no usuário: capacidades de fórum respondem "SIM"
+onde o navegador responde 403. Para medir de verdade, `wp --user=<login> eval …`.
+
+### Nem toda negação do `/wp-admin` sai com 403
+
+`plugins.php` morre em `wp-admin/includes/menu.php:384`, num `wp_die( …, 403 )`
+explícito, porque `user_can_access_admin_page()` reprova a página inteira. Já
+`theme-install.php` **passa** por esse portão — ele pendura em `themes.php` — e só
+então bate na verificação do próprio arquivo (`theme-install.php:16`), um
+`wp_die()` **sem argumento de status**; o padrão de `_default_wp_die_handler()` é
+**500**. A tela diz a mesma coisa nos dois casos.
+
+E `admin.php?page=wc-orders` devolve **301** para `edit.php?post_type=shop_order`
+quando o HPOS está desligado — é ali que o 403 acontece. Um verificador que
+espere 403 em toda negação acusa falha onde não há, e um que leia só o primeiro
+código lê 301 como sucesso.
+
+### O menu "Produtos" pode apontar para as avaliações
+
+Para um papel com `moderate_comments` e sem `edit_products`, o item de menu
+**Produtos** existe e resolve para `admin.php?page=product-reviews` — as
+avaliações, que o WooCommerce registra sob aquele menu. O catálogo
+(`edit.php?post_type=product`) responde 403 e nenhum item leva até lá. Quem vir o
+rótulo na lateral e concluir que o perfil administra o catálogo terá lido o
+rótulo, não o destino.
+
+### Em single-site, `edit_users` alcança o `administrator`
+
+Não existe "editar usuário abaixo de mim" no núcleo. Quem tem `edit_users` pode
+abrir a ficha de um `administrator`, **trocar a senha dele** e entrar com a
+conta; com `promote_users`, pode promover a si mesmo. As duas juntas transformam
+o Administrador restrito em Super Administrador com dois cliques, e a proibição
+de instalar plugin vira decoração.
+
+`Reconectar_Permissoes::negar_gestao_de_usuarios_superiores()` barra as duas
+rotas em `map_meta_cap`. Ao conferir, lembre que `promote_user` **exige o papel
+de destino como terceiro argumento** — a armadilha registrada acima.
+
+### `negar_escrita_ao_admin_de_empresas()` monitora `edit_post` genérico
+
+O filtro vigia `edit_post`, `delete_post` e `publish_post` para qualquer post, e
+a exceção é uma **allowlist de post types**. Quando o papel ganhou capacidade de
+conteúdo, o filtro passou a negar a edição de post e de página sem uma linha de
+mudança: o código estava no lugar certo, correto para o que fora escrito, e
+impedia em silêncio o que a especificação nova pedia.
+
+Ao dar capacidade de escrita nova a um desses papéis, acrescente o post type à
+allowlist — ou a capacidade é concedida, sincronizada e perdida adiante. Produto
+e pedido ficam de fora de propósito: quem administra o produto é a loja dona
+dele.
 
 ### `reconectar_demo_remover()` lista post types explicitamente
 
@@ -294,6 +466,43 @@ gera caixa, e caixa dentro de grade ocupa célula. Em `ul.products` isso dava
 quatro colunas declaradas e três cartões por linha, com o primeiro começando na
 célula 2. `content: none` apaga a caixa; `display: none` deixaria o item na
 contagem. Vale para qualquer contêiner do pai que vire grade.
+
+### `max-width` do tema pai vence `width` autoral — e a cascata não acusa
+
+Regra escrita, regra aplicada, tela igual. O `woocommerce.css` declara
+`table.cart .product-thumbnail img { max-width: 3.70633em }` (59,3px) e
+`table.cart .qty { max-width: 3.632em }` (58,1px). Uma regra autoral de `width`
+**ganha a cascata** — o DevTools mostra a nossa vencendo, e nada muda, porque o
+teto veio de **outra propriedade**, que ninguém disputou.
+
+É o sintoma mais caro deste repositório: código no lugar certo que não faz nada.
+E a investigação vai para a especificidade, que não é o problema. Ao vestir
+elemento que o WooCommerce ou o Storefront já dimensionam, declare `max-width`
+ao lado de `width` — ou varra o CSSOM antes, atrás de `max-width`, `min-width` e
+`flex-basis`, não só da propriedade que você está escrevendo.
+
+### `<td>` em `display: flex` perde o `colspan`
+
+A célula deixa de ser célula, e o papel vai embora junto com a atribuição de
+largura. Medido: `td.actions[colspan="6"]` caiu de 1187px para 331px e empilhou
+em três linhas. Pôr a `<tr>` em `display: block` **não** resolve — a célula
+anônima resultante continua dimensionada pelo algoritmo de tabela, e o valor
+seguiu 331. A saída é manter a célula em `table-cell` e usar float nos filhos:
+`table-cell` já estabelece um bloco de formatação, então contém os floats sem
+clearfix.
+
+### `shop_table_responsive` não tira o `display: table` da `<table>`
+
+A classe põe as `<td>` em bloco e esconde o `<thead>`, e é fácil concluir que a
+tabela virou lista. O elemento continua tabela, e tabela dimensiona pela largura
+mínima do conteúdo, **ignorando o contêiner**: medido no carrinho, cartões de
+473px numa tela de 375 — transbordo horizontal, que é o que faz a barra inferior
+sumir no celular. Só `table`, `tbody` e `tr` em `display: block` resolvem.
+
+E `a.remove` do WooCommerce **já nasce `position: absolute`**. Tirar
+`td.product-remove` do fluxo sem devolver o link ao fluxo faz ele se posicionar
+contra a própria célula, que passou a ter 6px: medido, o "×" foi parar em x=474
+numa tela de 375. `.remove { position: static }` dentro do `td` absoluto.
 
 ### Em `flex-wrap: wrap`, quem decide a quebra é a **base**, não o encolhimento
 

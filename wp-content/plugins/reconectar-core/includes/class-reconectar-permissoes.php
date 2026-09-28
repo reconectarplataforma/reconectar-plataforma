@@ -44,17 +44,62 @@ class Reconectar_Permissoes {
 	 *
 	 * @var string[]
 	 */
-	const PAPEIS_DA_COMUNIDADE = array( 'administrator', 'seller', 'company_admin' );
+	const PAPEIS_DA_COMUNIDADE = array( 'administrator', 'seller', 'company_admin', 'content_moderator' );
 
 	/**
-	 * Papel do Administrador de Empresas.
+	 * Papel do Administrador.
 	 *
-	 * Quarto ator da plataforma: administra a *operação* — cadastra empresas e
-	 * lojas, consulta produtos e pedidos de quem gere — sem administrar a
-	 * *tecnologia*. É o princípio que a especificação enuncia, e a razão de este
-	 * papel não receber nenhuma capacidade nativa do WordPress para isso.
+	 * A chave continua sendo `company_admin`, e isso é deliberado: ela está
+	 * gravada em `wp_usermeta` de todas as contas que já têm o papel, e renomear
+	 * chave de papel exigiria migração versionada para não deixar essas contas
+	 * sem permissão nenhuma — o defeito silencioso que o `CLAUDE.md` registra.
+	 * O que mudou foi o rótulo: este ator deixou de ser apenas "Administrador de
+	 * Empresas" e passou a ser o **Administrador** da plataforma, que cadastra
+	 * lojas e empresas, modera conteúdo e configura as contas das lojas.
+	 *
+	 * O que ele continua não podendo é o que define o papel: administrar a
+	 * *tecnologia*. Sem `manage_options`, sem `manage_woocommerce`, sem
+	 * `dokandar` e sem nenhuma `CAPS_DE_DESENVOLVIMENTO`.
 	 */
 	const PAPEL_ADMIN_EMPRESAS = 'company_admin';
+
+	/**
+	 * Papel do Moderador de Conteúdo.
+	 *
+	 * Cuida do que a plataforma publica — conteúdo da comunidade, campanhas na
+	 * home, menus de navegação — e do fórum. Não toca em loja, em empresa, em
+	 * produto, em pedido nem em conta de usuário.
+	 *
+	 * A chave fica em inglês por simetria com `company_admin`, que estabeleceu a
+	 * convenção para chave de papel gravada no banco. O rótulo é em português,
+	 * como todo o resto.
+	 */
+	const PAPEL_MODERADOR = 'content_moderator';
+
+	/**
+	 * Autoriza a entrada no `/wp-admin` sem conceder administração técnica.
+	 *
+	 * Existe por causa de um nó que só aparece quando se lê as duas travas
+	 * juntas. `restringir_gestao_da_tecnologia()` barra a instalação de plugins
+	 * **acrescentando `manage_options`** ao conjunto exigido, e
+	 * `eh_administracao_tecnica()` — o portão do `/wp-admin` — é exatamente
+	 * `manage_options || manage_woocommerce`. Dar `manage_options` a um perfil
+	 * restrito para que ele entre no painel devolveria a ele, pela mesma linha,
+	 * a instalação de plugins.
+	 *
+	 * `manage_woocommerce` abriria a porta sem quebrar aquela trava, mas tem
+	 * outro preço: faria aparecer os menus do WooCommerce e do Dokan, cujas
+	 * listagens **não têm escopo por empresa**. O Administrador é limitado às
+	 * empresas dele dentro do `/painel-empresas/`; no `/wp-admin` ele veria
+	 * produtos e pedidos de todas, desfazendo em silêncio o isolamento.
+	 *
+	 * Daí uma capacidade própria, consultada **só** nas duas travas de interface
+	 * administrativa (`bloquear_area_administrativa()` e
+	 * `ocultar_barra_administrativa()`). `eh_administracao_tecnica()` não a
+	 * conhece: nos outros dois lugares que a consultam — o isolamento entre
+	 * vendedores — a resposta certa para estes perfis continua sendo "não".
+	 */
+	const CAP_ADMIN_WP = 'reconectar_acessar_wp_admin';
 
 	/**
 	 * Portão da rota `/painel-empresas/`.
@@ -89,6 +134,17 @@ class Reconectar_Permissoes {
 	const CAP_TODAS_AS_EMPRESAS = 'reconectar_gerir_todas_as_empresas';
 
 	/**
+	 * Criar, editar, publicar e despublicar campanhas da home.
+	 *
+	 * Uma primitiva só para o CPT inteiro, no molde de `CAP_GERIR_EMPRESAS`: o
+	 * `register_post_type()` da campanha aponta para ela todas as primitivas de
+	 * post e deixa as meta caps no padrão. O comentário longo em
+	 * `class-reconectar-empresa.php:172` registra por que apontar meta cap ali é
+	 * defeito, e não redundância — vale igual aqui.
+	 */
+	const CAP_GERIR_CAMPANHAS = 'reconectar_gerir_campanhas';
+
+	/**
 	 * Todas as capacidades ligadas à administração de empresas.
 	 *
 	 * @var string[]
@@ -102,20 +158,22 @@ class Reconectar_Permissoes {
 	);
 
 	/**
-	 * Capacidades do papel `company_admin`.
+	 * A fatia de *operação* do papel `company_admin`.
 	 *
-	 * A lista é deliberadamente curta, e o que ela *não* traz importa tanto
-	 * quanto o que traz: sem `manage_options`, `manage_woocommerce`,
-	 * `edit_users`, `create_users`, `promote_users`, `list_users`, sem nenhuma
-	 * `CAPS_DE_PLUGIN` e sem `dokandar`.
+	 * Deixou de ser a lista completa do papel: hoje ela é um dos três blocos que
+	 * `capacidades_do_administrador()` soma — este, o do Moderador de Conteúdo e
+	 * o `CAPS_DE_USUARIOS`. O nome sobrevive porque é ele que a documentação e o
+	 * diário citam.
 	 *
-	 * As três primeiras abririam o `/wp-admin` inteiro — `bloquear_area_administrativa()`
-	 * usa `manage_options` e `manage_woocommerce` como portão, e `edit_users` dá
-	 * acesso a qualquer conta, inclusive às administrativas. `dokandar` é a
-	 * capacidade que, para o Dokan, *define* que alguém é vendedor
-	 * (`dokan_is_user_seller()` é literalmente `user_can( $id, 'dokandar' )`):
-	 * concedê-la faria este ator herdar em silêncio tudo que o plugin liberar por
-	 * ela daqui em diante.
+	 * O que continua **fora** importa tanto quanto o que está dentro:
+	 * `manage_options`, `manage_woocommerce`, `dokandar` e qualquer
+	 * `CAPS_DE_DESENVOLVIMENTO`. As duas primeiras abririam o `/wp-admin` inteiro
+	 * com os menus do WooCommerce e do Dokan, cujas listagens não têm escopo por
+	 * empresa — o acesso ao painel vem de `CAP_ADMIN_WP`, justamente para não
+	 * passar por elas. `dokandar` é a capacidade que, para o Dokan, *define* que
+	 * alguém é vendedor (`dokan_is_user_seller()` é literalmente
+	 * `user_can( $id, 'dokandar' )`): concedê-la faria este ator herdar em
+	 * silêncio tudo que o plugin liberar por ela daqui em diante.
 	 *
 	 * `CAP_TODAS_AS_EMPRESAS` também está de fora — ver o comentário dela.
 	 *
@@ -128,6 +186,86 @@ class Reconectar_Permissoes {
 		self::CAP_GERIR_EMPRESAS,
 		self::CAP_GERIR_LOJAS,
 		self::CAP_VER_OPERACAO,
+	);
+
+	/**
+	 * O que o Moderador de Conteúdo publica e modera.
+	 *
+	 * São capacidades nativas do WordPress de propósito: o que se modera aqui é
+	 * post, página e comentário do próprio núcleo, e inventar primitivas
+	 * autorais para eles só criaria um segundo vocabulário para a mesma coisa.
+	 * Produto e pedido ficam de fora — quem administra o produto é a loja dona
+	 * dele, e `negar_escrita_ao_admin_de_empresas()` mantém a negação mesmo se
+	 * um plugin de terceiro conceder `edit_products` por papel.
+	 *
+	 * `edit_theme_options` merece a nota que o resto da lista não precisa: ela é
+	 * a **única** capacidade que o WordPress oferece para editar menus de
+	 * navegação, e vem grudada ao Customizer e aos widgets. Não há granularidade
+	 * menor no núcleo — ou o moderador cria menus e alcança essas duas telas, ou
+	 * não cria menus. A amplitude é do WordPress, não uma escolha nossa; o que
+	 * está ao nosso alcance é impedir que dali se chegue a instalar tema, e é o
+	 * que `CAPS_DE_DESENVOLVIMENTO` faz.
+	 *
+	 * A consequência visível é **Aparência → Temas abrindo com 200**, e ela não é
+	 * falha de trava: `wp-admin/themes.php` exige `switch_themes` *ou*
+	 * `edit_theme_options`, e a segunda é justamente a que os menus pedem. A tela
+	 * fica só de leitura, e isso foi medido, não deduzido — o JSON que o núcleo
+	 * imprime nela traz `"activate":null`, `"delete":null` e `"autoupdate":null`
+	 * para cada tema, `theme-install.php` cai no `wp_die()` de negação e
+	 * `theme-editor.php` responde 403.
+	 *
+	 * Fechá-la à força custaria mais do que resolve: seria um desvio por tela em
+	 * `admin_init`, e `nav-menus.php` — a tela que o perfil existe para usar —
+	 * depende exatamente da mesma capacidade. A trava que vale é a da lista de
+	 * capacidades, não a da URL.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DE_CONTEUDO = array(
+		'upload_files',
+		'moderate_comments',
+		'edit_posts',
+		'edit_others_posts',
+		'edit_published_posts',
+		'publish_posts',
+		'delete_posts',
+		'delete_others_posts',
+		'delete_published_posts',
+		'read_private_posts',
+		'edit_pages',
+		'edit_others_pages',
+		'edit_published_pages',
+		'publish_pages',
+		'delete_pages',
+		'delete_others_pages',
+		'delete_published_pages',
+		'read_private_pages',
+		'edit_theme_options',
+		self::CAP_GERIR_CAMPANHAS,
+	);
+
+	/**
+	 * Gestão das contas de usuário, exclusiva do Administrador.
+	 *
+	 * "Configura os usuários das lojas" exige `edit_users`, e em single-site
+	 * `edit_users` alcança **qualquer** conta, inclusive a do Super
+	 * Administrador: quem a tem pode trocar a senha de um `administrator` e
+	 * entrar com ela. `promote_users`, no mesmo golpe, permite promover a si
+	 * mesmo. As duas juntas transformariam este papel no topo em dois cliques, e
+	 * a promessa de não dar acesso de desenvolvedor viraria decoração.
+	 *
+	 * Quem fecha essa porta é `negar_gestao_de_usuarios_superiores()`, em
+	 * `map_meta_cap`. Sem aquele filtro, esta lista é insegura — e a falha seria
+	 * silenciosa, porque a tela funciona.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DE_USUARIOS = array(
+		'list_users',
+		'create_users',
+		'edit_users',
+		'delete_users',
+		'promote_users',
 	);
 
 	/**
@@ -152,20 +290,36 @@ class Reconectar_Permissoes {
 	);
 
 	/**
-	 * Capacidades de gestão de plugins, restritas ao Administrador.
+	 * Capacidades de desenvolvimento, restritas ao Super Administrador.
 	 *
-	 * A especificação é taxativa: apenas o Administrador instala, ativa,
-	 * desativa, atualiza, configura ou remove plugins.
+	 * A especificação é taxativa quanto a plugins: apenas o Administrador
+	 * instala, ativa, desativa, atualiza, configura ou remove. A lista nasceu
+	 * com eles e precisou crescer quando o Moderador de Conteúdo ganhou
+	 * `edit_theme_options` — a única capacidade do núcleo que edita menus.
+	 * `edit_theme_options` abre o menu **Aparência**, e dali se chega a instalar
+	 * e editar tema: barrar plugin e deixar tema livre seria fechar uma porta e
+	 * deixar a do lado aberta, já que um tema também executa PHP arbitrário.
+	 *
+	 * `edit_files` e `update_core` entram pela mesma razão: as duas editam ou
+	 * substituem código da instalação.
 	 *
 	 * @var string[]
 	 */
-	const CAPS_DE_PLUGIN = array(
+	const CAPS_DE_DESENVOLVIMENTO = array(
 		'install_plugins',
 		'activate_plugins',
 		'update_plugins',
 		'delete_plugins',
 		'edit_plugins',
 		'upload_plugins',
+		'switch_themes',
+		'install_themes',
+		'update_themes',
+		'delete_themes',
+		'edit_themes',
+		'upload_themes',
+		'edit_files',
+		'update_core',
 	);
 
 	/**
@@ -176,7 +330,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 3;
+	const VERSAO_CAPACIDADES = 5;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -191,9 +345,13 @@ class Reconectar_Permissoes {
 
 		// Autorização.
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restringir_por_vendedor' ), 10, 4 );
-		add_filter( 'map_meta_cap', array( __CLASS__, 'restringir_gestao_de_plugins' ), 10, 2 );
+		add_filter( 'map_meta_cap', array( __CLASS__, 'restringir_gestao_da_tecnologia' ), 10, 2 );
+		add_filter( 'map_meta_cap', array( __CLASS__, 'negar_gestao_de_usuarios_superiores' ), 10, 4 );
 		add_filter( 'map_meta_cap', array( __CLASS__, 'negar_escrita_ao_admin_de_empresas' ), 10, 4 );
 		add_filter( 'map_meta_cap', array( __CLASS__, 'negar_escrita_no_forum' ), 10, 3 );
+		// Prioridade 11: revisa o que `bbp_map_meta_caps` decide em 10.
+		add_filter( 'map_meta_cap', array( __CLASS__, 'restaurar_gestao_de_foruns' ), 11, 3 );
+		add_action( 'set_user_role', array( __CLASS__, 'sincronizar_papel_no_forum' ), 10, 2 );
 		add_action( 'template_redirect', array( __CLASS__, 'bloquear_comunidade' ) );
 		// Prioridade 1, e não a padrão: o WooCommerce registra em `admin_init` o
 		// seu próprio bloqueio (`WC_Admin::prevent_admin_access()`), que manda para
@@ -230,6 +388,8 @@ class Reconectar_Permissoes {
 		}
 
 		self::sincronizar_papel_do_admin_de_empresas();
+		self::sincronizar_papel_do_moderador();
+		self::renomear_papel( 'administrator', __( 'Super Administrador', 'reconectar-core' ) );
 
 		$papeis = wp_roles();
 
@@ -256,13 +416,22 @@ class Reconectar_Permissoes {
 			}
 
 			if ( 'administrator' === $papel ) {
-				// O Administrador acumula os dois lados: administra a tecnologia
-				// e, por consequência, também a operação. Recebe inclusive
-				// `CAP_TODAS_AS_EMPRESAS` — sem ela, o painel de empresas ficaria
-				// vazio para quem instalou a plataforma.
+				// O Super Administrador acumula os dois lados: administra a
+				// tecnologia e, por consequência, também a operação. Recebe
+				// inclusive `CAP_TODAS_AS_EMPRESAS` — sem ela, o painel de
+				// empresas ficaria vazio para quem instalou a plataforma.
 				foreach ( self::CAPS_DE_EMPRESA as $capacidade ) {
 					$objeto->add_cap( $capacidade );
 				}
+
+				// Ele já entra no `/wp-admin` por `manage_options`, mas as duas
+				// abaixo não são decoração: `CAP_ADMIN_WP` mantém a trava com uma
+				// resposta coerente caso alguém um dia retire `manage_options` de
+				// um administrador a dedo, e `CAP_GERIR_CAMPANHAS` é primitiva de
+				// CPT — sem ela o menu Campanhas some para quem instalou a
+				// plataforma, exatamente como aconteceria com as empresas.
+				$objeto->add_cap( self::CAP_ADMIN_WP );
+				$objeto->add_cap( self::CAP_GERIR_CAMPANHAS );
 
 				continue;
 			}
@@ -273,7 +442,15 @@ class Reconectar_Permissoes {
 				}
 			}
 
-			foreach ( self::CAPS_DE_PLUGIN as $capacidade ) {
+			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
+			// a lista completa. Para qualquer outro, estas duas não fazem sentido
+			// nenhum — e uma concessão feita por engano sai aqui.
+			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
+				$objeto->remove_cap( self::CAP_ADMIN_WP );
+				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
+			}
+
+			foreach ( self::CAPS_DE_DESENVOLVIMENTO as $capacidade ) {
 				$objeto->remove_cap( $capacidade );
 			}
 		}
@@ -282,35 +459,131 @@ class Reconectar_Permissoes {
 	}
 
 	/**
-	 * Cria — ou recria — o papel do Administrador de Empresas.
+	 * Cria — ou recria — o papel do Administrador.
 	 *
 	 * `remove_role()` antes de `add_role()` não é redundância com o `add_role()`
 	 * sozinho, que é inerte quando o papel já existe: sem a remoção, uma
-	 * capacidade retirada de `CAPS_DO_ADMIN_DE_EMPRESAS` continuaria gravada no
-	 * banco para sempre. Como a lista é justamente o registro do que este ator
+	 * capacidade retirada de `capacidades_do_administrador()` continuaria gravada
+	 * no banco para sempre. Como a lista é justamente o registro do que este ator
 	 * *não* pode, ela precisa ser a verdade — e não o teto histórico.
 	 *
 	 * Os dois passos acontecem no mesmo tique, então nenhum usuário chega a ser
 	 * observado sem capacidades no intervalo.
 	 */
 	private static function sincronizar_papel_do_admin_de_empresas() {
-		$capacidades = array();
-
-		foreach ( self::CAPS_DO_ADMIN_DE_EMPRESAS as $capacidade ) {
-			$capacidades[ $capacidade ] = true;
-		}
-
 		remove_role( self::PAPEL_ADMIN_EMPRESAS );
 
 		add_role(
 			self::PAPEL_ADMIN_EMPRESAS,
-			__( 'Administrador de Empresas', 'reconectar-core' ),
-			$capacidades
+			__( 'Administrador', 'reconectar-core' ),
+			self::mapa_de_capacidades( self::capacidades_do_administrador() )
 		);
 	}
 
 	/**
-	 * Nega a gestão de plugins a quem não for Administrador.
+	 * Cria — ou recria — o papel do Moderador de Conteúdo.
+	 *
+	 * Mesmo molde do papel acima, e pela mesma razão: recriar do zero é o que
+	 * faz a lista de constantes ser a verdade, e não o teto histórico.
+	 */
+	private static function sincronizar_papel_do_moderador() {
+		remove_role( self::PAPEL_MODERADOR );
+
+		add_role(
+			self::PAPEL_MODERADOR,
+			__( 'Moderador de Conteúdo', 'reconectar-core' ),
+			self::mapa_de_capacidades( self::capacidades_do_moderador() )
+		);
+	}
+
+	/**
+	 * As capacidades do Moderador de Conteúdo.
+	 *
+	 * É método, e não constante, porque soma três listas — e expressão de
+	 * constante em PHP não aceita `array_merge()` nem espalhamento. A soma fica
+	 * aqui uma vez só, em vez de virar uma quarta lista literal que precisaria
+	 * ser mantida em paralelo às outras três.
+	 *
+	 * @return string[]
+	 */
+	private static function capacidades_do_moderador() {
+		return array_merge(
+			array( 'read', self::CAP_COMUNIDADE, self::CAP_ADMIN_WP ),
+			self::CAPS_DE_ESCRITA_NO_FORUM,
+			self::CAPS_DE_CONTEUDO
+		);
+	}
+
+	/**
+	 * As capacidades do Administrador.
+	 *
+	 * Tudo do Moderador de Conteúdo, mais a operação e a gestão de contas. A
+	 * herança é deliberada e está na especificação: quem administra a plataforma
+	 * também modera o que ela publica.
+	 *
+	 * @return string[]
+	 */
+	private static function capacidades_do_administrador() {
+		return array_merge(
+			self::capacidades_do_moderador(),
+			self::CAPS_DO_ADMIN_DE_EMPRESAS,
+			self::CAPS_DE_USUARIOS
+		);
+	}
+
+	/**
+	 * Converte a lista de capacidades no mapa que `add_role()` espera.
+	 *
+	 * `array_unique()` não é zelo: as listas se sobrepõem de propósito — `read` e
+	 * `CAP_COMUNIDADE` aparecem no Moderador e em `CAPS_DO_ADMIN_DE_EMPRESAS` —
+	 * e uma chave repetida no mapa não faria mal, mas a duplicata escondida
+	 * atrapalharia a conferência por `wp user list-caps`.
+	 *
+	 * @param string[] $capacidades Lista de capacidades.
+	 * @return array<string,bool>
+	 */
+	private static function mapa_de_capacidades( array $capacidades ) {
+		$mapa = array();
+
+		foreach ( array_unique( $capacidades ) as $capacidade ) {
+			$mapa[ $capacidade ] = true;
+		}
+
+		return $mapa;
+	}
+
+	/**
+	 * Troca o rótulo de um papel sem tocar nas capacidades dele.
+	 *
+	 * O caminho óbvio seria `remove_role()` + `add_role()`, como fazem os dois
+	 * papéis autorais acima — e é justamente o que não se pode fazer com o
+	 * `administrator`. Ali a remoção é irreversível se algo falhar entre as duas
+	 * chamadas, e o que ficaria para trás é uma instalação sem nenhum
+	 * administrador: ninguém para recriar o papel, nem pelo painel.
+	 *
+	 * `WP_Roles` guarda tudo numa opção só (`$role_key`), então a escrita
+	 * reaproveita a cópia em memória que o próprio núcleo usa em `add_cap()` e
+	 * altera apenas o campo `name`. `role_names` é atualizado junto porque é dele
+	 * que `get_names()` lê no resto da requisição.
+	 *
+	 * @param string $papel Chave do papel.
+	 * @param string $nome  Rótulo novo.
+	 */
+	private static function renomear_papel( $papel, $nome ) {
+		$papeis = wp_roles();
+
+		if ( ! isset( $papeis->roles[ $papel ] ) || $nome === $papeis->roles[ $papel ]['name'] ) {
+			return;
+		}
+
+		$papeis->roles[ $papel ]['name'] = $nome;
+		$papeis->role_names[ $papel ]    = $nome;
+
+		update_option( $papeis->role_key, $papeis->roles );
+	}
+
+	/**
+	 * Nega plugins, temas e edição de arquivo a quem não for Super Administrador.
 	 *
 	 * A revogação em `sincronizar_capacidades()` já resolve o caso normal, mas
 	 * ela age sobre o papel — e uma capacidade pode ser concedida diretamente a
@@ -321,13 +594,112 @@ class Reconectar_Permissoes {
 	 * @param string   $cap  Capacidade consultada.
 	 * @return string[]
 	 */
-	public static function restringir_gestao_de_plugins( $caps, $cap ) {
-		if ( in_array( $cap, self::CAPS_DE_PLUGIN, true ) && ! in_array( 'manage_options', $caps, true ) ) {
-			// `manage_options` é a capacidade que, na prática, distingue o
+	public static function restringir_gestao_da_tecnologia( $caps, $cap ) {
+		if ( in_array( $cap, self::CAPS_DE_DESENVOLVIMENTO, true ) && ! in_array( 'manage_options', $caps, true ) ) {
+			// `manage_options` é a capacidade que, na prática, distingue o Super
 			// Administrador dos demais papéis desta instalação. Exigi-la junto
 			// preserva a decisão original quando ela já for restritiva e a
 			// endurece quando não for.
+			//
+			// É também a razão de `CAP_ADMIN_WP` existir em vez de simplesmente
+			// dar `manage_options` aos perfis novos: seria esta linha, e só ela,
+			// devolvendo a eles a instalação de plugins.
 			$caps[] = 'manage_options';
+		}
+
+		return $caps;
+	}
+
+	/**
+	 * Impede que a gestão de contas alcance uma conta mais poderosa que a sua.
+	 *
+	 * Em single-site o WordPress não gradua `edit_users`: quem a tem edita
+	 * **qualquer** conta, inclusive a de um `administrator` — e trocar a senha de
+	 * um administrador é entrar com ela. `promote_users`, no mesmo golpe, deixa
+	 * promover a si mesmo. O Administrador precisa das duas para configurar as
+	 * contas das lojas, que é o que a especificação pede, e sem esta trava as
+	 * duas juntas o levariam ao topo em dois cliques.
+	 *
+	 * São duas regras:
+	 *
+	 * 1. não se mexe em quem tem `manage_options`, salvo se você também tiver;
+	 * 2. não se promove alguém a um papel que traga capacidade que você não tem —
+	 *    o que cobre `administrator` e qualquer papel que alguém crie por cima.
+	 *
+	 * A segunda é a que sobrevive ao futuro: a primeira sozinha seria burlada por
+	 * um papel novo com `install_plugins` e sem `manage_options`.
+	 *
+	 * @param string[] $caps       Capacidades primitivas exigidas.
+	 * @param string   $cap        Capacidade consultada.
+	 * @param int      $usuario_id Usuário que age.
+	 * @param array    $args       `$args[0]` é o usuário alvo.
+	 * @return string[]
+	 */
+	public static function negar_gestao_de_usuarios_superiores( $caps, $cap, $usuario_id, $args ) {
+		if ( ! in_array( $cap, array( 'edit_user', 'delete_user', 'promote_user' ), true ) ) {
+			return $caps;
+		}
+
+		// Quem administra a tecnologia não é limitado por esta trava — e a
+		// checagem é por `manage_options`, não pelo papel, porque papel é rótulo.
+		if ( user_can( $usuario_id, 'manage_options' ) ) {
+			return $caps;
+		}
+
+		$alvo = empty( $args[0] ) ? 0 : (int) $args[0];
+
+		if ( $alvo && $alvo !== $usuario_id && user_can( $alvo, 'manage_options' ) ) {
+			$caps[] = 'do_not_allow';
+
+			return $caps;
+		}
+
+		if ( 'promote_user' !== $cap ) {
+			return $caps;
+		}
+
+		/*
+		 * `promote_user` não diz para qual papel: o núcleo o consulta sempre como
+		 * `current_user_can( 'promote_user', $id )`, sem destino. Ele precisa ser
+		 * procurado, e em três lugares — a omissão de qualquer um deixa um
+		 * caminho de promoção sem regra nenhuma:
+		 *
+		 * - `$args[1]`, quando quem pergunta informa o destino. O núcleo nunca o
+		 *   faz, mas código autoral e teste podem, e aceitar aqui custa uma linha.
+		 * - `role`, o campo de `user-edit.php`.
+		 * - `new_role`, o da ação em massa de `users.php` (`wp-admin/users.php:123`)
+		 *   — chave **diferente**, e é o caminho que promove vários de uma vez.
+		 *
+		 * A regra é conservadora de propósito: qualquer capacidade do papel de
+		 * destino que o ator não tenha reprova a promoção inteira. Isso cobre
+		 * `administrator` e também qualquer papel que um plugin crie depois.
+		 */
+		$destino = '';
+
+		if ( isset( $args[1] ) && is_string( $args[1] ) ) {
+			$destino = sanitize_key( $args[1] );
+		} elseif ( isset( $_REQUEST['role'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$destino = sanitize_key( wp_unslash( $_REQUEST['role'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		} elseif ( isset( $_REQUEST['new_role'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$destino = sanitize_key( wp_unslash( $_REQUEST['new_role'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		if ( '' === $destino ) {
+			return $caps;
+		}
+
+		$papel = wp_roles()->get_role( $destino );
+
+		if ( ! $papel ) {
+			return $caps;
+		}
+
+		foreach ( $papel->capabilities as $capacidade => $concedida ) {
+			if ( $concedida && ! user_can( $usuario_id, $capacidade ) ) {
+				$caps[] = 'do_not_allow';
+
+				return $caps;
+			}
 		}
 
 		return $caps;
@@ -351,6 +723,12 @@ class Reconectar_Permissoes {
 	 * de que a resposta agora tem um nome e um lugar só. O `company_admin` não
 	 * tem nenhuma das duas capacidades e, portanto, não passa: ele administra a
 	 * operação, não a tecnologia.
+	 *
+	 * Ele **entra** no `/wp-admin` assim mesmo, e sem passar por aqui: as duas
+	 * travas de interface administrativa aceitam `CAP_ADMIN_WP` como alternativa.
+	 * As outras duas — o isolamento entre vendedores — continuam consultando só
+	 * este método, porque ali a resposta certa para os perfis novos permanece
+	 * "não": eles não devem ver os registros de todos os vendedores.
 	 *
 	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
 	 * @return bool
@@ -393,6 +771,15 @@ class Reconectar_Permissoes {
 	 * silenciosamente deixar de ser consulta. A garantia precisa estar na
 	 * autorização, não na lista de capacidades do papel.
 	 *
+	 * **A exceção é uma allowlist, e isso mudou.** As três primeiras monitoradas
+	 * (`edit_post`, `delete_post`, `publish_post`) são as meta caps genéricas de
+	 * *qualquer* post type, e enquanto este ator não escrevia conteúdo bastava
+	 * abrir uma fresta para o CPT de empresa. Quando ele ganhou a moderação de
+	 * conteúdo, a mesma linha passou a negar post, página, campanha e fórum — o
+	 * sintoma pior deste repositório, o da tela que funciona e da ação que
+	 * silenciosamente não acontece. Post type que ele administra entra na lista;
+	 * produto e pedido continuam de fora, que é a razão de a trava existir.
+	 *
 	 * @param string[] $caps       Capacidades primitivas exigidas.
 	 * @param string   $cap        Capacidade consultada.
 	 * @param int      $usuario_id Usuário sob avaliação.
@@ -420,16 +807,34 @@ class Reconectar_Permissoes {
 			return $caps;
 		}
 
-		// A empresa é justamente o que este ator administra, e o CPT dela responde
-		// pelas meta caps genéricas de post. Sem esta exceção, a trava cortaria a
-		// própria razão de ser do papel.
-		if ( ! empty( $args[0] ) && Reconectar_Empresa::POST_TYPE === get_post_type( (int) $args[0] ) ) {
+		if ( ! empty( $args[0] ) && in_array( get_post_type( (int) $args[0] ), self::post_types_que_o_administrador_escreve(), true ) ) {
 			return $caps;
 		}
 
 		$caps[] = 'do_not_allow';
 
 		return $caps;
+	}
+
+	/**
+	 * Os post types que o Administrador pode escrever.
+	 *
+	 * `forum`, `topic` e `reply` são as chaves do bbPress, escritas literais de
+	 * propósito: as constantes dele só existem depois que o plugin carrega, e
+	 * `map_meta_cap` é consultado cedo demais para depender disso.
+	 *
+	 * @return string[]
+	 */
+	private static function post_types_que_o_administrador_escreve() {
+		return array(
+			Reconectar_Empresa::POST_TYPE,
+			Reconectar_Campanha::POST_TYPE,
+			'post',
+			'page',
+			'forum',
+			'topic',
+			'reply',
+		);
 	}
 
 	/* ---------------------------------------------------------------------
@@ -590,6 +995,52 @@ class Reconectar_Permissoes {
 		'assign_topic_tags',
 		'publish_forums',
 		'edit_forums',
+		// Os fóruns desta instalação nascem pela mão do Super Administrador. Sem
+		// `edit_others_forums` o Administrador abriria a listagem de fóruns e não
+		// poderia tocar em nenhum dos que estão lá — a entrega pela metade que a
+		// especificação ("criar fóruns") não aceita.
+		'edit_others_forums',
+	);
+
+	/**
+	 * Papel de fórum que o bbPress atribui aos dois perfis administrativos.
+	 *
+	 * O bbPress mantém uma segunda camada de papéis — `bbp_keymaster`,
+	 * `bbp_moderator`, `bbp_participant`, `bbp_spectator`, `bbp_blocked` —
+	 * gravada como papel adicional do usuário. Ela **se sobrepõe** ao papel do
+	 * WordPress: `bbp_participant`, que todo cadastro recebe, é o que fazia
+	 * `edit_topics` e `delete_others_topics` responderem "não" a um Moderador de
+	 * Conteúdo cujo papel declara moderação de conteúdo.
+	 *
+	 * `bbp_moderator` e não `bbp_keymaster`: o segundo traz `keep_gate`, que abre
+	 * as Configurações do bbPress e a ferramenta de **redefinição** — a que apaga
+	 * fóruns, tópicos e respostas da instalação inteira. Medido: com
+	 * `bbp_moderator`, `options-general.php?page=bbpress` e
+	 * `tools.php?page=bbp-repair` continuam respondendo 403.
+	 */
+	const PAPEL_DE_MODERACAO_NO_FORUM = 'bbp_moderator';
+
+	/**
+	 * Capacidades de fórum que o bbPress reserva ao `keep_gate`.
+	 *
+	 * `bbp_map_forum_meta_caps()` — sob `bbp_map_meta_caps`, em `map_meta_cap`
+	 * prioridade 10 — troca estas duas por `do_not_allow` para quem não é
+	 * keymaster, **independentemente do papel**. Medido nesta instalação, com o
+	 * papel declarando as duas:
+	 *
+	 *     allcaps[edit_forums] = true
+	 *     map_meta_cap( 'edit_forums' ) = do_not_allow
+	 *
+	 * É o sintoma pior deste repositório: a capacidade é escrita, é aplicada e se
+	 * perde adiante. Repare que `publish_forums` **não** está na lista — aquela o
+	 * bbPress mapeia para `moderate`, que o `bbp_moderator` tem. A assimetria é
+	 * dele, não nossa.
+	 *
+	 * @var string[]
+	 */
+	const CAPS_DE_FORUM_RESERVADAS_AO_BBPRESS = array(
+		'edit_forums',
+		'edit_others_forums',
 	);
 
 	/**
@@ -639,6 +1090,102 @@ class Reconectar_Permissoes {
 		$caps[] = 'do_not_allow';
 
 		return $caps;
+	}
+
+	/**
+	 * Devolve a gestão de fóruns a quem o papel do WordPress já autorizou.
+	 *
+	 * Prioridade **11**, depois do `bbp_map_meta_caps` que roda em 10: a decisão
+	 * que este filtro revisa é justamente a dele, e um filtro na mesma prioridade
+	 * dependeria da ordem de registro dos plugins.
+	 *
+	 * A trava do bbPress existe por uma razão legítima — fórum é estrutura, não
+	 * conteúdo, e o plugin não quer moderador criando seção nova. Aqui a
+	 * especificação pede o contrário, e de forma explícita: o Administrador
+	 * "cria fóruns". Então a negação cai, e cai **só** onde o papel do WordPress
+	 * já tinha dito sim. Quem não declara a capacidade continua barrado, e
+	 * `keep_gate` — Configurações e redefinição do bbPress — não é tocado.
+	 *
+	 * A leitura é feita em `allcaps` e não com `user_can()` de propósito: a
+	 * segunda reentraria em `map_meta_cap` com a mesma capacidade, que voltaria a
+	 * este filtro. Seria recursão infinita, não uma resposta errada.
+	 *
+	 * @param string[] $caps       Capacidades primitivas exigidas.
+	 * @param string   $cap        Capacidade consultada.
+	 * @param int      $usuario_id Usuário sob avaliação.
+	 * @return string[]
+	 */
+	public static function restaurar_gestao_de_foruns( $caps, $cap, $usuario_id ) {
+		if ( ! in_array( $cap, self::CAPS_DE_FORUM_RESERVADAS_AO_BBPRESS, true ) ) {
+			return $caps;
+		}
+
+		if ( ! in_array( 'do_not_allow', $caps, true ) ) {
+			return $caps;
+		}
+
+		$usuario = get_userdata( $usuario_id );
+
+		if ( ! $usuario || empty( $usuario->allcaps[ $cap ] ) ) {
+			return $caps;
+		}
+
+		return array( $cap );
+	}
+
+	/**
+	 * Dá ao Moderador e ao Administrador o papel de fórum correspondente.
+	 *
+	 * Sem isto, os dois perfis ficam com o `bbp_participant` que o bbPress
+	 * concede a todo cadastro, e nenhuma das capacidades de moderação declaradas
+	 * no papel do WordPress chega a valer — ver `PAPEL_DE_MODERACAO_NO_FORUM`.
+	 *
+	 * Pendurado em `set_user_role`, e não em `add_user_role`: `bbp_set_user_role()`
+	 * troca o papel com `WP_User::remove_role()` e `WP_User::add_role()`, que
+	 * disparam `add_user_role` — este método chamaria a si mesmo. `set_user_role`
+	 * é o gancho do caminho normal (a tela de usuários, `wp user set-role`) e não
+	 * participa daquela troca.
+	 *
+	 * Nada é rebaixado: quem já é `bbp_keymaster` — o Super Administrador —
+	 * passa intacto. Um moderador não pode perder alcance porque alguém salvou o
+	 * perfil dele.
+	 *
+	 * @param int    $usuario_id Usuário cujo papel mudou.
+	 * @param string $papel      Papel novo.
+	 * @return void
+	 */
+	public static function sincronizar_papel_no_forum( $usuario_id, $papel ) {
+		if ( ! in_array( $papel, array( self::PAPEL_MODERADOR, self::PAPEL_ADMIN_EMPRESAS ), true ) ) {
+			return;
+		}
+
+		self::aplicar_moderacao_no_forum( $usuario_id );
+	}
+
+	/**
+	 * Promove um usuário a moderador do fórum, se ainda não estiver acima disso.
+	 *
+	 * Idempotente por construção, que é requisito deste repositório: chamada duas
+	 * vezes, a segunda não escreve nada.
+	 *
+	 * @param int $usuario_id Usuário.
+	 * @return bool Se houve mudança.
+	 */
+	public static function aplicar_moderacao_no_forum( $usuario_id ) {
+		if ( ! function_exists( 'bbp_set_user_role' ) || ! function_exists( 'bbp_get_user_role' ) ) {
+			return false;
+		}
+
+		$atual = bbp_get_user_role( $usuario_id );
+
+		// `bbp_keymaster` está acima e não se mexe; o papel já correto tampouco.
+		if ( in_array( $atual, array( 'bbp_keymaster', self::PAPEL_DE_MODERACAO_NO_FORUM ), true ) ) {
+			return false;
+		}
+
+		bbp_set_user_role( $usuario_id, self::PAPEL_DE_MODERACAO_NO_FORUM );
+
+		return true;
 	}
 
 	/**
@@ -959,7 +1506,7 @@ class Reconectar_Permissoes {
 			return;
 		}
 
-		if ( self::eh_administracao_tecnica() ) {
+		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
 			return;
 		}
 
@@ -1003,6 +1550,10 @@ class Reconectar_Permissoes {
 	/**
 	 * Esconde a barra administrativa de quem não entra no painel.
 	 *
+	 * A condição é a mesma de `bloquear_area_administrativa()` de propósito: uma
+	 * barra com o link "Painel" que leva a um redirecionamento é pior que barra
+	 * nenhuma.
+	 *
 	 * @param bool $exibir Decisão anterior.
 	 * @return bool
 	 */
@@ -1011,7 +1562,7 @@ class Reconectar_Permissoes {
 			return $exibir;
 		}
 
-		if ( self::eh_administracao_tecnica() ) {
+		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
 			return $exibir;
 		}
 

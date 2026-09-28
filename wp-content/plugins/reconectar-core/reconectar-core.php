@@ -45,6 +45,11 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-migracoes.php';
 // das entradas possíveis — e não a regra.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-cadastro-lojas.php';
 
+// O banner da home com vigência. Fica no plugin porque a campanha é conteúdo
+// da instituição, não do tema: trocar de tema não pode apagar a agenda de
+// campanhas já publicadas.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-campanha.php';
+
 // Voto, leitura e melhor resposta do fórum. O bbPress entrega tópico, resposta,
 // categoria e tag; o que transforma isso num Q&A é esta camada — e ela é regra
 // de negócio, não aparência.
@@ -54,6 +59,17 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-forum.php';
 // proteção de dados: o Gravatar entrega a um terceiro o hash do e-mail de quem
 // avalia e o IP de quem visita. Uma troca de tema não pode reabrir isso.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avatar-local.php';
+
+// Pagamento direto do comprador à loja, por PIX ou transferência. O dinheiro
+// não passa pela plataforma: o que existe aqui é o cadastro da chave na
+// dashboard do Dokan e a instrução que o comprador recebe depois do pedido.
+require_once RECONECTAR_CORE_PATH . 'includes/pagamento/funcoes-pix.php';
+require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamento-pix.php';
+require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamento-direto.php';
+// As três classes de gateway ficam de fora daqui de propósito: elas estendem
+// `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
+// exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do
+// filtro `woocommerce_payment_gateways`.
 
 /**
  * Inicializa os módulos do plugin.
@@ -76,6 +92,9 @@ function reconectar_core_init() {
 	Reconectar_Empresa::init();
 	Reconectar_Painel_Empresas::init();
 	Reconectar_Cadastro_De_Lojas::init();
+	Reconectar_Campanha::init();
+	Reconectar_Pagamento_Pix::init();
+	Reconectar_Pagamento_Direto::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
 	Reconectar_Forum::init();

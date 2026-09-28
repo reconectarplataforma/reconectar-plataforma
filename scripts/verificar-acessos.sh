@@ -241,6 +241,12 @@ if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   conferir "$JAR_VENDEDOR" "/forums/"               "200"              "a listagem de perguntas"
   conferir "$JAR_VENDEDOR" "/wp-admin/"             "302 /dashboard/"  "volta ao painel dele"
   conferir "$JAR_VENDEDOR" "/wp-admin/plugins.php"  "403"              "não gere plugins"
+  # `restaurar_gestao_de_foruns()` devolve `edit_forums` a quem o papel já
+  # autorizou. O vendedor participa do fórum e não o administra: se um dia a
+  # capacidade vazar para o papel `seller`, é esta linha que avisa. O 302 é o
+  # portão do `/wp-admin` chegando primeiro — negação mais forte que o 403, e
+  # esperar 403 aqui exigiria que a trava fosse *mais fraca* para passar.
+  conferir "$JAR_VENDEDOR" "/wp-admin/edit.php?post_type=forum" "302 /dashboard/" "participa do fórum, não o administra"
   conferir "$JAR_VENDEDOR" "/painel-empresas/"      "403"              "vender não é administrar a empresa"
   # A listagem de lojas é rota nova, e rota nova é porta nova: sem este caso, o
   # dia em que `/painel-empresas/loja/` deixasse de passar por `proteger()`
@@ -258,16 +264,49 @@ fi
 ID_NOSSO_CHAO="$(wp_eval '$p = get_page_by_path( "nosso-chao", OBJECT, "reconectar_empresa" ); echo $p ? $p->ID : "";')"
 ID_BEM_VIVER="$(wp_eval '$p = get_page_by_path( "bem-viver", OBJECT, "reconectar_empresa" ); echo $p ? $p->ID : "";')"
 
-echo "Administrador de empresas (demo-admin-nosso-chao)"
+# Os dois alvos da tela de edição de usuário, pela mesma razão: `user-edit.php`
+# identifica a conta por ID, e o caso que interessa — o Administrador tentando
+# abrir a conta do Super Administrador — não existe sem saber qual é.
+ID_SUPER="$(wp_eval '$u = get_user_by( "login", "admin" ); echo $u ? $u->ID : "";')"
+ID_LOJA_SABOR="$(wp_eval '$u = get_user_by( "login", "demo-sabor-da-terra" ); echo $u ? $u->ID : "";')"
+
+# O papel `company_admin` entra no `/wp-admin` desde que ganhou `CAP_ADMIN_WP`, e
+# os dois primeiros casos deste bloco são o retrato invertido do que eram: antes
+# o painel técnico o devolvia ao `/painel-empresas/`, e a listagem de usuários
+# vinha junto na negação. Hoje ele administra as contas das lojas por ali, que é
+# o que "configura os usuários das lojas" pede.
+#
+# `themes.php` responder 200 não é trava frouxa: o núcleo abre a tela a quem tem
+# `switch_themes` **ou** `edit_theme_options`, e a segunda é a única capacidade
+# que edita menus. A tela fica de leitura — quem prova isso são os casos de
+# capacidade mais abaixo, que negam `switch_themes` e `install_themes`. Conferir
+# aqui só a URL daria a impressão errada nos dois sentidos.
+echo "Administrador (demo-admin-nosso-chao)"
 JAR_EMPRESAS=/tmp/reconectar-acessos-empresas.txt
 if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
-  conferir "$JAR_EMPRESAS" "/painel-empresas/"     "200"                     "o painel é dele"
-  conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200"                    "a listagem das lojas sob sua gestão"
-  conferir "$JAR_EMPRESAS" "/comunidade/"          "200"                     "participa da comunidade"
-  conferir "$JAR_EMPRESAS" "/wp-admin/"            "302 /painel-empresas/"   "volta ao painel dele"
-  conferir "$JAR_EMPRESAS" "/wp-admin/plugins.php" "403"                     "não gere plugins"
-  conferir "$JAR_EMPRESAS" "/wp-admin/users.php"   "302"                     "não gere usuários pelo painel técnico"
-  conferir "$JAR_EMPRESAS" "/dashboard/"           "302"                     "não é vendedor"
+  conferir "$JAR_EMPRESAS" "/painel-empresas/"      "200" "o painel é dele"
+  conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200" "a listagem das lojas sob sua gestão"
+  conferir "$JAR_EMPRESAS" "/comunidade/"           "200" "participa da comunidade"
+  conferir "$JAR_EMPRESAS" "/wp-admin/"             "200" "entra no painel técnico"
+  conferir "$JAR_EMPRESAS" "/wp-admin/users.php"    "200" "configura as contas das lojas"
+  conferir "$JAR_EMPRESAS" "/wp-admin/nav-menus.php" "200" "cria menus"
+  conferir "$JAR_EMPRESAS" "/wp-admin/plugins.php"  "403" "não gere plugins"
+  conferir "$JAR_EMPRESAS" "/wp-admin/theme-editor.php" "403" "não edita arquivo de tema"
+  conferir "$JAR_EMPRESAS" "/wp-admin/options-general.php" "403" "não configura a instalação"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=product" "403" "produto é da loja, não dele"
+  conferir "$JAR_EMPRESAS" "/dashboard/"            "302" "não é vendedor"
+
+  # "Criar fóruns" é literal na especificação, e o bbPress reserva `edit_forums`
+  # ao keymaster — a negação não vinha do papel e por isso não aparecia em
+  # nenhum caso de capacidade. As duas últimas linhas são o outro lado: o
+  # keymaster teria junto as Configurações e a ferramenta de **redefinição**,
+  # que apaga o fórum inteiro da instalação.
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=forum"     "200" "administra os fóruns"
+  conferir "$JAR_EMPRESAS" "/wp-admin/post-new.php?post_type=forum" "200" "cria fóruns"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=topic"     "200" "modera os tópicos"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=reply"     "200" "modera as respostas"
+  conferir "$JAR_EMPRESAS" "/wp-admin/options-general.php?page=bbpress" "403" "não configura o bbPress"
+  conferir "$JAR_EMPRESAS" "/wp-admin/tools.php?page=bbp-repair"    "403" "não redefine o fórum"
 
   if [ -n "$ID_NOSSO_CHAO" ] && [ -n "$ID_BEM_VIVER" ]; then
     conferir "$JAR_EMPRESAS" "/painel-empresas/empresa/$ID_NOSSO_CHAO/" "200" "abre a empresa que administra"
@@ -275,11 +314,60 @@ if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
   else
     echo "  --    carga de demonstração ausente; isolamento entre empresas não verificado por URL"
   fi
+
+  # A escalada de privilégio pela tela, e não só pela capacidade. Confere-se o
+  # corpo, não o status: `user-edit.php` nega com um `wp_die()` sem código, que
+  # sai como **500** — o mesmo número de um fatal de PHP. Esperar "500" daria um
+  # verde quando o arquivo estivesse quebrado, que é exatamente o caso que uma
+  # verificação de permissão precisa distinguir.
+  if [ -n "$ID_SUPER" ] && [ -n "$ID_LOJA_SABOR" ]; then
+    conferir_corpo "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_SUPER" \
+      "Sem permissão para editar este usuário" "presente" "não edita o Super Administrador"
+    conferir_corpo "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" \
+      "Sem permissão para editar este usuário" "ausente" "edita a conta de uma loja"
+  else
+    echo "  --    contas ausentes; escalada por URL não verificada"
+  fi
 else
   falhas=$((falhas + 1))
 fi
 
-echo "Administrador"
+# O Moderador de Conteúdo não tem escopo de empresa — ele modera a plataforma
+# inteira —, e é por isso que `/painel-empresas/` lhe é negado: moderar conteúdo
+# não é administrar cadastro de loja. Os dois lados precisam estar aqui, porque
+# uma regressão que lhe desse o painel gerencial não mudaria nenhuma outra tela.
+echo "Moderador de Conteúdo (demo-moderador)"
+JAR_MODERADOR=/tmp/reconectar-acessos-moderador.txt
+if autenticar "demo-moderador" "$SENHA_DEMO" "$JAR_MODERADOR"; then
+  conferir "$JAR_MODERADOR" "/wp-admin/"              "200" "entra no painel técnico"
+  conferir "$JAR_MODERADOR" "/wp-admin/nav-menus.php" "200" "cria menus"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reconectar_campanha" "200" "publica campanhas"
+  conferir "$JAR_MODERADOR" "/comunidade/"            "200" "modera a comunidade"
+  conferir "$JAR_MODERADOR" "/forums/"                "200" "tem acesso ao fórum"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=forum"     "200" "administra os fóruns"
+  conferir "$JAR_MODERADOR" "/wp-admin/post-new.php?post_type=forum" "200" "cria fóruns"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=topic"     "200" "modera os tópicos"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reply"     "200" "modera as respostas"
+  conferir "$JAR_MODERADOR" "/wp-admin/options-general.php?page=bbpress" "403" "não configura o bbPress"
+  conferir "$JAR_MODERADOR" "/wp-admin/tools.php?page=bbp-repair"    "403" "não redefine o fórum"
+  conferir "$JAR_MODERADOR" "/wp-admin/users.php"     "403" "não configura usuários"
+  conferir "$JAR_MODERADOR" "/wp-admin/plugins.php"   "403" "não gere plugins"
+  conferir "$JAR_MODERADOR" "/wp-admin/theme-editor.php" "403" "não edita arquivo de tema"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=product" "403" "produto é da loja"
+  conferir "$JAR_MODERADOR" "/painel-empresas/"       "403" "moderar não é administrar empresa"
+  conferir "$JAR_MODERADOR" "/dashboard/"             "302" "não é vendedor"
+
+  # Pelo corpo, e não pelo status, pela razão registrada no bloco acima: o
+  # `wp_die()` de negação sai como 500 e um fatal de PHP sairia igual.
+  if [ -n "$ID_LOJA_SABOR" ]; then
+    conferir_corpo "$JAR_MODERADOR" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" \
+      "Sem permissão para editar este usuário" "presente" "não edita conta de loja"
+  fi
+else
+  falhas=$((falhas + 1))
+fi
+
+echo "Super Administrador (admin)"
 JAR_ADMIN=/tmp/reconectar-acessos-admin.txt
 if autenticar "admin" "$SENHA_ADMIN" "$JAR_ADMIN"; then
   conferir "$JAR_ADMIN" "/wp-admin/"            "200" "painel completo"
@@ -453,51 +541,89 @@ fi
 # regressão em `sincronizar_capacidades()` concederia sem que nenhuma URL mudasse
 # de código.
 #
-# O último caso é o alcance decidido para este ator: consulta, não edição. Ele
-# administra o vendedor da Sabor da Terra e ainda assim não pode editar um
+# O caso do produto é o alcance decidido para este ator: consulta, não edição.
+# Ele administra o vendedor da Sabor da Terra e ainda assim não pode editar um
 # produto dele.
-echo "Capacidades proibidas ao administrador de empresas"
+#
+# `manage_options` e `manage_woocommerce` continuam na lista mesmo agora que os
+# dois papéis entram no `/wp-admin`, e é o ponto mais importante deste bloco: a
+# porta se abriu por uma capacidade própria, `reconectar_acessar_wp_admin`, e
+# não por uma das duas. Conceder `manage_options` devolveria a instalação de
+# plugins pela mesma linha que a barra — `restringir_gestao_da_tecnologia()`
+# exige exatamente ela —, e `manage_woocommerce` abriria as listagens de produto
+# e pedido de **todas** as lojas, desfazendo em silêncio o isolamento por
+# empresa que só existe dentro do `/painel-empresas/`.
+#
+# As capacidades de tema estão aqui por inteiro porque `edit_theme_options` —
+# que os dois papéis têm, por ser a única do núcleo que edita menus — abre a
+# tela Aparência → Temas. São estes casos que provam que a tela é só de leitura;
+# nenhuma URL provaria, já que ela responde 200 de propósito.
+echo "Capacidades proibidas ao Administrador e ao Moderador"
 if docker compose version >/dev/null 2>&1; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
-    $u = get_user_by( "login", "demo-admin-nosso-chao" );
-    if ( ! $u ) { echo "::sem-dados\n"; exit; }
-    wp_set_current_user( $u->ID );
+    $atores = array(
+      "Administrador" => get_user_by( "login", "demo-admin-nosso-chao" ),
+      "Moderador"     => get_user_by( "login", "demo-moderador" ),
+    );
+    if ( ! $atores["Administrador"] || ! $atores["Moderador"] ) { echo "::sem-dados\n"; exit; }
+
     $proibidas = array(
       "manage_options",
       "manage_woocommerce",
-      "edit_users",
-      "create_users",
-      "promote_users",
-      "list_users",
       "dokandar",
+      "install_plugins",
       "activate_plugins",
+      "edit_plugins",
+      "delete_plugins",
+      "switch_themes",
+      "install_themes",
       "edit_themes",
+      "delete_themes",
+      "upload_themes",
+      "edit_files",
+      "update_core",
     );
-    foreach ( $proibidas as $cap ) {
-      printf( "::%s %s\n", current_user_can( $cap ) ? "FALHA" : "ok", $cap );
+
+    foreach ( $atores as $rotulo => $ator ) {
+      foreach ( $proibidas as $cap ) {
+        printf( "::%s %s: %s\n", user_can( $ator, $cap ) ? "FALHA" : "ok", $rotulo, $cap );
+      }
     }
+
+    // Gestão de contas: concedida ao Administrador por desenho, negada ao
+    // Moderador. Os dois lados juntos, porque uma regressão que negasse a
+    // todo mundo passaria num teste que só verifica a negação.
+    foreach ( array( "list_users", "create_users", "edit_users", "promote_users" ) as $cap ) {
+      printf( "::%s Administrador tem: %s\n", user_can( $atores["Administrador"], $cap ) ? "ok" : "FALHA", $cap );
+      printf( "::%s Moderador: %s\n", user_can( $atores["Moderador"], $cap ) ? "FALHA" : "ok", $cap );
+    }
+
+    wp_set_current_user( $atores["Administrador"]->ID );
     $vendedor = get_user_by( "login", "demo-sabor-da-terra" );
     $produtos = $vendedor ? get_posts( array( "post_type" => "product", "author" => $vendedor->ID, "numberposts" => 1 ) ) : array();
     if ( $produtos ) {
-      printf( "::%s %s\n", current_user_can( "edit_post", $produtos[0]->ID ) ? "FALHA" : "ok", "edit_post de produto de vendedor sob sua gestão" );
+      printf( "::%s %s\n", current_user_can( "edit_post", $produtos[0]->ID ) ? "FALHA" : "ok", "Administrador: edit_post de produto de loja sob sua gestão" );
     }' 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
 
   if [ "$saida" = "sem-dados" ]; then
     echo "  --    carga de demonstração ausente; capacidades não verificadas"
   elif [ -z "$saida" ]; then
     total=$((total + 1))
-    echo "  FALHA não foi possível consultar as capacidades do company_admin"
+    echo "  FALHA não foi possível consultar as capacidades dos papéis administrativos"
     falhas=$((falhas + 1))
   else
     # Heredoc, e não pipe: um `while` do outro lado de um pipe roda em subshell,
     # e os incrementos de `falhas` morreriam com ela — o script terminaria com
     # status 0 anunciando falhas que acabou de imprimir.
+    # O rótulo já vem com o nome do ator e diz por si se o caso espera concessão
+    # ou negação ("Administrador tem: edit_users"). Escrever "negado" na mensagem,
+    # como antes, agora mentiria na metade das linhas.
     while IFS=" " read -r estado rotulo; do
       total=$((total + 1))
       if [ "$estado" = "ok" ]; then
-        [ "$verboso" = "sim" ] && echo "  ok    $rotulo negado"
+        [ "$verboso" = "sim" ] && echo "  ok    $rotulo"
       else
-        echo "  FALHA $rotulo concedido ao company_admin"
+        echo "  FALHA $rotulo"
         falhas=$((falhas + 1))
       fi
     done <<FIM
@@ -506,6 +632,81 @@ FIM
   fi
 else
   echo "  --    Docker Compose ausente; capacidades não verificadas"
+fi
+
+# A escalada de privilégio que `edit_users` abre, tentada de verdade.
+#
+# Em single-site, quem tem `edit_users` alcança **qualquer** conta, inclusive a
+# do Super Administrador: trocar a senha dele e entrar com ela. E `promote_users`
+# permite promover a si mesmo. As duas juntas transformariam o Administrador no
+# topo em dois cliques — e o pedido de não dar acesso de desenvolvedor viraria
+# decoração, sem que nenhuma tela parecesse quebrada.
+#
+# Os casos aqui são meta-capacidades (`edit_user`, `promote_user`), com alvo, e
+# é por isso que este bloco não cabe no de cima: as primitivas do Administrador
+# estão concedidas de propósito, e é `negar_gestao_de_usuarios_superiores()`, em
+# `map_meta_cap`, que decide caso a caso. Os dois últimos casos são o contorno:
+# sobre a própria conta e sobre uma loja, as mesmas capacidades precisam
+# continuar funcionando, ou o filtro teria fechado o perfil inteiro.
+echo "Escalada de privilégio pelo Administrador"
+if docker compose version >/dev/null 2>&1; then
+  saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
+    $ator  = get_user_by( "login", "demo-admin-nosso-chao" );
+    $super = get_user_by( "login", "admin" );
+    $loja  = get_user_by( "login", "demo-sabor-da-terra" );
+    if ( ! $ator || ! $super || ! $loja ) { echo "::sem-dados\n"; exit; }
+
+    wp_set_current_user( $ator->ID );
+
+    printf( "::%s nao edita o Super Administrador\n", current_user_can( "edit_user", $super->ID ) ? "FALHA" : "ok" );
+    printf( "::%s nao apaga o Super Administrador\n", current_user_can( "delete_user", $super->ID ) ? "FALHA" : "ok" );
+    printf( "::%s nao promove o Super Administrador\n", current_user_can( "promote_user", $super->ID ) ? "FALHA" : "ok" );
+    printf( "::%s nao promove a si mesmo a administrator\n", current_user_can( "promote_user", $ator->ID, "administrator" ) ? "FALHA" : "ok" );
+
+    // Os dois campos por onde o papel de destino chega de verdade, e não só o
+    // argumento acima. `users.php` usa `new_role` na ação em massa e
+    // `user-edit.php` usa `role`: são chaves diferentes, e ler só uma deixaria
+    // o outro caminho sem regra nenhuma.
+    foreach ( array( "role", "new_role" ) as $campo ) {
+      $_REQUEST = array( $campo => "administrator" );
+      printf( "::%s nao promove a administrator via campo %s\n", current_user_can( "promote_user", $ator->ID ) ? "FALHA" : "ok", $campo );
+
+      $_REQUEST = array( $campo => "customer" );
+      printf( "::%s ainda promove a customer via campo %s\n", current_user_can( "promote_user", $loja->ID ) ? "ok" : "FALHA", $campo );
+    }
+    $_REQUEST = array();
+
+    // `wp_update_user()` fica de fora de propósito, e a ausência merece nota: ela
+    // é API de baixo nível e **não** consulta `map_meta_cap`, então uma tentativa
+    // por ali promoveria o usuário de verdade e reprovaria um filtro que está
+    // correto — além de estragar o ambiente no meio da verificação. Quem chama
+    // `promote_user` é a tela, e é a tela que o caso HTTP acima exercita.
+    printf( "::%s edita a conta de uma loja\n", current_user_can( "edit_user", $loja->ID ) ? "ok" : "FALHA" );
+    printf( "::%s edita a propria conta\n", current_user_can( "edit_user", $ator->ID ) ? "ok" : "FALHA" );' 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
+
+  if [ "$saida" = "sem-dados" ]; then
+    echo "  --    carga de demonstração ausente; escalada não verificada"
+  elif [ -z "$saida" ]; then
+    total=$((total + 1))
+    echo "  FALHA não foi possível tentar a escalada de privilégio"
+    falhas=$((falhas + 1))
+  else
+    # Heredoc pela mesma razão dos blocos anteriores: um `while` depois de um
+    # pipe roda em subshell e os incrementos de `falhas` morreriam com ela.
+    while IFS=" " read -r estado rotulo; do
+      total=$((total + 1))
+      if [ "$estado" = "ok" ]; then
+        [ "$verboso" = "sim" ] && echo "  ok    $rotulo"
+      else
+        echo "  FALHA $rotulo"
+        falhas=$((falhas + 1))
+      fi
+    done <<FIM
+$saida
+FIM
+  fi
+else
+  echo "  --    Docker Compose ausente; escalada não verificada"
 fi
 
 # A trava de URL prova que o cliente não chega à listagem. Este bloco prova a

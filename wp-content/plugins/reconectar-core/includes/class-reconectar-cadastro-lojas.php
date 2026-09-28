@@ -58,7 +58,11 @@ class Reconectar_Cadastro_De_Lojas {
 	private static $revertendo = false;
 
 	/**
-	 * Registra os ganchos das cinco camadas.
+	 * Registra os ganchos das cinco camadas, mais a limpeza do aviso do painel.
+	 *
+	 * `remover_aviso_de_onboarding()` não fecha porta nenhuma: ela apenas evita
+	 * que o Dokan cobre para sempre a publicação de uma página que esta classe
+	 * esvaziou de propósito.
 	 */
 	public static function init() {
 		add_filter( 'dokan_register_user_role', array( __CLASS__, 'apenas_cliente' ) );
@@ -70,6 +74,7 @@ class Reconectar_Cadastro_De_Lojas {
 		// cedo o bastante para preceder `template_redirect`, que é onde o
 		// manipulador do "Become a vendor" atende ao POST.
 		add_action( 'wp_loaded', array( __CLASS__, 'remover_virar_vendedor' ) );
+		add_action( 'wp_loaded', array( __CLASS__, 'remover_aviso_de_onboarding' ) );
 
 		add_action( 'set_user_role', array( __CLASS__, 'reverter_promocao' ), 10, 3 );
 		add_action( 'add_user_role', array( __CLASS__, 'reverter_adicao' ), 10, 2 );
@@ -181,6 +186,40 @@ class Reconectar_Cadastro_De_Lojas {
 		remove_action( 'template_redirect', array( $controlador, 'become_a_seller_form_handler' ) );
 		remove_action( 'woocommerce_after_my_account', array( $controlador, 'render_become_a_vendor_section' ) );
 		remove_action( 'woocommerce_account_account-migration_endpoint', array( $controlador, 'load_customer_to_vendor_update_template' ) );
+	}
+
+	/**
+	 * Tira do painel o aviso de que a página de onboarding não está publicada.
+	 *
+	 * `Manager::show_vendor_onboarding_page_notice()` acusa como erro de
+	 * configuração justamente o estado que esta plataforma escolheu: a página
+	 * `/vendor-onboarding/` fica em rascunho por decisão do `provision.sh`, porque
+	 * o shortcode dela sai do ar em `ajustar_formularios()`. Publicá-la para
+	 * calar o aviso reabriria a terceira porta da lista acima — o aviso pede
+	 * exatamente o que a classe inteira existe para impedir.
+	 *
+	 * Suprimir importa mais do que parece: o painel do Dokan mostra o aviso em
+	 * toda tela de configuração, e um alerta permanente que ninguém pode resolver
+	 * ensina o administrador a ignorar os alertas que importam.
+	 *
+	 * A instância tem de ser a que o Dokan registrou — o callback é um array
+	 * `[ $objeto, 'metodo' ]` e o WordPress compara identidade ao remover. O
+	 * container registra `admin_notices` como compartilhado: medido, `get()`
+	 * devolve sempre o mesmo objeto, e é o dele o `spl_object_id` que aparece na
+	 * chave do callback em `$wp_filter`.
+	 */
+	public static function remover_aviso_de_onboarding() {
+		if ( ! function_exists( 'dokan_get_container' ) ) {
+			return;
+		}
+
+		$avisos = dokan_get_container()->get( 'admin_notices' );
+
+		if ( ! is_object( $avisos ) ) {
+			return;
+		}
+
+		remove_filter( 'dokan_admin_notices', array( $avisos, 'show_vendor_onboarding_page_notice' ) );
 	}
 
 	/**
