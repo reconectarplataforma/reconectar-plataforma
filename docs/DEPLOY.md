@@ -164,6 +164,12 @@ Cole a linha inteira. Ela é o que dispensa o `StrictHostKeyChecking=no`:
 desligar a verificação faria a esteira aceitar qualquer servidor que
 respondesse naquele endereço, numa sessão que carrega uma chave de produção.
 
+Se algum dos cinco faltar, o primeiro passo da ação composta interrompe o
+workflow nomeando exatamente o que não está cadastrado. A guarda existe porque
+o `required: true` do input **não** barra valor vazio — ele só exige que o
+`with:` traga a chave — e a falha sem ela acontecia adiante, como o `usage` do
+`ssh`, que parece erro de sintaxe do comando.
+
 ### O environment `producao`
 
 Os dois workflows que falam com o servidor declaram `environment: producao`.

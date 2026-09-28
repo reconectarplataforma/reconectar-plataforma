@@ -29,6 +29,51 @@ inputs:
 runs:
   using: composite
   steps:
+    # `required: true` num input de ação composta NÃO falha quando o valor chega
+    # vazio — ele só falha quando o `with:` omite a chave, e aqui as cinco chaves
+    # sempre existem: o que falta é o secret ou a variable por trás delas.
+    #
+    # Sem esta guarda o job seguia adiante e morria no `ssh`, que imprime o
+    # próprio `usage` quando o usuário do destino é vazio (`ssh "@"`). Medido:
+    # `@` e `@host` saem em usage; `usuario@` e destino vazio saem em "Could not
+    # resolve hostname". O usage manda a investigação para a sintaxe da linha,
+    # que está certa, e não para o cadastro que falta.
+    #
+    # Pior que o erro ilegível: `CAMINHO_REMOTO` vazio faria o passo seguinte
+    # sincronizar para `/wp-content/` e `/scripts/` na RAIZ do servidor — e com
+    # `--rsync-path="sudo rsync"`, portanto como root e com `--delete`.
+    - name: Conferir que os secrets e variables existem
+      shell: bash
+      env:
+        CHAVE_PRIVADA: ${{ inputs.chave-privada }}
+        HOST_KEY: ${{ inputs.host-key }}
+        HOST: ${{ inputs.host }}
+        USUARIO: ${{ inputs.usuario }}
+        CAMINHO_REMOTO: ${{ inputs.caminho-remoto }}
+      run: |
+        faltou=0
+
+        # "Falta", e não "$2 não está cadastrado": o segundo argumento já traz o
+        # artigo, e o particípio concordaria errado com metade da lista.
+        exigir() {
+          if [ -z "$1" ]; then
+            echo "::error::Falta $2 nas configurações do repositório"
+            faltou=1
+          fi
+        }
+
+        exigir "$CHAVE_PRIVADA"  "o secret SSH_CHAVE_PRIVADA"
+        exigir "$HOST_KEY"       "a variable SSH_HOST_KEY"
+        exigir "$HOST"           "a variable SSH_HOST"
+        exigir "$USUARIO"        "a variable SSH_USUARIO"
+        exigir "$CAMINHO_REMOTO" "a variable CAMINHO_REMOTO"
+
+        if [ "$faltou" -eq 1 ]; then
+          echo "Cadastre em Settings → Secrets and variables → Actions." >&2
+          echo "A lista completa, com os valores, está em docs/DEPLOY.md." >&2
+          exit 1
+        fi
+
     - shell: bash
       # Os valores chegam por `env:`, nunca interpolados dentro do `run:`. Um
       # `${{ }}` no corpo do script é substituição textual ANTES de o shell
