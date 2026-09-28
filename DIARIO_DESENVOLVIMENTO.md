@@ -2802,3 +2802,67 @@ Storefront são de terceiros e gitignorados, e a autorização de leitura conced
 nesta série valia para um arquivo só. É também por isso que a correção é CSS
 sobre o markup existente, e não override de template: o que não se lê, não se
 copia.
+
+---
+
+## 2026-09-28 — Esteira de deploy no GitLab CI
+
+**O que foi feito**
+- Criado `.gitlab-ci.yml` com três estágios: `verificar` (lint de PHP e de
+  shell, em toda branch e todo merge request), `implantar` (push na `main`) e
+  `demonstracao` (carga e remoção dos dados fictícios, em jobs manuais).
+- `docker-compose.yml`: `WORDPRESS_DEBUG` deixa de ser literal `"1"` e passa a
+  `${WORDPRESS_DEBUG:-1}` — mesmo default para quem desenvolve, desligável pelo
+  `.env` do servidor.
+- Criado `docs/DEPLOY.md` com a preparação única do servidor, a tabela de
+  variáveis CI/CD, o roteiro de verificação e a lista do que a esteira **não**
+  faz.
+- Duas armadilhas novas no `CLAUDE.md`.
+
+**Decisões técnicas**
+
+O código vai por `rsync` a partir do runner, e não por `git pull` no servidor: o
+runner já tem o checkout e já tem a chave, então a instância não precisa de
+nenhuma credencial do GitLab.
+
+O recorte da sincronização é o ponto de risco da entrega, e o comentário que o
+protege é a parte mais importante do arquivo. Só
+`wp-content/themes/reconectar/` e `wp-content/plugins/reconectar-core/` são
+versionados; o núcleo, o Storefront, os cinco plugins de terceiros e **todo** o
+`uploads/` chegam pelo `provision.sh` no destino. Um `--delete` no nível de
+`wp-content/` apagaria a instalação inteira, e os uploads não teriam origem
+nenhuma para serem restaurados. Dentro de cada diretório versionado o `--delete`
+é justamente o comportamento desejado.
+
+Não há `docker-compose.prod.yml`. Listas de `ports` no Compose **concatenam** em
+vez de substituir — um override declarando `80:80` deixaria a 8090 aberta
+também, em silêncio. A porta vem do `.env` do servidor, e o phpMyAdmin fica fora
+do ar porque o job nomeia os serviços no `up` (`db wordpress`).
+
+A chave do host vai numa variável (`SSH_HOST_KEY`, colhida com `ssh-keyscan`), e
+não se usa `StrictHostKeyChecking=no`: desligar a verificação faria a esteira
+aceitar qualquer servidor que respondesse naquele endereço, numa sessão que
+carrega chave privada de produção. E `SSH_CHAVE_PRIVADA` é *File* + *Protected*,
+nunca *Masked* — o GitLab só mascara valores de linha única, e uma chave privada
+tem várias.
+
+O job de demonstração chama `seed-demo.sh`, não o `demo.php` direto: a guarda de
+confirmação da remoção mora no script, e o caminho pelo PHP a contornaria. O
+gesto humano que a pergunta pedia é, na esteira, o clique no job manual.
+
+O lint de PHP conta os arquivos antes de conferi-los. Um `find` sobre caminho
+renomeado não casa nada e sai com status 0 — o job passaria em verde tendo
+conferido zero arquivo, que é o pior resultado possível.
+
+**Pendências que dependem de ação humana**
+- `chmod 400 dev.pem`; criar o projeto no GitLab e o remote (o atual é GitHub).
+- Security Group liberando 80/tcp e 22/tcp; Docker e o plugin `compose` na
+  instância.
+- O `.env` do servidor, criado à mão **antes do primeiro `up`** — o
+  `wp-config.php` nasce uma vez e não é reescrito depois. As regras de segurança
+  do projeto bloqueiam qualquer ferramenta de tocar em `.env*`; o trecho foi
+  entregue no chat e está em `docs/DEPLOY.md`.
+- `WP_URL` tem de ser o DNS público: a allowlist de `Host` não conhece endereço
+  da AWS, e com o default o site sobe carimbando todo asset com `localhost`.
+- A esteira ainda não rodou uma vez — nada aqui foi verificado contra a
+  instância. O roteiro de verificação está em `docs/DEPLOY.md`.

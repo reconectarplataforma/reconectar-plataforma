@@ -683,6 +683,43 @@ trecho no chat para o usuário criar à mão. O `.env.example` documenta as chav
 A 8080 estava ocupada na máquina de desenvolvimento. Documentação que diga 8080
 está desatualizada.
 
+### O deploy sincroniza **dois** diretórios de `wp-content/`, nunca a pasta
+
+`git ls-files wp-content/` devolve exatamente `plugins/reconectar-core/` e
+`themes/reconectar/`. O núcleo do WordPress, o Storefront, o WooCommerce, o
+Dokan, o bbPress, o BuddyPress e **todo** o `uploads/` não estão no Git — chegam
+pelo `provision.sh` no destino.
+
+Um `rsync --delete` no nível de `wp-content/` apaga a instalação inteira do
+servidor. Os plugins e o tema pai voltariam num provisionamento; os **uploads
+não têm origem nenhuma** para serem restaurados. Dentro de cada diretório
+versionado, o `--delete` é o que se quer: arquivo removido do tema tem de sumir
+de lá.
+
+O `.gitlab-ci.yml` traz esse recorte com um comentário longo por cima. É o tipo
+de bloco que alguém "simplifica" para uma linha só seis meses depois — e o
+estrago não aparece no job, que termina em verde.
+
+E o `rsync` precisa de `--rsync-path="sudo rsync"`: os arquivos do bind-mount
+pertencem ao UID 33 e o `ec2-user` é 1000, a mesma assimetria registrada acima.
+
+### Fora do `localhost`, o site depende de `WP_URL` apontar para o host público
+
+A allowlist de `Host` (`configurar-url-dinamica.php:82`) só aceita `localhost`,
+o loopback e os três blocos privados. Um DNS público — da AWS ou de onde for —
+não casa e cai em `RECONECTAR_HOST_PADRAO`, que o `provision.sh:96` deriva de
+`WP_URL`.
+
+Com o default `http://localhost:8090`, o servidor sobe funcionando e carimba
+**todo** asset e todo link com `localhost`. O sintoma não é erro: é a página
+crua, sem CSS, para quem acessa de fora — enquanto para quem faz um túnel SSH
+tudo parece certo.
+
+E o `wp-config.php` nasce na primeira subida e não é reescrito quando as
+variáveis mudam depois. `WP_URL`, senha de banco e porta têm de estar certas
+**antes** do primeiro `up`; consertar depois é derrubar o volume, o que apaga o
+banco.
+
 ## Convenções
 
 **Idioma.** Todo código autoral é escrito em português: nomes de função,
