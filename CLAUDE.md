@@ -205,6 +205,33 @@ E a comissão tem de ir a **zero** no mesmo bloco: o padrão que o assistente
 propõe é 10% mais R$10, e aqui a plataforma não retém nada — aceitar o padrão
 exibiria na dashboard de cada loja um desconto que ninguém cobra.
 
+### `wp option patch update` exige a chave; `patch insert` exige a opção
+
+Nenhuma das duas falha em silêncio — falham com erro, e sob `set -euo pipefail`
+isso derruba o `provision.sh` inteiro. O caro é que o estado que dispara cada uma
+não existe na máquina de desenvolvimento. Medido:
+
+| Estado da opção | `patch update` | `patch insert` |
+| --- | --- | --- |
+| não existe | `No data exists for key "…"` | `Cannot create key "…" on data type boolean` |
+| existe, chave ausente | `No data exists for key "…"` | cria a chave |
+| existe, chave presente | atualiza | atualiza |
+
+A mensagem do `patch update` é a **mesma** nos dois estados de falha, então ela
+não diz se falta a opção ou só a chave — quem lê o log do job não consegue
+escolher a correção por ela.
+
+`dokan_appearance` **nasce sem** `show_register_as_vendor`, a mesma forma da
+armadilha do `dokan_selling` registrada acima. Aqui a chave existia porque a tela
+do Dokan já tinha sido salva alguma vez, o provisionamento passava, e o primeiro
+deploy na EC2 morreu nela com exit 1 no meio do job.
+
+Para gravar chave dentro de opção-mapa use `reconectar_gravar_chave_de_opcao()`
+(`scripts/provision.sh`), que garante a opção e então usa `patch insert`. A
+exceção é o laço dos gateways do WooCommerce, logo abaixo dela: ali a chave
+`enabled` ausente **é** informação — significa gateway no padrão de fábrica, que
+já vem desligado —, e criá-la escreveria configuração para repetir o que já vale.
+
 ### bbPress e BuddyPress estão ativos
 
 bbPress 2.6.18 e BuddyPress 14.5.2 são instalados e ativados pelo
