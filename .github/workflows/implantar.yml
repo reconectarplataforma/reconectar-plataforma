@@ -36,7 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/preparar-ssh
+      - id: preparar_ssh
+        uses: ./.github/actions/preparar-ssh
         with:
           chave-privada: ${{ secrets.SSH_CHAVE_PRIVADA }}
           host-key: ${{ vars.SSH_HOST_KEY }}
@@ -45,6 +46,7 @@ jobs:
           caminho-remoto: ${{ vars.CAMINHO_REMOTO }}
 
       - name: Criar a árvore de destino
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         env:
           CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
         run: |
@@ -67,6 +69,7 @@ jobs:
       # UID 33 (a imagem Apache é Debian) e o `ec2-user` é 1000. Sem isso a escrita
       # falha em arquivo que já existe.
       - name: Sincronizar o código autoral
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         env:
           CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
         run: |
@@ -93,6 +96,7 @@ jobs:
       # O `wpcli` sobe sob demanda no passo seguinte; o `demo` já está atrás de
       # profile.
       - name: Subir o banco e o WordPress
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         run: ssh $OPCOES_SSH "$ALVO" "$COMPOSE up -d db wordpress"
 
       # O WP-CLI que chega antes de o núcleo terminar de ser copiado para o volume
@@ -100,6 +104,7 @@ jobs:
       # descreve o instante, não o problema. Mesmo laço de `scripts/demo-completa.sh`.
       # `$COMPOSE` expande aqui; `\$decorrido` fica para o shell do servidor.
       - name: Esperar o wp-config.php aparecer
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         run: |
           ssh $OPCOES_SSH "$ALVO" "
             decorrido=0
@@ -114,4 +119,5 @@ jobs:
           "
 
       - name: Provisionar
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         run: ssh $OPCOES_SSH "$ALVO" "$COMPOSE run --rm wpcli bash /var/www/scripts/provision.sh"
