@@ -45,12 +45,28 @@ jobs:
           usuario: ${{ vars.SSH_USUARIO }}
           caminho-remoto: ${{ vars.CAMINHO_REMOTO }}
 
+      # `sudo` porque o padrão do `CAMINHO_REMOTO` fica sob `/opt`, que pertence
+      # a root: sem ele o `mkdir` falha com "Permission denied" na primeira
+      # execução, e o erro parece de caminho errado. Não é dependência nova — o
+      # `rsync` abaixo já precisa de `sudo` sem senha, que a AWS dá ao `ec2-user`.
+      #
+      # O `chown` é da RAIZ e nunca `-R`: dentro dela, `wp-content/` pertence ao
+      # UID 33 do container Apache, e um chown recursivo tiraria do WordPress a
+      # escrita nos uploads. Ele existe para que o `.env` do servidor possa ser
+      # criado à mão sem sudo, e é inócuo quando o diretório já é do usuário.
+      #
+      # `\$(id -un)` fica para o shell do servidor, e não para o do runner: é o
+      # usuário que de fato logou, e não uma segunda cópia de `SSH_USUARIO` que
+      # poderia divergir dele.
       - name: Criar a árvore de destino
         if: steps.preparar_ssh.outputs.configurado == 'true'
         env:
           CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
         run: |
-          ssh $OPCOES_SSH "$ALVO" "mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts"
+          ssh $OPCOES_SSH "$ALVO" "
+            sudo mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts
+            sudo chown \$(id -un):\$(id -gn) $CAMINHO_REMOTO
+          "
 
       # ATENÇÃO — o recorte abaixo não é arbitrário e não pode ser "simplificado"
       # para um `rsync wp-content/`.
