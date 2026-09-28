@@ -72,6 +72,18 @@ sudo chown ec2-user:ec2-user /opt/reconectar
 
 Este caminho é o valor da variável `CAMINHO_REMOTO`.
 
+O deploy também cria a árvore sozinho, com `sudo`, e devolve a raiz ao usuário
+de login. Mas isso **não dispensa** os dois comandos acima antes do primeiro
+deploy: o `.env` do passo 3 tem de estar no diretório antes que o job suba o
+container, e o job sobe o container na mesma execução em que cria a árvore. Rodar
+o deploy primeiro e escrever o `.env` depois é chegar tarde. A criação
+automática existe para os deploys seguintes, e para o dia em que o diretório
+sumir.
+
+O `chown` do job é da raiz e nunca recursivo: dentro dela, `wp-content/` passa a
+pertencer ao UID 33 do container Apache, e um `chown -R` tiraria do WordPress a
+escrita nos uploads.
+
 ### 3. O `.env`, **antes do primeiro `up`**
 
 O `wp-config.php` nasce na primeira subida do container e **não é reescrito**

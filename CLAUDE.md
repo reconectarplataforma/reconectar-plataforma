@@ -205,6 +205,33 @@ E a comissão tem de ir a **zero** no mesmo bloco: o padrão que o assistente
 propõe é 10% mais R$10, e aqui a plataforma não retém nada — aceitar o padrão
 exibiria na dashboard de cada loja um desconto que ninguém cobra.
 
+### `wp option patch update` exige a chave; `patch insert` exige a opção
+
+Nenhuma das duas falha em silêncio — falham com erro, e sob `set -euo pipefail`
+isso derruba o `provision.sh` inteiro. O caro é que o estado que dispara cada uma
+não existe na máquina de desenvolvimento. Medido:
+
+| Estado da opção | `patch update` | `patch insert` |
+| --- | --- | --- |
+| não existe | `No data exists for key "…"` | `Cannot create key "…" on data type boolean` |
+| existe, chave ausente | `No data exists for key "…"` | cria a chave |
+| existe, chave presente | atualiza | atualiza |
+
+A mensagem do `patch update` é a **mesma** nos dois estados de falha, então ela
+não diz se falta a opção ou só a chave — quem lê o log do job não consegue
+escolher a correção por ela.
+
+`dokan_appearance` **nasce sem** `show_register_as_vendor`, a mesma forma da
+armadilha do `dokan_selling` registrada acima. Aqui a chave existia porque a tela
+do Dokan já tinha sido salva alguma vez, o provisionamento passava, e o primeiro
+deploy na EC2 morreu nela com exit 1 no meio do job.
+
+Para gravar chave dentro de opção-mapa use `reconectar_gravar_chave_de_opcao()`
+(`scripts/provision.sh`), que garante a opção e então usa `patch insert`. A
+exceção é o laço dos gateways do WooCommerce, logo abaixo dela: ali a chave
+`enabled` ausente **é** informação — significa gateway no padrão de fábrica, que
+já vem desligado —, e criá-la escreveria configuração para repetir o que já vale.
+
 ### bbPress e BuddyPress estão ativos
 
 bbPress 2.6.18 e BuddyPress 14.5.2 são instalados e ativados pelo
@@ -702,6 +729,30 @@ depois — e o estrago não aparece no job, que termina em verde.
 
 E o `rsync` precisa de `--rsync-path="sudo rsync"`: os arquivos do bind-mount
 pertencem ao UID 33 e o `ec2-user` é 1000, a mesma assimetria registrada acima.
+
+### Configuração que aponta para anexo não atravessa o deploy
+
+Corolário do recorte acima, e o primeiro deploy caiu nele. `custom_logo` é uma
+theme mod que guarda o **ID de um anexo**, e anexo mora em `uploads/`, que não é
+versionado nem sincronizado. A logo definida no Customizer da máquina de
+desenvolvimento não existe do outro lado — nem o ID, nem o arquivo.
+
+O sintoma não é imagem quebrada: `header.php:47` tem fallback, e o cabeçalho cai
+no nome do site em **Thoge**, uma fonte de display que numa linha de cabeçalho
+sai ilegível. A página inteira parece correta, com CSS e tudo no lugar, e só a
+marca fica errada — o que manda a investigação para a tipografia, que está
+funcionando: medido, `thoge.otf` respondia 200 no servidor.
+
+O arquivo nunca foi o problema: as três logos estão em
+`themes/reconectar/assets/img/`, versionadas, e o tema sobe inteiro. Faltava
+importar para a biblioteca e apontar a mod, o que o `provision.sh` passa a fazer
+na seção "Logo do cabeçalho". A guarda confere o **anexo**, não só a mod: um
+banco restaurado sem a mídia deixaria o ID apontando para o nada, e aí o
+provisionamento diria "já definida" sobre um cabeçalho em fallback.
+
+Vale para qualquer opção que guarde ID de anexo — ícone do site, imagem de
+cabeçalho, capa de página. Configuração feita pelo Customizer local não chega ao
+servidor por nenhum caminho: ou entra no `provision.sh`, ou é refeita à mão lá.
 
 ### Fora do `localhost`, o site depende de `WP_URL` apontar para o host público
 

@@ -111,6 +111,33 @@ else
   wp theme activate storefront
 fi
 
+echo "== Logo do cabeçalho =="
+# `header.php:47` desenha a logo personalizada e, sem ela, cai no nome do site em
+# Thoge — uma fonte de display, que numa linha de cabeçalho sai ilegível. O
+# primeiro deploy na EC2 subiu assim: a logo estava definida em desenvolvimento,
+# mas `custom_logo` guarda o ID de um anexo, e anexo mora em `wp-content/uploads/`,
+# que não é versionado nem entra no recorte do `rsync`. Nada no servidor tinha
+# como saber qual imagem é a marca.
+#
+# O arquivo em si sempre esteve lá — `assets/img/` é do tema, e o tema sobe
+# inteiro. O que faltava era importá-lo para a biblioteca e apontar a mod.
+#
+# A guarda confere o ANEXO, e não só a mod: um banco restaurado sem a mídia
+# deixaria `custom_logo` apontando para um ID que não existe mais, e aí o
+# cabeçalho volta ao fallback enquanto o provisionamento diria "já definida".
+if [ -d "/var/www/html/wp-content/themes/reconectar" ]; then
+  id_logo="$(wp theme mod get custom_logo --field=value 2>/dev/null || true)"
+
+  if [ -n "$id_logo" ] && wp post get "$id_logo" --field=ID >/dev/null 2>&1; then
+    echo "Logo do cabeçalho já definida (anexo $id_logo)."
+  else
+    id_logo="$(wp media import wp-content/themes/reconectar/assets/img/logo-apoio-cor.png \
+      --title="Reconectar - Incubadora Digital" --porcelain)"
+    wp theme mod set custom_logo "$id_logo"
+    echo "Logo do cabeçalho importada (anexo $id_logo)."
+  fi
+fi
+
 echo "== Plugins do marketplace e comunidade =="
 # `nextend-facebook-connect` é o Nextend Social Login: apesar do slug, a versão
 # livre entrega Facebook, Google e X. Ele fica instalado e ativo mesmo sem
@@ -213,6 +240,31 @@ do
   fi
 done
 
+# Grava uma chave dentro de uma opção-mapa, exista ela ou não.
+#
+# `wp option patch update` exige que a CHAVE já esteja lá e sai com erro quando
+# falta — sob `set -e`, isso aborta o provisionamento inteiro. E numa instalação
+# nova ela falta: medido na EC2, `dokan_appearance` nasce sem
+# `show_register_as_vendor` e o deploy morreu em `No data exists for key`. Aqui a
+# chave existia porque a tela do Dokan já tinha sido salva alguma vez, e foi por
+# isso que o defeito nunca apareceu em desenvolvimento.
+#
+# Quem cria a chave é `patch insert`, que também atualiza a já existente. Ele
+# exige, por sua vez, que a OPÇÃO exista: sem ela sai em `Cannot create key …
+# on data type boolean`, porque `get_option()` devolveu `false`. Criá-la como
+# objeto vazio é inócuo — o Dokan lê cada chave com o default interno dela.
+#
+# Argumentos: <opção> <chave> [--format=json] <valor>
+reconectar_gravar_chave_de_opcao() {
+  local opcao="$1"; shift
+
+  if ! wp option get "$opcao" >/dev/null 2>&1; then
+    wp option add "$opcao" --format=json '{}'
+  fi
+
+  wp option patch insert "$opcao" "$@"
+}
+
 echo "== Autocadastro de loja (desligado) =="
 # Quem cadastra loja nesta plataforma é o Administrador ou o Administrador de
 # Empresas, pelo painel de empresas. As duas linhas abaixo NÃO são a trava — a
@@ -224,7 +276,7 @@ echo "== Autocadastro de loja (desligado) =="
 if [ "$(wp option pluck dokan_appearance show_register_as_vendor 2>/dev/null || true)" = "off" ]; then
   echo "Autocadastro de loja já desligado."
 else
-  wp option patch update dokan_appearance show_register_as_vendor off
+  reconectar_gravar_chave_de_opcao dokan_appearance show_register_as_vendor off
 fi
 
 # A página de onboarding ficaria em branco depois que o shortcode dela sai do ar.
@@ -249,7 +301,7 @@ echo "== Meios de pagamento =="
 if [ "$(wp option pluck dokan_withdraw withdraw_methods --format=json 2>/dev/null || true)" = '{"paypal":"","bank":"bank","pix":"pix"}' ]; then
   echo "Métodos de recebimento da loja já configurados."
 else
-  wp option patch update dokan_withdraw withdraw_methods --format=json '{"paypal":"","bank":"bank","pix":"pix"}'
+  reconectar_gravar_chave_de_opcao dokan_withdraw withdraw_methods --format=json '{"paypal":"","bank":"bank","pix":"pix"}'
 fi
 
 # Os gateways de fábrica do WooCommerce competem com os autorais e mandariam o
@@ -260,10 +312,14 @@ fi
 # na entrega, que nenhuma loja se comprometeu a aceitar.
 #
 # A chave `enabled` só existe depois que o gateway é salvo ao menos uma vez:
-# medido, `woocommerce_cheque_settings` não a tem, e `wp option patch update`
-# sobre chave inexistente sai com erro — que num script sob `set -e` abortaria o
-# provisionamento inteiro. Ausente, o gateway está no padrão de fábrica dele,
-# que já é desligado; não há o que fazer.
+# medido, `woocommerce_cheque_settings` não a tem. Aqui a ausência dela é
+# informação, e não um caso a consertar — por isso este bloco NÃO usa
+# `reconectar_gravar_chave_de_opcao`: sem a chave, o gateway está no padrão de
+# fábrica dele, que já é desligado, e gravar `no` só criaria configuração para
+# repetir o que já vale. O `[ -z "$estado" ]` abaixo é essa leitura.
+#
+# O `patch update` do ramo `else` é seguro porque só se chega nele com a chave
+# lida e diferente de `no`.
 for gateway in bacs cheque cod; do
   estado="$(wp option pluck "woocommerce_${gateway}_settings" enabled 2>/dev/null || true)"
 
