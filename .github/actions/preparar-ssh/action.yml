@@ -9,6 +9,11 @@
 name: Preparar acesso SSH
 description: Instala a chave privada, fixa a chave do host e exporta OPCOES_SSH, ALVO e COMPOSE.
 
+outputs:
+  configurado:
+    description: Indica se todos os valores necessários ao SSH foram fornecidos.
+    value: ${{ steps.validar.outputs.configurado }}
+
 inputs:
   chave-privada:
     description: Conteúdo da chave privada (secret SSH_CHAVE_PRIVADA).
@@ -43,6 +48,7 @@ runs:
     # sincronizar para `/wp-content/` e `/scripts/` na RAIZ do servidor — e com
     # `--rsync-path="sudo rsync"`, portanto como root e com `--delete`.
     - name: Conferir que os secrets e variables existem
+      id: validar
       shell: bash
       env:
         CHAVE_PRIVADA: ${{ inputs.chave-privada }}
@@ -69,12 +75,16 @@ runs:
         exigir "$CAMINHO_REMOTO" "a variable CAMINHO_REMOTO"
 
         if [ "$faltou" -eq 1 ]; then
+          echo "configurado=false" >> "$GITHUB_OUTPUT"
           echo "Cadastre em Settings → Secrets and variables → Actions." >&2
           echo "A lista completa, com os valores, está em docs/DEPLOY.md." >&2
           exit 1
         fi
 
-    - shell: bash
+        echo "configurado=true" >> "$GITHUB_OUTPUT"
+
+    - if: ${{ steps.validar.outputs.configurado == 'true' }}
+      shell: bash
       # Os valores chegam por `env:`, nunca interpolados dentro do `run:`. Um
       # `${{ }}` no corpo do script é substituição textual ANTES de o shell
       # existir: um valor com aspas ou `$(...)` viraria comando. Aqui todos são

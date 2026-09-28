@@ -32,7 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/preparar-ssh
+      - id: preparar_ssh
+        uses: ./.github/actions/preparar-ssh
         with:
           chave-privada: ${{ secrets.SSH_CHAVE_PRIVADA }}
           host-key: ${{ vars.SSH_HOST_KEY }}
@@ -50,6 +51,7 @@ jobs:
       # recusa a remoção em vez de perguntar (`scripts/seed-demo.sh:67`). O gesto
       # humano que a pergunta pedia é, aqui, o disparo manual do workflow.
       - name: Executar
+        if: steps.preparar_ssh.outputs.configurado == 'true'
         env:
           ACAO: ${{ inputs.acao }}
           CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
