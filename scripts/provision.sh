@@ -111,6 +111,33 @@ else
   wp theme activate storefront
 fi
 
+echo "== Logo do cabeçalho =="
+# `header.php:47` desenha a logo personalizada e, sem ela, cai no nome do site em
+# Thoge — uma fonte de display, que numa linha de cabeçalho sai ilegível. O
+# primeiro deploy na EC2 subiu assim: a logo estava definida em desenvolvimento,
+# mas `custom_logo` guarda o ID de um anexo, e anexo mora em `wp-content/uploads/`,
+# que não é versionado nem entra no recorte do `rsync`. Nada no servidor tinha
+# como saber qual imagem é a marca.
+#
+# O arquivo em si sempre esteve lá — `assets/img/` é do tema, e o tema sobe
+# inteiro. O que faltava era importá-lo para a biblioteca e apontar a mod.
+#
+# A guarda confere o ANEXO, e não só a mod: um banco restaurado sem a mídia
+# deixaria `custom_logo` apontando para um ID que não existe mais, e aí o
+# cabeçalho volta ao fallback enquanto o provisionamento diria "já definida".
+if [ -d "/var/www/html/wp-content/themes/reconectar" ]; then
+  id_logo="$(wp theme mod get custom_logo --field=value 2>/dev/null || true)"
+
+  if [ -n "$id_logo" ] && wp post get "$id_logo" --field=ID >/dev/null 2>&1; then
+    echo "Logo do cabeçalho já definida (anexo $id_logo)."
+  else
+    id_logo="$(wp media import wp-content/themes/reconectar/assets/img/logo-apoio-cor.png \
+      --title="Reconectar - Incubadora Digital" --porcelain)"
+    wp theme mod set custom_logo "$id_logo"
+    echo "Logo do cabeçalho importada (anexo $id_logo)."
+  fi
+fi
+
 echo "== Plugins do marketplace e comunidade =="
 # `nextend-facebook-connect` é o Nextend Social Login: apesar do slug, a versão
 # livre entrega Facebook, Google e X. Ele fica instalado e ativo mesmo sem

@@ -730,6 +730,30 @@ depois — e o estrago não aparece no job, que termina em verde.
 E o `rsync` precisa de `--rsync-path="sudo rsync"`: os arquivos do bind-mount
 pertencem ao UID 33 e o `ec2-user` é 1000, a mesma assimetria registrada acima.
 
+### Configuração que aponta para anexo não atravessa o deploy
+
+Corolário do recorte acima, e o primeiro deploy caiu nele. `custom_logo` é uma
+theme mod que guarda o **ID de um anexo**, e anexo mora em `uploads/`, que não é
+versionado nem sincronizado. A logo definida no Customizer da máquina de
+desenvolvimento não existe do outro lado — nem o ID, nem o arquivo.
+
+O sintoma não é imagem quebrada: `header.php:47` tem fallback, e o cabeçalho cai
+no nome do site em **Thoge**, uma fonte de display que numa linha de cabeçalho
+sai ilegível. A página inteira parece correta, com CSS e tudo no lugar, e só a
+marca fica errada — o que manda a investigação para a tipografia, que está
+funcionando: medido, `thoge.otf` respondia 200 no servidor.
+
+O arquivo nunca foi o problema: as três logos estão em
+`themes/reconectar/assets/img/`, versionadas, e o tema sobe inteiro. Faltava
+importar para a biblioteca e apontar a mod, o que o `provision.sh` passa a fazer
+na seção "Logo do cabeçalho". A guarda confere o **anexo**, não só a mod: um
+banco restaurado sem a mídia deixaria o ID apontando para o nada, e aí o
+provisionamento diria "já definida" sobre um cabeçalho em fallback.
+
+Vale para qualquer opção que guarde ID de anexo — ícone do site, imagem de
+cabeçalho, capa de página. Configuração feita pelo Customizer local não chega ao
+servidor por nenhum caminho: ou entra no `provision.sh`, ou é refeita à mão lá.
+
 ### Fora do `localhost`, o site depende de `WP_URL` apontar para o host público
 
 A allowlist de `Host` (`configurar-url-dinamica.php:82`) só aceita `localhost`,
