@@ -1,0 +1,75 @@
+# Lint de PHP e de shell. Não toca em servidor nenhum e não lê secret nenhum.
+#
+# Faz o que hoje só é feito à mão antes de commitar — e a armadilha registrada no
+# `CLAUDE.md` é justamente que o caminho errado de montagem faz o lint falhar por
+# arquivo inexistente, parecendo erro de sintaxe. Aqui os caminhos são os do
+# repositório, sem montagem nenhuma para errar.
+
+name: Verificar
+
+on:
+  push:
+  pull_request:
+
+# Um push novo na mesma branch torna a verificação anterior obsoleta — ela seguiria
+# rodando para dizer algo sobre um commit que já não é o topo.
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-php:
+    runs-on: ubuntu-latest
+    # A imagem é a mesma família de produção. Lintar com outra versão de PHP
+    # responderia sobre um interpretador que não é o que vai rodar o código.
+    container: php:8.2-cli
+    # Num pull request da própria organização o push já disparou este workflow;
+    # deixar o evento `pull_request` rodar de novo seria o mesmo trabalho duas
+    # vezes, no mesmo commit. De um fork não existe push neste repositório, e aí
+    # o pull request é o único gatilho.
+    #
+    # Consequência a lembrar se algum dia houver required status checks: um job
+    # pulado por `if` fica *skipped*, e check obrigatório não se satisfaz com
+    # skipped — ele fica pendente para sempre. Marque como obrigatório o
+    # workflow, não estes jobs.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    env:
+      CAMINHOS_PHP: wp-content/plugins/reconectar-core wp-content/themes/reconectar scripts
+    steps:
+      # A imagem oficial do PHP é Debian slim e não traz git. Sem ele o
+      # `actions/checkout` cai no download por API — que funciona, mas em
+      # silêncio e por outro caminho. Uma linha resolve e o checkout fica
+      # determinístico.
+      - name: Instalar git para o checkout
+        run: apt-get update && apt-get install -y --no-install-recommends git
+
+      - uses: actions/checkout@v4
+
+      # A contagem vem antes do lint de propósito. `find` sobre caminho renomeado
+      # não casa nada e sai com status 0 — o job passaria em verde tendo conferido
+      # zero arquivo, que é o pior resultado possível: verde que não significa nada.
+      - name: Conferir que há o que lintar
+        run: |
+          encontrados=$(find $CAMINHOS_PHP -name '*.php' | wc -l)
+          echo "Arquivos PHP encontrados: $encontrados"
+          [ "$encontrados" -gt 0 ]
+
+      # `xargs` devolve 123 se qualquer invocação falhar, então um único arquivo
+      # com erro de sintaxe reprova o job inteiro.
+      - name: php -l
+        run: find $CAMINHOS_PHP -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  lint-shell:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      # `bash -n`, e não `sh -n`: os scripts do projeto são bash, e o `sh` não
+      # reconheceria a sintaxe deles.
+      - name: bash -n
+        run: |
+          for arquivo in scripts/*.sh; do
+            echo "-- $arquivo"
+            bash -n "$arquivo"
+          done

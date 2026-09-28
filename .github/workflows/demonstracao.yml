@@ -1,0 +1,61 @@
+# Carga e remoção dos dados fictícios, sempre à mão.
+#
+# Fora do fluxo automático: a carga é idempotente e não duplica nada, mas RECRIA
+# no servidor o que tiver sido apagado de propósito. Rodá-la a cada push desfaria,
+# sem aviso, uma limpeza feita antes de uma apresentação.
+
+name: Dados de demonstração
+
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: O que fazer com os dados de demonstração
+        required: true
+        type: choice
+        options:
+          - instalar
+          - remover
+
+# Instalar e remover ao mesmo tempo deixaria a base num estado que nenhum dos
+# dois pediu.
+concurrency:
+  group: demonstracao-producao
+  cancel-in-progress: false
+
+jobs:
+  demonstracao:
+    runs-on: ubuntu-latest
+    environment:
+      name: producao
+      url: http://${{ vars.SSH_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/preparar-ssh
+        with:
+          chave-privada: ${{ secrets.SSH_CHAVE_PRIVADA }}
+          host-key: ${{ vars.SSH_HOST_KEY }}
+          host: ${{ vars.SSH_HOST }}
+          usuario: ${{ vars.SSH_USUARIO }}
+          caminho-remoto: ${{ vars.CAMINHO_REMOTO }}
+
+      # Chama o `seed-demo.sh`, e não o `demo.php` direto: o script resolve a raiz
+      # do projeto pelo próprio caminho, então funciona por caminho absoluto, e é
+      # nele que mora a guarda de confirmação da remoção — o caminho pelo PHP a
+      # contornaria, e o `-y` que se passasse ao PHP seria inerte, porque ele só
+      # lê o primeiro argumento.
+      #
+      # O `-y` aqui não é cosmético: sem terminal interativo o `seed-demo.sh`
+      # recusa a remoção em vez de perguntar (`scripts/seed-demo.sh:67`). O gesto
+      # humano que a pergunta pedia é, aqui, o disparo manual do workflow.
+      - name: Executar
+        env:
+          ACAO: ${{ inputs.acao }}
+          CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
+        run: |
+          if [ "$ACAO" = "remover" ]; then
+            ssh $OPCOES_SSH "$ALVO" "bash $CAMINHO_REMOTO/scripts/seed-demo.sh remover -y"
+          else
+            ssh $OPCOES_SSH "$ALVO" "bash $CAMINHO_REMOTO/scripts/seed-demo.sh instalar"
+          fi

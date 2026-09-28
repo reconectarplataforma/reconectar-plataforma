@@ -1,0 +1,67 @@
+# Escreve a chave e o known_hosts no runner e exporta as três variáveis que os
+# passos seguintes usam para falar com a instância.
+#
+# Existe como ação composta, e não como bloco repetido nos dois workflows, porque
+# duas cópias divergem: a de `implantar` ganharia um ajuste que a de
+# `demonstracao` não receberia, e a segunda passaria a falhar por um motivo que
+# ninguém procuraria no arquivo certo.
+
+name: Preparar acesso SSH
+description: Instala a chave privada, fixa a chave do host e exporta OPCOES_SSH, ALVO e COMPOSE.
+
+inputs:
+  chave-privada:
+    description: Conteúdo da chave privada (secret SSH_CHAVE_PRIVADA).
+    required: true
+  host-key:
+    description: Linha do known_hosts, colhida com ssh-keyscan.
+    required: true
+  host:
+    description: DNS público da instância.
+    required: true
+  usuario:
+    description: Usuário de login (ec2-user).
+    required: true
+  caminho-remoto:
+    description: Raiz do projeto no servidor.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      # Os valores chegam por `env:`, nunca interpolados dentro do `run:`. Um
+      # `${{ }}` no corpo do script é substituição textual ANTES de o shell
+      # existir: um valor com aspas ou `$(...)` viraria comando. Aqui todos são
+      # de confiança, mas o hábito é o que impede o dia em que um deles não for.
+      env:
+        CHAVE_PRIVADA: ${{ inputs.chave-privada }}
+        HOST_KEY: ${{ inputs.host-key }}
+        HOST: ${{ inputs.host }}
+        USUARIO: ${{ inputs.usuario }}
+        CAMINHO_REMOTO: ${{ inputs.caminho-remoto }}
+      run: |
+        install -d -m 700 ~/.ssh
+
+        # `printf %s`, e não `echo`: o `echo` de alguns shells interpreta
+        # escapes, e uma chave privada com `\n` literal dentro do base64 sairia
+        # corrompida — erro que aparece como "invalid format", não como chave
+        # alterada.
+        printf '%s\n' "$CHAVE_PRIVADA" > ~/.ssh/id_deploy
+        chmod 400 ~/.ssh/id_deploy
+
+        # A chave do host vem de variável, e não de `StrictHostKeyChecking=no`:
+        # desligar a verificação aceitaria qualquer servidor que respondesse
+        # naquele endereço, numa sessão que carrega chave privada de produção.
+        printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+        {
+          echo "OPCOES_SSH=-i $HOME/.ssh/id_deploy -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+          echo "ALVO=$USUARIO@$HOST"
+          # `--project-directory` e `-f` juntos: o primeiro sozinho não muda onde
+          # o Compose procura o arquivo. É o par que faz os bind-mounts relativos
+          # do `docker-compose.yml` (`./wp-content`, `./scripts`) resolverem a
+          # partir da raiz do projeto no servidor, e o `.env` de lá ser lido.
+          echo "COMPOSE=docker compose --project-directory $CAMINHO_REMOTO -f $CAMINHO_REMOTO/docker-compose.yml"
+        } >> "$GITHUB_ENV"

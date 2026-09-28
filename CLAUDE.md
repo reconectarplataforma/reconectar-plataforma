@@ -696,9 +696,9 @@ não têm origem nenhuma** para serem restaurados. Dentro de cada diretório
 versionado, o `--delete` é o que se quer: arquivo removido do tema tem de sumir
 de lá.
 
-O `.gitlab-ci.yml` traz esse recorte com um comentário longo por cima. É o tipo
-de bloco que alguém "simplifica" para uma linha só seis meses depois — e o
-estrago não aparece no job, que termina em verde.
+`.github/workflows/implantar.yml` traz esse recorte com um comentário longo por
+cima. É o tipo de bloco que alguém "simplifica" para uma linha só seis meses
+depois — e o estrago não aparece no job, que termina em verde.
 
 E o `rsync` precisa de `--rsync-path="sudo rsync"`: os arquivos do bind-mount
 pertencem ao UID 33 e o `ec2-user` é 1000, a mesma assimetria registrada acima.

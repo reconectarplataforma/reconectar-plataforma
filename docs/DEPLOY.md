@@ -1,20 +1,25 @@
-# Deploy — GitLab CI para a instância EC2
+# Deploy — GitHub Actions para a instância EC2
 
-A esteira está em [`.gitlab-ci.yml`](../.gitlab-ci.yml). Um push na `main`
-sincroniza o código autoral com a instância e roda o `provision.sh`. Os dados de
-demonstração ficam em jobs manuais, fora do fluxo automático.
+Os workflows estão em [`.github/workflows/`](../.github/workflows/). Um push na
+`main` sincroniza o código autoral com a instância e roda o `provision.sh`. Os
+dados de demonstração ficam num workflow manual, fora do fluxo automático.
 
 ## O que a esteira faz
 
-| Estágio | Quando | O que faz |
+| Workflow | Quando | O que faz |
 | --- | --- | --- |
-| `verificar` | toda branch e todo merge request | `php -l` em `reconectar-core/`, `themes/reconectar/` e `scripts/`; `bash -n` nos `scripts/*.sh` |
-| `implantar` | push na `main` | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` |
-| `demonstracao` | manual, depois do deploy | `seed-demo.sh instalar` ou `seed-demo.sh remover -y` |
+| [`verificar.yml`](../.github/workflows/verificar.yml) | todo push e todo pull request de fork | `php -l` em `reconectar-core/`, `themes/reconectar/` e `scripts/`; `bash -n` nos `scripts/*.sh` |
+| [`implantar.yml`](../.github/workflows/implantar.yml) | push na `main`, ou disparo manual | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` |
+| [`demonstracao.yml`](../.github/workflows/demonstracao.yml) | só manual, com escolha `instalar`/`remover` | `seed-demo.sh instalar` ou `seed-demo.sh remover -y` |
+
+O preparo do SSH é uma ação composta, [`.github/actions/preparar-ssh/`](../.github/actions/preparar-ssh/action.yml),
+usada pelos dois workflows que falam com o servidor. Não é enfeite: duas cópias
+do mesmo bloco divergem, e a que não recebeu o ajuste passa a falhar por um
+motivo que ninguém procuraria no arquivo certo.
 
 O deploy é `rsync` a partir do runner, não `git pull` no servidor: o runner já
 tem o checkout e já tem a chave SSH, então **o servidor não precisa de nenhuma
-credencial do GitLab**.
+credencial do GitHub**.
 
 ### O recorte da sincronização
 
@@ -76,7 +81,7 @@ estar certas antes, não depois. Se o arquivo já tiver nascido errado, o conser
 
 Crie `/opt/reconectar/.env` à mão, com as chaves abaixo. **Troque as senhas** —
 os defaults do `docker-compose.yml` são de desenvolvimento e estão no
-repositório público.
+repositório.
 
 ```
 WORDPRESS_PORT=80
@@ -110,32 +115,44 @@ em `RECONECTAR_HOST_PADRAO`, derivado de `WP_URL`. Com o default
 ### 4. Security Group
 
 - **80/tcp** para `0.0.0.0/0` — o site.
-- **22/tcp** para os runners do GitLab.
+- **22/tcp** para os runners do GitHub.
 
-Este é o preço da opção escolhida: os IPs dos runners compartilhados são amplos
-e variáveis, então na prática a 22 fica aberta. Um runner instalado na própria
-EC2 eliminaria a exposição, ao custo de manter o runner.
+Este é o preço da opção escolhida: os IPs dos runners hospedados pelo GitHub são
+amplos e variáveis (a lista está em `https://api.github.com/meta`, campo
+`actions`, e muda), então na prática a 22 fica aberta. Um runner auto-hospedado
+na própria EC2 eliminaria a exposição, ao custo de manter o runner.
 
 A 8081 (phpMyAdmin) e a 8090 **não** devem ser liberadas. O phpMyAdmin nem sobe:
 o job nomeia os serviços (`up -d db wordpress`), e é assim que ele fica fora do
 ar sem precisar de arquivo de override.
 
-## Variáveis CI/CD do GitLab
+## Secrets e variables do repositório
 
-Settings → CI/CD → Variables.
+Settings → Secrets and variables → Actions.
 
-| Variável | Tipo | Valor |
-| --- | --- | --- |
-| `SSH_CHAVE_PRIVADA` | **File**, Protected | o conteúdo do `dev.pem` |
-| `SSH_HOST` | Variable, Protected | `ec2-3-148-211-66.us-east-2.compute.amazonaws.com` |
-| `SSH_USUARIO` | Variable, Protected | `ec2-user` |
-| `SSH_HOST_KEY` | Variable, Protected | saída do `ssh-keyscan` (abaixo) |
-| `CAMINHO_REMOTO` | Variable, Protected | `/opt/reconectar` |
+**Aba Secrets** — só um, o único valor que precisa ficar ilegível depois de
+gravado:
 
-`SSH_CHAVE_PRIVADA` **não** pode ser marcada como *Masked*: o GitLab só mascara
-valores de linha única, e uma chave privada tem várias. *File* + *Protected* é a
-combinação correta — *Protected* restringe a variável a branches protegidas, o
-que impede que um MR de terceiro dispare um job com acesso à chave.
+| Secret | Valor |
+| --- | --- |
+| `SSH_CHAVE_PRIVADA` | o conteúdo inteiro do `dev.pem`, com as linhas `BEGIN`/`END` |
+
+**Aba Variables** — o resto. Nenhum deles é segredo, e como variável eles
+aparecem legíveis no log, o que é o que se quer quando um deploy falha por
+endereço errado:
+
+| Variable | Valor |
+| --- | --- |
+| `SSH_HOST` | `ec2-3-148-211-66.us-east-2.compute.amazonaws.com` |
+| `SSH_USUARIO` | `ec2-user` |
+| `SSH_HOST_KEY` | saída do `ssh-keyscan` (abaixo) |
+| `CAMINHO_REMOTO` | `/opt/reconectar` |
+
+A chave **do host** é pública por definição — é o que o servidor apresenta a
+quem conecta. Guardá-la como secret só faria o GitHub mascará-la no log, e a
+mensagem de erro de host mudado viraria `***`, ilegível justamente na hora em que
+ela importa. `SSH_HOST` como variable é o que permite montar a URL do
+environment; como secret ela sairia mascarada ali também.
 
 Para o `SSH_HOST_KEY`, na sua máquina:
 
@@ -146,6 +163,21 @@ ssh-keyscan -t ed25519 ec2-3-148-211-66.us-east-2.compute.amazonaws.com
 Cole a linha inteira. Ela é o que dispensa o `StrictHostKeyChecking=no`:
 desligar a verificação faria a esteira aceitar qualquer servidor que
 respondesse naquele endereço, numa sessão que carrega uma chave de produção.
+
+### O environment `producao`
+
+Os dois workflows que falam com o servidor declaram `environment: producao`.
+Criá-lo em Settings → Environments não é obrigatório para eles rodarem, mas é
+onde ficam as duas proteções que valem a pena:
+
+- **Required reviewers** — o deploy espera aprovação humana antes de rodar.
+- **Deployment branches** — restringe o environment à `main`, de modo que nenhum
+  workflow de outra branch alcance os secrets dele.
+
+Isso é o análogo do *Protected* do GitLab. Some-se a ele o comportamento do
+próprio GitHub: **secrets não são entregues a workflow disparado por pull
+request de fork**, então um PR de terceiro nunca vê a chave, mesmo que altere o
+arquivo do workflow.
 
 A chave `dev.pem` **nunca entra no repositório** — `*.pem` está no `.gitignore`.
 Na sua máquina, `chmod 400 dev.pem`.
@@ -158,8 +190,9 @@ Na sua máquina, `chmod 400 dev.pem`.
    **duas vezes** e repita — a segunda é a que pega o erro.
 2. **`WP_URL`.** Abra o site pelo DNS público e confira no HTML que nenhum asset
    sai com `localhost`.
-3. **Idempotência.** Dois deploys seguidos sem commit no meio: o `provision.sh`
-   tem de imprimir "já instalado" / "já ativo" em todas as linhas.
+3. **Idempotência.** Dois deploys seguidos sem commit no meio (o segundo pelo
+   "Run workflow" do `implantar.yml`): o `provision.sh` tem de imprimir "já
+   instalado" / "já ativo" em todas as linhas.
 4. **Superfície.** `curl` na 8081 e na 8090 do DNS público tem de falhar; só a 80
    responde.
 5. **RBAC.** `./scripts/verificar-acessos.sh` apontado para o servidor. As travas
@@ -173,8 +206,7 @@ Na sua máquina, `chmod 400 dev.pem`.
   gerado, então editar à mão não sobrevive ao próximo provisionamento.
 - **Backup do banco antes do deploy.** O deploy não roda migração de schema, mas
   o `provision.sh` escreve opções. Um dump prévio seria a rede de segurança.
-- **Rollback.** Voltar é dar deploy no commit anterior. Sem release versionada e
-  sem symlink de versão.
+- **Rollback automático.** Voltar é reverter na `main` e disparar o
+  `implantar.yml` à mão. Sem release versionada e sem symlink de versão.
 - **Ambiente de homologação separado.** Um servidor só, uma branch só.
-- **Rotação da chave.** O `dev.pem` é uma chave de longa duração numa variável
-  de CI.
+- **Rotação da chave.** O `dev.pem` é uma chave de longa duração num secret.
