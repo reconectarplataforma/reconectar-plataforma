@@ -1,0 +1,331 @@
+/**
+ * Componente flutuante de enquete.
+ *
+ * Duas exigências que este repositório já pagou para aprender, e que valem para
+ * todo CSS de plugin:
+ *
+ * 1. **`box-sizing` declarado aqui dentro.** O reset do tema não alcança o
+ *    plugin, e um `width: 100%` que "funciona" com o Storefront presente estoura
+ *    sem ele — medido uma vez a 375px, campo de 398px numa coluna de 375.
+ * 2. **Token sempre com fallback literal.** O componente não pode exigir tema
+ *    nenhum; é o mesmo motivo pelo qual os `--rc-pe-*` do painel de empresas
+ *    trazem valor de reserva.
+ *
+ * Nenhum `font-size` literal: a escala de nove degraus mora no `:root` do tema,
+ * e o piso é `--rc-fonte-2xs` (12px).
+ */
+
+.rc-enquete,
+.rc-enquete *,
+.rc-enquete *::before,
+.rc-enquete *::after {
+	box-sizing: border-box;
+}
+
+.rc-enquete {
+	/*
+	 * 20 parecia o valor certo — é o patamar dos painéis flutuantes do projeto,
+	 * sugestões da busca e seletor de município — e está errado. Aqueles dois
+	 * vivem **dentro** do cabeçalho e só competem entre irmãos; este aqui é fixo
+	 * no documento e compete com o cabeçalho inteiro.
+	 *
+	 * Varrido o documento, estes são todos os patamares que existem acima de 5:
+	 *
+	 *   .site-header.rc-cabecalho   999   position: relative
+	 *   #wpadminbar               99999   (o WordPress, não o projeto)
+	 *   .rc-barra-inferior           30
+	 *   .rc-busca__sugestoes         20
+	 *   .rc-municipio__lista         20
+	 *
+	 * Com 20, o gatilho some sob o cabeçalho sempre que a viewport for baixa o
+	 * bastante para o cartão alcançá-lo — medido a 824×513, o topo do cartão caía
+	 * atrás do menu. 1000 fica acima do cabeçalho e continua abaixo da barra de
+	 * administração.
+	 *
+	 * Isso **não** contraria a decisão de que nada da página passa por cima da
+	 * barra inferior: abaixo de 768px o cartão inteiro sai da tela, e os dois
+	 * nunca coexistem — o empilhamento não chega a ser consultado.
+	 */
+	z-index: 1000;
+
+	/*
+	 * `fixed` aqui, e não no `<details>`, porque é este elemento que ancora o × —
+	 * ele é irmão da caixa e precisa de um containing block posicionado para
+	 * flutuar sobre a faixa do gatilho.
+	 */
+	position: fixed;
+	right: var( --rc-espaco, 1rem );
+	bottom: var( --rc-espaco, 1rem );
+	width: 320px;
+	max-width: calc( 100vw - 2 * var( --rc-espaco, 1rem ) );
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 4px 20px rgba( 0, 0, 0, 0.18 );
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: #333333;
+}
+
+/* O gatilho ------------------------------------------------------------- */
+
+.rc-enquete__gatilho {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	/* 44px de alvo, o mínimo do critério 2.5.5 da WCAG. */
+	min-height: 44px;
+	padding: 0.625rem 0.875rem;
+	border-radius: 12px;
+	cursor: pointer;
+	/*
+	 * Roxo institucional com texto branco: 9,6:1. O primário da marca mede
+	 * 2,30:1 sobre branco e já reprovou o critério 1.4.3 uma vez, na home.
+	 */
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #ffffff;
+	font-weight: 600;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	/* O triângulo nativo do `<details>`, nos dois motores. */
+	list-style: none;
+}
+
+.rc-enquete__gatilho::-webkit-details-marker {
+	display: none;
+}
+
+.rc-enquete__caixa[open] .rc-enquete__gatilho {
+	border-radius: 12px 12px 0 0;
+	/*
+	 * O × flutua sobre o canto direito desta faixa. Sem a reserva, um rótulo longo
+	 * — "3 enquetes abertas" numa tela estreita — passaria por baixo do botão, e o
+	 * texto continuaria legível para o leitor de tela enquanto some para quem
+	 * enxerga.
+	 */
+	padding-right: 44px;
+}
+
+.rc-enquete__gatilho:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-enquete__icone {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: rgba( 255, 255, 255, 0.22 );
+}
+
+.rc-enquete__gatilho-texto {
+	flex: 1 1 auto;
+}
+
+/*
+ * O cartão dispensado sai da tela por `hidden`. A regra é explícita de
+ * propósito: `[hidden]` vem da folha do navegador, e qualquer `display` de autor
+ * sobre `.rc-enquete` — inclusive um acrescentado adiante por distração — venceria
+ * o atributo e devolveria o cartão à tela de quem acabou de fechá-lo.
+ */
+.rc-enquete[hidden] {
+	display: none;
+}
+
+/* O corpo --------------------------------------------------------------- */
+
+.rc-enquete__corpo {
+	max-height: min( 70vh, 560px );
+	overflow-y: auto;
+	padding: 0.875rem;
+	border: 1px solid #e0e0e0;
+	border-top: 0;
+	border-radius: 0 0 12px 12px;
+}
+
+/*
+ * O × ocupa o canto superior direito da **faixa do gatilho**, e não do corpo
+ * branco, onde ficava antes: ali ele nascia colado à barra de rolagem do painel e
+ * parecia órfão, porque era — o corpo começa onde a faixa termina.
+ *
+ * Ele é irmão do `<details>`, não filho do `<summary>`, e o absoluto se ancora no
+ * wrapper — que é `position: fixed`, portanto containing block garantido. Essa
+ * âncora é a razão de o wrapper existir: dentro do `<summary>` o clique no botão
+ * ainda alternaria o `<details>`, e o comportamento diverge entre motores.
+ *
+ * 44×44 de alvo, o piso do critério 2.5.5 — o mesmo do gatilho, cuja altura
+ * mínima é exatamente 44px, de modo que o botão cobre a faixa inteira e nada
+ * sobra por fora. O glifo desenha bem menor que a caixa, e é isso que se quer:
+ * alvo grande, marca discreta.
+ *
+ * Branco sobre o roxo institucional: 9,6:1. O `#595959` de antes era leitura
+ * sobre o branco do corpo e, mudado de fundo, mediria 1,9:1 contra o roxo —
+ * reprovando o critério 1.4.3 numa mudança que só encostou na posição.
+ */
+.rc-enquete__fechar {
+	position: absolute;
+	top: 0;
+	right: 0;
+	display: block;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 0 12px 0 0;
+	background: none;
+	color: #ffffff;
+	font-family: inherit;
+	font-size: var( --rc-fonte-xl, 1.5rem );
+	line-height: 1;
+	cursor: pointer;
+}
+
+.rc-enquete__fechar:hover,
+.rc-enquete__fechar:focus {
+	background: rgba( 255, 255, 255, 0.18 );
+	color: #ffffff;
+}
+
+.rc-enquete__fechar:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: -3px;
+}
+
+.rc-enquete__item + .rc-enquete__item {
+	margin-top: 1rem;
+	padding-top: 1rem;
+	border-top: 1px solid #e0e0e0;
+}
+
+.rc-enquete__titulo {
+	margin: 0 0 0.625rem;
+	font-size: var( --rc-fonte-base, 1rem );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	font-weight: 600;
+	color: #333333;
+}
+
+.rc-enquete__opcoes {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-enquete__opcao {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: 0.25rem 0.5rem;
+	padding: 0.25rem 0;
+}
+
+.rc-enquete__radio {
+	grid-column: 1;
+	margin: 0;
+	width: 18px;
+	height: 18px;
+	accent-color: var( --reconectar-cor-institucional, #663191 );
+}
+
+.rc-enquete__rotulo {
+	grid-column: 2;
+	cursor: pointer;
+}
+
+/*
+ * Nada de barra nem de percentual: o cartão deixou de publicar placar por
+ * alternativa, porque o número ao lado do próprio voto — alterável — convida a
+ * trocá-lo para acompanhar a maioria. As classes do placar saíram daqui junto
+ * com o markup; o resultado mora no painel de transparência, e a regra inteira
+ * está no PHPDoc de `imprimir_formulario()`.
+ */
+
+.rc-enquete__confirmacao {
+	margin: 0.625rem 0 0;
+	font-weight: 600;
+	color: var( --reconectar-cor-institucional, #663191 );
+}
+
+.rc-enquete__total,
+.rc-enquete__resultado {
+	font-size: var( --rc-fonte-xs, 0.8125rem );
+	color: #717171;
+}
+
+.rc-enquete__total {
+	margin: 0.5rem 0 0;
+}
+
+.rc-enquete__resultado {
+	margin: 0.25rem 0 0;
+}
+
+.rc-enquete__enviar {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	margin-top: 0.75rem;
+	padding: 0.5rem 0.875rem;
+	border: 0;
+	border-radius: 8px;
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #ffffff;
+	font-family: inherit;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.rc-enquete__enviar:hover,
+.rc-enquete__enviar:focus-visible {
+	background: #52277a;
+}
+
+.rc-enquete__enviar:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-enquete__convite {
+	margin: 0.75rem 0 0;
+}
+
+/*
+ * O link padrão do tema é `#31BEB1` — 2,30:1 sobre branco, reprovado. O roxo
+ * institucional passa com folga, e vai declarado aqui porque o componente não
+ * pode contar com o tema.
+ */
+.rc-enquete__login,
+.rc-enquete__link {
+	color: var( --reconectar-cor-institucional, #663191 );
+	font-weight: 600;
+	text-decoration: underline;
+}
+
+/* Celular --------------------------------------------------------------- */
+
+@media ( max-width: 767px ) {
+
+	/*
+	 * No celular quem anuncia a enquete é o item "Votar" da barra inferior, com o
+	 * contador de votos pendentes — e por isso o cartão sai inteiro.
+	 *
+	 * Não é economia de espaço: a pílula era ancorada em
+	 * `calc( --rc-barra-altura + --rc-barra-refugio + 12px )`, ou seja, logo acima
+	 * da barra, e os dois anunciariam a mesma enquete no mesmo canto da tela. É a
+	 * mesma decisão já tomada para `.rc-conta`, que sai do cabeçalho do celular
+	 * porque a barra leva ao mesmo destino: dois caminhos idênticos na mesma tela
+	 * são redundância para quem vê e um item a mais para quem navega por lista de
+	 * links.
+	 *
+	 * A decisão é da folha de estilo, e não do PHP, porque a largura da tela não
+	 * existe no servidor: decidir lá serviria a escolha errada à metade dos
+	 * visitantes no dia em que um cache de página entrar em cena.
+	 */
+	.rc-enquete {
+		display: none;
+	}
+}

@@ -1,0 +1,254 @@
+/**
+ * Gráfico de votos do painel de transparência.
+ *
+ * O painel já imprimia `.reconectar-proposta__barra` e
+ * `.reconectar-proposta__preenchimento` com `style="width: X%"` — e **nenhuma
+ * das duas jamais desenhou**. Medido na página: `width: 0`, `display: inline`,
+ * fundo transparente. Não era cascata perdida nem especificidade: não havia
+ * regra alguma para essas classes em folha nenhuma do projeto, e `width` não se
+ * aplica a caixa inline não substituída, então nem o atributo inline valia.
+ *
+ * Daí as duas primeiras linhas deste arquivo serem `display: block` na trilha e
+ * na barra. Um `<span>` desenha retângulo quando sai do fluxo inline, nunca
+ * antes — e é o tipo de defeito que não acusa em lugar nenhum: o HTML estava
+ * correto, o percentual estava no atributo, e a página parecia apenas "sem
+ * gráfico ainda".
+ *
+ * As duas exigências de todo CSS de plugin deste repositório valem aqui:
+ *
+ * 1. **`box-sizing` declarado no próprio componente.** O reset do tema não
+ *    alcança o plugin, e a trilha usa `width: 100%` com borda arredondada.
+ * 2. **Token sempre com fallback literal.** O painel é plugin e não pode exigir
+ *    tema nenhum, como já fazem os `--rc-pe-*` do painel de empresas.
+ *
+ * Nenhum `font-size` literal: a escala de nove degraus mora no `:root` do tema.
+ */
+
+.rc-grafico-votos,
+.rc-grafico-votos *,
+.rc-grafico-votos *::before,
+.rc-grafico-votos *::after {
+	box-sizing: border-box;
+}
+
+.rc-grafico-votos {
+	margin: 0.75rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+/*
+ * Rótulo e valor dividem a primeira linha; a barra ocupa a largura inteira
+ * embaixo. Rótulo de alternativa é texto livre e costuma ser longo — "Feira de
+ * alimentos da agricultura familiar" tem 41 caracteres —, e barra horizontal com
+ * rótulo por cima é a única forma que não o espreme nem o corta. Foi por isso
+ * que a rosca e o gráfico de colunas ficaram de fora: os dois empurram o texto
+ * para uma legenda, que separa o nome do dado que ele nomeia.
+ */
+.rc-grafico-votos__linha {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+}
+
+.rc-grafico-votos__linha + .rc-grafico-votos__linha {
+	margin-top: 0.75rem;
+}
+
+/*
+ * Com o formulário de voto a linha ganha uma coluna à esquerda para o radio. O
+ * modificador vai na lista, não na linha: quem decide é o estado da enquete, e
+ * repetir a decisão em cada `<li>` abriria espaço para uma linha divergir das
+ * outras.
+ */
+.rc-grafico-votos--votavel .rc-grafico-votos__linha {
+	grid-template-columns: auto 1fr auto;
+}
+
+.rc-grafico-votos__radio {
+	grid-column: 1;
+	align-self: center;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var( --reconectar-cor-institucional, #663191 );
+}
+
+.rc-grafico-votos__rotulo {
+	grid-column: 1;
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+/*
+ * O rótulo vira `<label>` no modo votável, e aí a linha inteira dele é área de
+ * clique — alvo bem maior que os 18px do radio, que é o que o critério 2.5.5 da
+ * WCAG pede na prática. `display: block` porque `<label>` nasce inline e a caixa
+ * de clique pararia no texto.
+ */
+.rc-grafico-votos--votavel .rc-grafico-votos__rotulo {
+	grid-column: 2;
+	display: block;
+	cursor: pointer;
+}
+
+.rc-grafico-votos__valor {
+	grid-column: 2;
+	white-space: nowrap;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	font-weight: 600;
+	color: #717171;
+}
+
+.rc-grafico-votos--votavel .rc-grafico-votos__valor {
+	grid-column: 3;
+}
+
+.rc-grafico-votos__trilha {
+	grid-column: 1 / -1;
+	display: block;
+	width: 100%;
+	height: 10px;
+	border-radius: 5px;
+	background: #ececec;
+	overflow: hidden;
+}
+
+/*
+ * Roxo institucional sobre a trilha cinza: 7,4:1, bem acima dos 3:1 que o
+ * critério 1.4.11 da WCAG pede de elemento gráfico. O primário da marca mede
+ * 1,9:1 contra a mesma trilha e fica de fora mesmo sendo a cor "óbvia" para um
+ * gráfico da plataforma — ele já reprovou o 1.4.3 uma vez, na home.
+ *
+ * Uma cor só para todas as alternativas, de propósito. Cor por categoria
+ * sugeriria que as alternativas são de naturezas diferentes, e destacar a mais
+ * votada com cor própria seria o mesmo convite ao voto de maioria que tirou o
+ * percentual do cartão flutuante. Quem compara lê o comprimento.
+ */
+.rc-grafico-votos__barra {
+	display: block;
+	height: 100%;
+	border-radius: 5px;
+	background: var( --reconectar-cor-institucional, #663191 );
+}
+
+/*
+ * Alternativa sem voto fica com barra de largura zero — nada desenhado. Uma
+ * largura mínima "para aparecer" desenharia participação que não houve, e o
+ * valor ao lado já diz "0,0% (0 votos)". É a mesma regra que proíbe imprimir
+ * `0%` calculado sobre divisor zero.
+ */
+
+.rc-grafico-votos__vazio {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	color: #717171;
+}
+
+.rc-grafico-votos__confirmacao {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	color: #717171;
+}
+
+/*
+ * Os dois avisos sobre o placar. Ambos ganham faixa lateral em vez de fundo
+ * colorido: o cartão do painel já é branco sobre branco, e uma tarja cheia no
+ * meio dele competiria com o gráfico — que é o que o leitor veio ver quando o
+ * gráfico existe.
+ *
+ * `#595959` sobre branco mede 7,0:1. O `#717171` usado nos textos de apoio mede
+ * 4,86:1 e passaria, mas estes dois parágrafos são a explicação de uma ausência:
+ * quem não os ler conclui que a tela quebrou.
+ */
+.rc-grafico-votos__reserva,
+.rc-grafico-votos__parcial {
+	margin: 0.75rem 0 0;
+	padding: 0.5rem 0 0.5rem 0.75rem;
+	border-left: 3px solid var( --reconectar-cor-institucional, #663191 );
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: #595959;
+}
+
+/*
+ * O parcial usa o amarelo de destaque porque ele avisa de um estado passageiro
+ * e só aparece para quem administra — a cor distingue "informação para você" de
+ * "regra da plataforma", que é o que a faixa roxa diz. Amarelo aqui é a borda,
+ * nunca o texto: `#f1bf3d` sobre branco mede 1,7:1 e reprovaria o critério 1.4.3
+ * na hora.
+ */
+.rc-grafico-votos__parcial {
+	border-left-color: var( --reconectar-cor-destaque, #f1bf3d );
+}
+
+/*
+ * Largura total e 44px de altura mínima — o alvo de toque do critério 2.5.5, o
+ * mesmo piso já adotado no botão do cartão flutuante. Roxo institucional sobre
+ * branco mede 9,6:1; o primário da marca mediria 2,30:1 e reprova o 1.4.3, como
+ * já reprovou uma vez na home.
+ */
+.rc-grafico-votos__enviar {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	margin-top: 0.75rem;
+	padding: 0.625rem 1rem;
+	border: 0;
+	border-radius: 4px;
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #fff;
+	font-family: inherit;
+	font-size: var( --rc-fonte-base, 1rem );
+	cursor: pointer;
+}
+
+.rc-grafico-votos__enviar:hover,
+.rc-grafico-votos__enviar:focus {
+	background: #52276f;
+	color: #fff;
+}
+
+/*
+ * Contorno próprio, e em amarelo de destaque: o foco padrão do navegador é uma
+ * linha escura, que sobre o roxo do botão praticamente some.
+ */
+.rc-grafico-votos__enviar:focus-visible,
+.rc-grafico-votos__radio:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-grafico-votos__convite {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+}
+
+@media ( max-width: 575px ) {
+
+	/*
+	 * A 375px a coluna útil do cartão fica perto de 280px, e o valor à direita
+	 * rouba dela o bastante para quebrar o rótulo em palavra solta. Empilhar
+	 * devolve a linha inteira ao texto.
+	 */
+	.rc-grafico-votos__linha {
+		grid-template-columns: 1fr;
+	}
+
+	.rc-grafico-votos__valor {
+		grid-column: 1;
+	}
+
+	/*
+	 * A coluna do radio sobrevive ao empilhamento — ele precisa ficar ao lado do
+	 * rótulo, não acima dele —, e o valor desce para a coluna do texto, alinhado
+	 * com o rótulo que ele mede.
+	 */
+	.rc-grafico-votos--votavel .rc-grafico-votos__linha {
+		grid-template-columns: auto 1fr;
+	}
+
+	.rc-grafico-votos--votavel .rc-grafico-votos__valor {
+		grid-column: 2;
+	}
+}

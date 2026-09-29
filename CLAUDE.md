@@ -43,6 +43,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `docs/PERFIS_E_PERMISSOES.md` | os cinco atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
 | `docs/DADOS_DEMONSTRACAO.md` | o que a carga cria, em detalhe |
+| `docs/CADASTRO_MANUAL.md` | popular um ambiente real à mão, pelo Super Administrador |
 | `DIARIO_DESENVOLVIMENTO.md` | histórico cronológico das entregas |
 
 Plugins e temas de terceiros **não são versionados**. Só `wp-content/themes/reconectar/`
@@ -460,6 +461,36 @@ empresas, que é plugin. Sem o tema, o padding e a borda voltam a somar por fora
 medido em 375px, o campo saía 398px numa coluna de 375. O painel não pode exigir
 tema nenhum — é a mesma razão pela qual os tokens `--rc-pe-*` trazem fallback
 literal. Declare `box-sizing` no próprio componente.
+
+### A grade do Bootstrap colide com o `.col2-set` do WooCommerce
+
+O checkout clássico monta `<div class="col2-set" id="customer_details"><div
+class="col-1">…`, e `.col-1`/`.col-2` são os dois primeiros degraus da grade de
+doze do Bootstrap — que o tema enfileira em **toda** página, na prioridade 5.
+Medido no checkout a 1600px, antes da correção:
+
+```
+.col-1 → 66,39px   (8,333% dos 796,75px da coluna)
+.col-2 → 132,78px  (16,667%)
+```
+
+O sintoma é o `<h3>` "Detalhes de cobrança" quebrando **letra a letra**: largura
+declarada vence a largura mínima do conteúdo, e o texto não tem para onde ir.
+
+É colisão de nomes, não disputa de especificidade, e é por isso que a
+investigação não encontra nada — **não há CSS autoral no caminho**. Varrido o
+CSSOM inteiro da página, aquelas duas do Bootstrap são as **únicas** regras que
+alcançam essas colunas: nem o Storefront nem o WooCommerce declaram largura ali,
+e o layout certo é o padrão do bloco. Daí `width: auto`, escopado por
+`.col2-set >` em `marketplace.css` — a grade segue valendo onde for usada. O
+mesmo markup está no carrinho, em "Minha conta", nos endereços e no recibo do
+pedido.
+
+Ao varrer o CSSOM atrás de colisões assim, lembre que **com CSS nesting toda
+`CSSStyleRule` tem `.cssRules`**, lista vazia. Um `if ( regra.cssRules ) {
+recursa; continue; }` engole todas as regras de estilo e responde "nenhuma
+colisão" — um falso negativo que parece verificação feita. Quem distingue
+`@media` é `conditionText !== undefined`.
 
 ### Vários cartões `rc-` **são** o `<a>`, não o contêm
 

@@ -145,6 +145,20 @@ class Reconectar_Permissoes {
 	const CAP_GERIR_CAMPANHAS = 'reconectar_gerir_campanhas';
 
 	/**
+	 * Criar, editar, publicar e encerrar enquetes da comunidade.
+	 *
+	 * Mesma forma de `CAP_GERIR_CAMPANHAS`, e pela mesma razão. Antes dela o
+	 * Moderador de Conteúdo administrava enquete **por acidente**: o post type
+	 * nunca declarou `capability_type`, caiu no padrão `post`, e as primitivas de
+	 * post que `CAPS_DE_CONTEUDO` dá para post e página abriam a tela de tabela.
+	 * O Administrador de empresas, que tem as mesmas primitivas, esbarrava em
+	 * `negar_escrita_ao_admin_de_empresas()` e via a tela sem conseguir salvar.
+	 *
+	 * Uma primitiva própria troca os dois acidentes por uma decisão.
+	 */
+	const CAP_GERIR_ENQUETES = 'reconectar_gerir_enquetes';
+
+	/**
 	 * Todas as capacidades ligadas à administração de empresas.
 	 *
 	 * @var string[]
@@ -242,6 +256,7 @@ class Reconectar_Permissoes {
 		'read_private_pages',
 		'edit_theme_options',
 		self::CAP_GERIR_CAMPANHAS,
+		self::CAP_GERIR_ENQUETES,
 	);
 
 	/**
@@ -330,7 +345,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 5;
+	const VERSAO_CAPACIDADES = 6;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -427,11 +442,12 @@ class Reconectar_Permissoes {
 				// Ele já entra no `/wp-admin` por `manage_options`, mas as duas
 				// abaixo não são decoração: `CAP_ADMIN_WP` mantém a trava com uma
 				// resposta coerente caso alguém um dia retire `manage_options` de
-				// um administrador a dedo, e `CAP_GERIR_CAMPANHAS` é primitiva de
-				// CPT — sem ela o menu Campanhas some para quem instalou a
+				// um administrador a dedo, e as duas de CPT são primitivas — sem
+				// elas os menus Campanhas e Enquetes somem para quem instalou a
 				// plataforma, exatamente como aconteceria com as empresas.
 				$objeto->add_cap( self::CAP_ADMIN_WP );
 				$objeto->add_cap( self::CAP_GERIR_CAMPANHAS );
+				$objeto->add_cap( self::CAP_GERIR_ENQUETES );
 
 				continue;
 			}
@@ -443,11 +459,12 @@ class Reconectar_Permissoes {
 			}
 
 			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
-			// a lista completa. Para qualquer outro, estas duas não fazem sentido
+			// a lista completa. Para qualquer outro, estas três não fazem sentido
 			// nenhum — e uma concessão feita por engano sai aqui.
 			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
 				$objeto->remove_cap( self::CAP_ADMIN_WP );
 				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
+				$objeto->remove_cap( self::CAP_GERIR_ENQUETES );
 			}
 
 			foreach ( self::CAPS_DE_DESENVOLVIMENTO as $capacidade ) {
@@ -829,6 +846,7 @@ class Reconectar_Permissoes {
 		return array(
 			Reconectar_Empresa::POST_TYPE,
 			Reconectar_Campanha::POST_TYPE,
+			Reconectar_Proposta_Votacao::POST_TYPE,
 			'post',
 			'page',
 			'forum',
