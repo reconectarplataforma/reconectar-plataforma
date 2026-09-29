@@ -43,6 +43,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `docs/PERFIS_E_PERMISSOES.md` | os cinco atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
 | `docs/DADOS_DEMONSTRACAO.md` | o que a carga cria, em detalhe |
+| `docs/CADASTRO_MANUAL.md` | popular um ambiente real à mão, pelo Super Administrador |
 | `DIARIO_DESENVOLVIMENTO.md` | histórico cronológico das entregas |
 
 Plugins e temas de terceiros **não são versionados**. Só `wp-content/themes/reconectar/`
