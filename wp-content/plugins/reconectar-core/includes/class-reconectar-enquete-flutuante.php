@@ -75,14 +75,14 @@ class Reconectar_Enquete_Flutuante {
 			'reconectar-enquete',
 			RECONECTAR_CORE_URL . 'assets/css/enquete.css',
 			array(),
-			'0.2.0'
+			'0.3.0'
 		);
 
 		wp_enqueue_script(
 			'reconectar-enquete',
 			RECONECTAR_CORE_URL . 'assets/js/enquete.js',
 			array(),
-			'0.2.0',
+			'0.3.0',
 			array(
 				'strategy'  => 'defer',
 				'in_footer' => true,
@@ -111,60 +111,80 @@ class Reconectar_Enquete_Flutuante {
 		 * Nasce **fechado**, inclusive no desktop. É o JS que abre o cartão na
 		 * primeira visita de cada sessão, e é isso que impede o componente de virar
 		 * perseguição: presente em todas as telas, ele reabriria a cada navegação.
+		 *
+		 * O `<details>` está dentro de uma `<div>` que não existia antes, e o wrapper
+		 * é o que permite ao × ficar **sobre** a faixa do gatilho sem estar dentro
+		 * dela — veja o comentário do botão, logo abaixo. O `position: fixed` e a
+		 * assinatura da dispensa moram no wrapper por isso.
 		 */
 		?>
-		<details class="rc-enquete" id="rc-enquete" data-rc-enquete="<?php echo esc_attr( implode( '-', wp_list_pluck( $enquetes, 'ID' ) ) ); ?>">
-			<summary class="rc-enquete__gatilho">
-				<span class="rc-enquete__icone" aria-hidden="true">✓</span>
-				<span class="rc-enquete__gatilho-texto">
-					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: %d: número de enquetes abertas. */
-							_n( 'Enquete aberta', '%d enquetes abertas', count( $enquetes ), 'reconectar-core' ),
-							count( $enquetes )
-						)
-					);
-					?>
-				</span>
-			</summary>
+		<div class="rc-enquete" data-rc-enquete="<?php echo esc_attr( implode( '-', wp_list_pluck( $enquetes, 'ID' ) ) ); ?>">
+			<details class="rc-enquete__caixa" id="rc-enquete">
+				<summary class="rc-enquete__gatilho">
+					<span class="rc-enquete__icone" aria-hidden="true">✓</span>
+					<span class="rc-enquete__gatilho-texto">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %d: número de enquetes abertas. */
+								_n( 'Enquete aberta', '%d enquetes abertas', count( $enquetes ), 'reconectar-core' ),
+								count( $enquetes )
+							)
+						);
+						?>
+					</span>
+				</summary>
 
-			<div class="rc-enquete__corpo">
-				<?php
-				/*
-				 * O × dispensa o componente pelo resto da visita — esconde inclusive a
-				 * pílula. Recolher pelo próprio `<summary>` já era lembrado na sessão,
-				 * então um botão que apenas recolhesse seria um segundo caminho para o
-				 * mesmo efeito, e o usuário que clica num × espera que aquilo saia da
-				 * tela, não que encolha.
-				 *
-				 * Ele mora **dentro** do corpo, e não na barra do gatilho, por duas
-				 * razões medidas. A especificação desencoraja conteúdo interativo dentro
-				 * de `<summary>`, onde o clique no filho ainda alterna o `<details>` e o
-				 * comportamento diverge entre motores — é o tipo de detalhe que este
-				 * repositório já pagou caro. E no celular fechado o gatilho vira um
-				 * círculo de 44×44: não há espaço para um segundo alvo ali, e pôr um
-				 * deixaria dois botões de 22px lado a lado, abaixo do piso do critério
-				 * 2.5.5. Aqui, ele só existe com o painel aberto — que é exatamente o
-				 * que foi pedido.
-				 *
-				 * Dispensar não esconde a participação: as mesmas enquetes seguem no
-				 * painel de transparência, onde agora também se vota.
-				 */
-				?>
-				<button
-					type="button"
-					class="rc-enquete__fechar"
-					data-rc-enquete-fechar
-					title="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
-					aria-label="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
-				><span aria-hidden="true">&times;</span></button>
+				<div class="rc-enquete__corpo">
+					<?php foreach ( $enquetes as $enquete ) : ?>
+						<?php self::imprimir_enquete( $enquete ); ?>
+					<?php endforeach; ?>
+				</div>
+			</details>
 
-				<?php foreach ( $enquetes as $enquete ) : ?>
-					<?php self::imprimir_enquete( $enquete ); ?>
-				<?php endforeach; ?>
-			</div>
-		</details>
+			<?php
+			/*
+			 * O × dispensa o componente pelo resto da visita — esconde inclusive a
+			 * pílula. Recolher pelo próprio `<summary>` já era lembrado na sessão,
+			 * então um botão que apenas recolhesse seria um segundo caminho para o
+			 * mesmo efeito, e o usuário que clica num × espera que aquilo saia da tela,
+			 * não que encolha.
+			 *
+			 * Ele fica **sobre** a faixa do gatilho, e é irmão do `<details>`, não
+			 * filho do `<summary>`. As duas razões que o mantinham no corpo continuam
+			 * de pé, e é justamente por isso que ele saiu por cima:
+			 *
+			 * 1. A especificação desencoraja conteúdo interativo dentro de `<summary>`,
+			 *    onde o clique no filho ainda alterna o `<details>` e o comportamento
+			 *    diverge entre motores. Fora do `<details>`, o clique não alcança o
+			 *    gatilho e o problema deixa de existir.
+			 * 2. No celular fechado o gatilho vira um círculo de 44×44, sem espaço para
+			 *    um segundo alvo — dois botões de 22px lado a lado ficariam abaixo do
+			 *    piso do critério 2.5.5. Aqui isso não acontece porque o botão só é
+			 *    revelado com o cartão aberto.
+			 *
+			 * Irmão, e não filho do `<summary>`, também porque conteúdo não-`<summary>`
+			 * de um `<details>` fechado não é renderizado: dentro da caixa, o × só
+			 * existiria quando o cartão já estivesse aberto — que é o efeito desejado,
+			 * mas obtido de um jeito que o esconderia também de quem usa o teclado para
+			 * tabular até ele.
+			 *
+			 * Nasce `hidden` e é o JS que o revela junto com o painel. Sem script ele
+			 * não fazia nada e mesmo assim era impresso; agora só aparece onde funciona.
+			 *
+			 * Dispensar não esconde a participação: as mesmas enquetes seguem no painel
+			 * de transparência, onde agora também se vota.
+			 */
+			?>
+			<button
+				type="button"
+				class="rc-enquete__fechar"
+				data-rc-enquete-fechar
+				hidden
+				title="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
+				aria-label="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
+			><span aria-hidden="true">&times;</span></button>
+		</div>
 		<?php
 	}
 

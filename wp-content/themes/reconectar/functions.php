@@ -31,6 +31,9 @@ $reconectar_modulos = array(
 	'inc/marketplace/vitrine.php',
 	'inc/marketplace/busca-sugestoes.php',
 	'inc/marketplace/loja.php',
+	// Antes de `cabecalho.php` e de `barra-inferior.php`: os dois imprimem o
+	// aviso de enquete e o item "Votar" a partir das funções deste arquivo.
+	'inc/marketplace/enquete.php',
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',
 	'inc/marketplace/barra-inferior.php',

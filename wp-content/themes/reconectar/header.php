@@ -58,6 +58,7 @@
 				<div class="rc-cabecalho__acoes">
 					<?php
 					reconectar_seletor_de_municipio();
+					reconectar_aviso_de_enquete();
 					reconectar_atalho_de_conta();
 					reconectar_resumo_do_carrinho();
 					?>

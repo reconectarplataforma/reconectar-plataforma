@@ -443,6 +443,55 @@ class Reconectar_Proposta_Votacao {
 		return array_slice( $votaveis, 0, max( 1, (int) $limite ) );
 	}
 
+	/**
+	 * As enquetes abertas em que um usuário ainda **não** votou.
+	 *
+	 * É o que alimenta o contador do cabeçalho e o da barra inferior. "Pendente"
+	 * quer dizer voto que falta *seu*, e por isso **deslogado devolve vazio**: quem
+	 * não entrou não tem voto a faltar, e um selo numérico para visitante anônimo
+	 * pediria uma ação que a tela seguinte recusaria. De quebra, é o que mantém o
+	 * HTML servido a anônimo idêntico para todo mundo, caso um cache de página
+	 * entre em cena algum dia.
+	 *
+	 * Memoizado por usuário porque a barra e o cabeçalho perguntam a mesma coisa na
+	 * mesma requisição. O custo de banco já está resolvido em `abertas()`, pelo
+	 * índice em transient.
+	 *
+	 * @param int $usuario_id Usuário; `0` usa o atual.
+	 * @return WP_Post[]
+	 */
+	public static function pendentes_de( $usuario_id = 0 ) {
+		static $cache = array();
+
+		$usuario_id = $usuario_id ? (int) $usuario_id : get_current_user_id();
+
+		if ( ! $usuario_id ) {
+			return array();
+		}
+
+		if ( isset( $cache[ $usuario_id ] ) ) {
+			return $cache[ $usuario_id ];
+		}
+
+		$pendentes = array();
+
+		/*
+		 * Sem teto, de propósito. O limite de `abertas()` é um `array_slice` no fim
+		 * — a consulta ao banco acontece inteira de qualquer jeito —, então cortar
+		 * aqui não economizaria nada e faria o selo anunciar um número menor que a
+		 * verdade. Número plausível e errado é pior que campo vazio.
+		 */
+		foreach ( self::abertas( PHP_INT_MAX ) as $enquete ) {
+			if ( '' === self::voto_de( $enquete->ID, $usuario_id ) ) {
+				$pendentes[] = $enquete;
+			}
+		}
+
+		$cache[ $usuario_id ] = $pendentes;
+
+		return $pendentes;
+	}
+
 	/* ---------------------------------------------------------------------
 	 * Voto
 	 * ------------------------------------------------------------------ */

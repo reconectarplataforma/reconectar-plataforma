@@ -43,12 +43,16 @@
 	 * administração.
 	 *
 	 * Isso **não** contraria a decisão de que nada da página passa por cima da
-	 * barra inferior: no celular o componente é ancorado acima dela por cálculo,
-	 * e os dois nunca se cruzam em geometria — o empilhamento não chega a ser
-	 * consultado.
+	 * barra inferior: abaixo de 768px o cartão inteiro sai da tela, e os dois
+	 * nunca coexistem — o empilhamento não chega a ser consultado.
 	 */
 	z-index: 1000;
 
+	/*
+	 * `fixed` aqui, e não no `<details>`, porque é este elemento que ancora o × —
+	 * ele é irmão da caixa e precisa de um containing block posicionado para
+	 * flutuar sobre a faixa do gatilho.
+	 */
 	position: fixed;
 	right: var( --rc-espaco, 1rem );
 	bottom: var( --rc-espaco, 1rem );
@@ -90,8 +94,15 @@
 	display: none;
 }
 
-.rc-enquete[open] .rc-enquete__gatilho {
+.rc-enquete__caixa[open] .rc-enquete__gatilho {
 	border-radius: 12px 12px 0 0;
+	/*
+	 * O × flutua sobre o canto direito desta faixa. Sem a reserva, um rótulo longo
+	 * — "3 enquetes abertas" numa tela estreita — passaria por baixo do botão, e o
+	 * texto continuaria legível para o leitor de tela enquanto some para quem
+	 * enxerga.
+	 */
+	padding-right: 44px;
 }
 
 .rc-enquete__gatilho:focus-visible {
@@ -136,26 +147,36 @@
 }
 
 /*
- * O × ocupa o canto superior direito do corpo, no fluxo: `margin-left: auto`
- * empurra o bloco para a direita e as margens negativas o encaixam no padding do
- * corpo, para não custar uma faixa de 44px dentro de um painel que já tem
- * `max-height: 70vh`.
+ * O × ocupa o canto superior direito da **faixa do gatilho**, e não do corpo
+ * branco, onde ficava antes: ali ele nascia colado à barra de rolagem do painel e
+ * parecia órfão, porque era — o corpo começa onde a faixa termina.
  *
- * 44×44 de alvo, o piso do critério 2.5.5 — o mesmo do gatilho. O glifo desenha
- * bem menor que a caixa, e é isso que se quer: alvo grande, marca discreta.
- * `#595959` sobre branco mede 7,0:1; o `#717171` do projeto mede 4,86:1 e
- * passaria, mas aqui o elemento é pequeno e isolado, e o degrau a mais não custa
- * nada.
+ * Ele é irmão do `<details>`, não filho do `<summary>`, e o absoluto se ancora no
+ * wrapper — que é `position: fixed`, portanto containing block garantido. Essa
+ * âncora é a razão de o wrapper existir: dentro do `<summary>` o clique no botão
+ * ainda alternaria o `<details>`, e o comportamento diverge entre motores.
+ *
+ * 44×44 de alvo, o piso do critério 2.5.5 — o mesmo do gatilho, cuja altura
+ * mínima é exatamente 44px, de modo que o botão cobre a faixa inteira e nada
+ * sobra por fora. O glifo desenha bem menor que a caixa, e é isso que se quer:
+ * alvo grande, marca discreta.
+ *
+ * Branco sobre o roxo institucional: 9,6:1. O `#595959` de antes era leitura
+ * sobre o branco do corpo e, mudado de fundo, mediria 1,9:1 contra o roxo —
+ * reprovando o critério 1.4.3 numa mudança que só encostou na posição.
  */
 .rc-enquete__fechar {
+	position: absolute;
+	top: 0;
+	right: 0;
 	display: block;
 	width: 44px;
 	height: 44px;
-	margin: -0.5rem -0.5rem 0 auto;
 	padding: 0;
 	border: 0;
+	border-radius: 0 12px 0 0;
 	background: none;
-	color: #595959;
+	color: #ffffff;
 	font-family: inherit;
 	font-size: var( --rc-fonte-xl, 1.5rem );
 	line-height: 1;
@@ -164,7 +185,8 @@
 
 .rc-enquete__fechar:hover,
 .rc-enquete__fechar:focus {
-	color: #333333;
+	background: rgba( 255, 255, 255, 0.18 );
+	color: #ffffff;
 }
 
 .rc-enquete__fechar:focus-visible {
@@ -288,54 +310,22 @@
 @media ( max-width: 767px ) {
 
 	/*
-	 * A 375px a coluna útil tem 343px, e um cartão de 320 cobriria a leitura
-	 * inteira. Fechado, o componente é só a pílula; aberto, o painel cresce no
-	 * lugar dela, com a mesma âncora inferior.
+	 * No celular quem anuncia a enquete é o item "Votar" da barra inferior, com o
+	 * contador de votos pendentes — e por isso o cartão sai inteiro.
 	 *
-	 * A âncora soma a altura da barra inferior ao refúgio da área segura do
-	 * aparelho. Fora do tema, os dois tokens caem para 56px e 0px, que é o que o
-	 * tema declara.
+	 * Não é economia de espaço: a pílula era ancorada em
+	 * `calc( --rc-barra-altura + --rc-barra-refugio + 12px )`, ou seja, logo acima
+	 * da barra, e os dois anunciariam a mesma enquete no mesmo canto da tela. É a
+	 * mesma decisão já tomada para `.rc-conta`, que sai do cabeçalho do celular
+	 * porque a barra leva ao mesmo destino: dois caminhos idênticos na mesma tela
+	 * são redundância para quem vê e um item a mais para quem navega por lista de
+	 * links.
+	 *
+	 * A decisão é da folha de estilo, e não do PHP, porque a largura da tela não
+	 * existe no servidor: decidir lá serviria a escolha errada à metade dos
+	 * visitantes no dia em que um cache de página entrar em cena.
 	 */
 	.rc-enquete {
-		right: var( --rc-espaco, 1rem );
-		bottom: calc(
-			var( --rc-barra-altura, 56px ) + var( --rc-barra-refugio, 0px ) + 12px
-		);
-		width: auto;
-		max-width: none;
-	}
-
-	.rc-enquete:not( [open] ) .rc-enquete__gatilho {
-		width: 44px;
-		height: 44px;
-		padding: 0;
-		border-radius: 50%;
-		justify-content: center;
-	}
-
-	/*
-	 * Fechado, o rótulo sai do olho e fica para o leitor de tela. A variante no
-	 * fluxo (sem `position`) seria mais segura contra ancestral não posicionado,
-	 * mas aqui geraria line box dentro da pílula e a deformaria: o absoluto tem
-	 * âncora garantida, porque `.rc-enquete` é `position: fixed`.
-	 */
-	.rc-enquete:not( [open] ) .rc-enquete__gatilho-texto {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		margin: -1px;
-		padding: 0;
-		border: 0;
-		overflow: hidden;
-		clip-path: inset( 50% );
-		white-space: nowrap;
-	}
-
-	.rc-enquete[open] {
-		left: var( --rc-espaco, 1rem );
-	}
-
-	.rc-enquete[open] .rc-enquete__corpo {
-		max-height: 60vh;
+		display: none;
 	}
 }

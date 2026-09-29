@@ -22,9 +22,16 @@
 	var CHAVE_DISPENSA = 'rc-enquete-dispensada';
 	var LARGURA_DESKTOP = 768;
 
+	/*
+	 * Dois elementos, e não um: `cartao` é o wrapper — quem sai da tela na
+	 * dispensa e quem ancora o × —, e `caixa` é o `<details>`, quem abre e fecha.
+	 * Confundir os dois devolve `undefined` em `cartao.open`, que é falso e não
+	 * lança: o cartão simplesmente deixaria de abrir, sem erro no console.
+	 */
 	var cartao = document.querySelector( '[data-rc-enquete]' );
+	var caixa = cartao && cartao.querySelector( 'details' );
 
-	if ( ! cartao ) {
+	if ( ! cartao || ! caixa ) {
 		return;
 	}
 
@@ -89,15 +96,14 @@
 
 	if ( fechar ) {
 		fechar.addEventListener( 'click', function () {
-			cartao.open = false;
+			caixa.open = false;
 			cartao.hidden = true;
 			marcar( assinaturaDispensa, true );
 
 			/*
-			 * Sem JS o botão não existe — ele é impresso no HTML, mas fechar é a
-			 * única coisa que ele faz, e quem chega aqui já tem script. O foco cai no
-			 * `<body>` quando o elemento focado some; forçá-lo para outro ponto da
-			 * página moveria a leitura de quem só quis dispensar um aviso.
+			 * O foco cai no `<body>` quando o elemento focado some; forçá-lo para
+			 * outro ponto da página moveria a leitura de quem só quis dispensar um
+			 * aviso.
 			 */
 		} );
 	}
@@ -105,29 +111,44 @@
 	/*
 	 * O cartão nasce fechado no HTML — é o estado seguro, e o único que não
 	 * depende de script. No desktop ele se apresenta aberto na primeira visita da
-	 * sessão; no celular fica sempre como pílula, porque ali o painel aberto cobre
-	 * a coluna de leitura inteira.
+	 * sessão; abaixo de 768px o componente inteiro está fora da tela por CSS, e
+	 * quem anuncia a enquete ali é a barra inferior.
 	 */
 	if ( window.innerWidth >= LARGURA_DESKTOP && ! marcado( assinatura ) ) {
-		cartao.open = true;
+		caixa.open = true;
 	}
 
-	cartao.addEventListener( 'toggle', function () {
-		marcar( assinatura, ! cartao.open );
+	/*
+	 * O × acompanha o painel: ele flutua sobre a faixa do gatilho, e sobre a
+	 * pílula fechada seria um segundo alvo espremido ao lado do primeiro. Nasce
+	 * `hidden` no HTML, então esta linha é também o que o torna visível pela
+	 * primeira vez — sem script ele não fazia nada e mesmo assim era impresso.
+	 */
+	function sincronizarFechar() {
+		if ( fechar ) {
+			fechar.hidden = ! caixa.open;
+		}
+	}
+
+	sincronizarFechar();
+
+	caixa.addEventListener( 'toggle', function () {
+		marcar( assinatura, ! caixa.open );
+		sincronizarFechar();
 	} );
 
 	document.addEventListener( 'keydown', function ( evento ) {
-		if ( 'Escape' !== evento.key || ! cartao.open ) {
+		if ( 'Escape' !== evento.key || ! caixa.open ) {
 			return;
 		}
 
-		cartao.open = false;
+		caixa.open = false;
 
 		/*
 		 * O foco volta para o gatilho: quem fechou pelo teclado estava dentro do
 		 * painel, e sem isso o foco cairia no início do documento.
 		 */
-		var gatilho = cartao.querySelector( 'summary' );
+		var gatilho = caixa.querySelector( 'summary' );
 
 		if ( gatilho ) {
 			gatilho.focus();

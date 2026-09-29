@@ -543,6 +543,7 @@
 }
 
 .rc-conta,
+.rc-enquete-aviso,
 .rc-carrinho__link {
   align-items: center;
   color: var(--rc-texto);
@@ -559,9 +560,48 @@
 }
 
 .rc-conta__rotulo,
+.rc-enquete-aviso__rotulo,
 .rc-carrinho__texto {
   font-size: var(--rc-fonte-sm);
   font-weight: 600;
+}
+
+/* `relative` para ancorar o selo, e `line-height: 0` porque o `<svg>` é inline e
+   arrastaria o espaço de descida da linha junto — o mesmo par já resolvido no
+   ícone da barra inferior. */
+.rc-enquete-aviso__icone {
+  display: block;
+  line-height: 0;
+  position: relative;
+}
+
+/* O selo numérico dos dois atalhos de enquete — cabeçalho e barra inferior.
+   Declarado num lugar só porque é a mesma informação: dois blocos divergiriam no
+   dia em que um deles for ajustado.
+
+   A cor é a institucional, não a secundária. O laranja `#CF6442` é a escolha
+   óbvia para notificação e mede **3,78:1** sobre o branco: passa como elemento
+   gráfico (critério 1.4.11) e **reprova** como texto (1.4.3) — e aqui há um
+   dígito dentro. O roxo com texto branco mede 9,6:1.
+
+   `--rc-fonte-2xs` é o piso da escala, 12px. Abaixo dele não se desce, e é por
+   isso que o selo tem `min-width` em vez de tamanho menor: o que encolhe é a
+   bolinha, nunca o número. */
+.rc-enquete-aviso__selo,
+.rc-barra-inferior__selo {
+  background: var(--reconectar-cor-institucional);
+  border: 2px solid var(--rc-superficie);
+  border-radius: 999px;
+  color: #fff;
+  font-size: var(--rc-fonte-2xs);
+  font-weight: 700;
+  line-height: 1;
+  min-width: 18px;
+  padding: 2px 4px;
+  position: absolute;
+  right: -8px;
+  text-align: center;
+  top: -8px;
 }
 
 .rc-carrinho__total {
@@ -705,6 +745,15 @@
     display: none;
   }
 
+  /* Pelo mesmo motivo, e literalmente ao lado: o item "Votar" da barra inferior
+     tem este exato destino. Aqui a redundância seria tripla, porque o cartão
+     flutuante do plugin também anuncia a mesma enquete — e é por isso que ele
+     sai da tela abaixo de 768px (`enquete.css`). No celular resta um anúncio só,
+     no lugar que o polegar alcança. */
+  .rc-enquete-aviso {
+    display: none;
+  }
+
   /* Só a contagem no celular. O subtotal é o item mais largo do carrinho e o
      menos acionável dali — quem quer o valor toca no carrinho, que é exatamente
      para onde este link leva. Some para todo mundo, e não pela técnica de
@@ -828,12 +877,21 @@
     padding-bottom: calc(var(--rc-barra-altura) + var(--rc-barra-refugio));
   }
 
-  /* Colunas iguais por `grid`, e não por `flex: 1`: com quatro rótulos de
-     larguras diferentes ("Início" contra "Pedidos"), o flex distribui a sobra e
-     não o total, e os ícones deixam de ficar equidistantes. */
+  /* Colunas iguais por `grid`, e não por `flex: 1`: com rótulos de larguras
+     diferentes ("Início" contra "Pedidos"), o flex distribui a sobra e não o
+     total, e os ícones deixam de ficar equidistantes.
+
+     `auto-flow` em vez de `repeat(4, 1fr)` porque o quinto item, "Votar", entra e
+     sai conforme haja enquete aberta: com a contagem fixa na folha, o item extra
+     cairia numa segunda linha por cima do conteúdo, e o PHP teria de informar
+     quantas colunas são — acoplamento que some inteiro com `auto-columns`.
+
+     A 320px, cinco colunas dão 64px cada, folgado sobre os 44px do critério
+     2.5.5. */
   .rc-barra-inferior__lista {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -860,10 +918,16 @@
 
   /* `line-height: 0` porque o `<svg>` é inline e arrasta o espaço de descida da
      linha junto: sem isto o ícone ganha 4px de ar embaixo e o par ícone/rótulo
-     deixa de ficar centrado na altura da barra. */
+     deixa de ficar centrado na altura da barra.
+
+     `relative` ancora o selo de "Votar". O absoluto aqui é seguro justamente
+     porque existe este ancestral posicionado: sem ele o selo subiria até o
+     viewport, ocuparia coordenada de documento e faria a página rolar na
+     horizontal — que é como a barra inteira já sumiu uma vez neste projeto. */
   .rc-barra-inferior__icone {
     display: block;
     line-height: 0;
+    position: relative;
   }
 
   .rc-barra-inferior__rotulo {
