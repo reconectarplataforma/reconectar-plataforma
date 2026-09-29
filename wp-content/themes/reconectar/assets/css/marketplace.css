@@ -4206,6 +4206,38 @@
 }
 
 /* ==========================================================================
+   Colunas do WooCommerce (.col2-set)
+   ========================================================================== */
+
+/*
+ * O checkout clássico monta `<div class="col2-set"><div class="col-1">…`, e
+ * `col-1` e `col-2` são também os dois primeiros degraus da grade de doze do
+ * Bootstrap, que o tema enfileira na prioridade 5 — antes de tudo, de propósito.
+ * É colisão de nomes, não disputa de especificidade, e por isso a investigação
+ * não encontra nada errado no CSS autoral: não existe CSS autoral no caminho.
+ *
+ * Medido no checkout a 1600px: `.col-1` saía com 66,39px (8,333% dos 796,75px
+ * da coluna) e `.col-2` com 132,78px (16,667%), e o `<h3>` "Detalhes de
+ * cobrança" quebrava letra a letra — largura declarada vence a largura mínima
+ * do conteúdo, e o texto não tem para onde ir.
+ *
+ * Varrido o CSSOM inteiro da página, essas duas do Bootstrap são as ÚNICAS
+ * regras que alcançam essas colunas: nem o Storefront nem o WooCommerce
+ * declaram largura ali. O layout certo é o padrão do bloco, e daí `auto` — uma
+ * porcentagem nossa seria número inventado para repor o que já funcionava
+ * sozinho.
+ *
+ * O escopo é `.col2-set` de propósito: a grade do Bootstrap segue valendo onde
+ * for usada. Hoje nenhum código autoral a usa, mas restringir custa uma palavra.
+ * Alcança junto o carrinho, "Minha conta", os endereços e o recibo do pedido,
+ * que montam esse mesmo markup.
+ */
+.col2-set > .col-1,
+.col2-set > .col-2 {
+  width: auto;
+}
+
+/* ==========================================================================
    Impressão
    ========================================================================== */
 
