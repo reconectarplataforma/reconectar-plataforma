@@ -167,40 +167,31 @@
 }
 
 /*
- * A barra e o número ocupam a coluna do rótulo: alinhados sob o texto, nunca sob
- * o controle. Em leitura (deslogado) não há radio, e o `grid-column` explícito
- * mantém o mesmo desenho nos dois casos.
+ * Nada de barra nem de percentual: o cartão deixou de publicar placar por
+ * alternativa, porque o número ao lado do próprio voto — alterável — convida a
+ * trocá-lo para acompanhar a maioria. As classes do placar saíram daqui junto
+ * com o markup; o resultado mora no painel de transparência, e a regra inteira
+ * está no PHPDoc de `imprimir_formulario()`.
  */
-.rc-enquete__barra,
-.rc-enquete__numero,
-.rc-enquete__sem-votos {
-	grid-column: 2;
+
+.rc-enquete__confirmacao {
+	margin: 0.625rem 0 0;
+	font-weight: 600;
+	color: var( --reconectar-cor-institucional, #663191 );
 }
 
-.rc-enquete__barra {
-	display: block;
-	height: 6px;
-	border-radius: 3px;
-	background: #ececec;
-	overflow: hidden;
-}
-
-.rc-enquete__preenchimento {
-	display: block;
-	height: 100%;
-	border-radius: 3px;
-	background: var( --reconectar-cor-primaria, #31beb1 );
-}
-
-.rc-enquete__numero,
-.rc-enquete__sem-votos,
-.rc-enquete__total {
+.rc-enquete__total,
+.rc-enquete__resultado {
 	font-size: var( --rc-fonte-xs, 0.8125rem );
 	color: #717171;
 }
 
 .rc-enquete__total {
 	margin: 0.5rem 0 0;
+}
+
+.rc-enquete__resultado {
+	margin: 0.25rem 0 0;
 }
 
 .rc-enquete__enviar {
@@ -238,7 +229,8 @@
  * institucional passa com folga, e vai declarado aqui porque o componente não
  * pode contar com o tema.
  */
-.rc-enquete__login {
+.rc-enquete__login,
+.rc-enquete__link {
 	color: var( --reconectar-cor-institucional, #663191 );
 	font-weight: 600;
 	text-decoration: underline;

@@ -31,6 +31,30 @@ class Reconectar_Painel_Transparencia {
 	}
 
 	/**
+	 * URL da página que publica o painel.
+	 *
+	 * O componente flutuante deixou de imprimir percentual — ver o placar ao lado
+	 * do próprio voto convida a trocá-lo para acompanhar a maioria. Quem quiser o
+	 * resultado vem para cá, e é esta função que leva. Ela vive no painel, e não
+	 * no componente, porque quem sabe onde a tela mora é a tela.
+	 *
+	 * A guarda de `post_status` não é zelo: `get_page_by_path()` devolve rascunho
+	 * e lixeira sem reclamar, e um link para página despublicada leva ao 404 de
+	 * quem não está logado — enquanto o editor, que está, vê tudo certo.
+	 *
+	 * @return string URL do painel, ou vazio se a página não existir publicada.
+	 */
+	public static function url() {
+		$pagina = get_page_by_path( 'transparencia' );
+
+		if ( ! $pagina || 'publish' !== $pagina->post_status ) {
+			return '';
+		}
+
+		return (string) get_permalink( $pagina );
+	}
+
+	/**
 	 * Desenha o painel.
 	 *
 	 * @return string HTML do painel.

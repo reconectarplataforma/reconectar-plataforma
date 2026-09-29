@@ -172,14 +172,15 @@ class Reconectar_Enquete_Flutuante {
 			return;
 		}
 
-		// Depois do ramo anônimo de propósito: sem placar em leitura, contar votos
-		// ali seria trabalho jogado fora em toda página servida a visitante.
+		// Depois do ramo anônimo de propósito: quem não entrou não vê número
+		// nenhum, e contar votos ali seria trabalho jogado fora em toda página
+		// servida a visitante. A contagem por alternativa não é mais lida aqui —
+		// o cartão imprime só o total, e o placar mora no painel de transparência.
 		$escolha  = Reconectar_Proposta_Votacao::voto_de( $enquete->ID );
-		$contagem = Reconectar_Proposta_Votacao::contagem( $enquete->ID );
 		$total    = Reconectar_Proposta_Votacao::total_de_votos( $enquete->ID );
 		$ja_votou = '' !== $escolha;
 
-		self::imprimir_formulario( $enquete, $opcoes, $contagem, $total, $escolha, $identificador, $ja_votou );
+		self::imprimir_formulario( $enquete, $opcoes, $total, $escolha, $identificador, $ja_votou );
 
 		echo '</section>';
 	}
@@ -215,21 +216,33 @@ class Reconectar_Enquete_Flutuante {
 	/**
 	 * Desenha o formulário de voto.
 	 *
-	 * Quem já votou vê a sua alternativa marcada e o resultado ao lado de cada
-	 * uma; o botão muda de "Votar" para "Alterar meu voto". Um voto por conta,
-	 * alterável enquanto a enquete estiver aberta — e o total não sobe na troca,
-	 * porque a contagem é recalculada do mapa de votantes.
+	 * Quem já votou vê a sua alternativa marcada, a confirmação de que o voto foi
+	 * registrado e o botão mudado de "Votar" para "Alterar meu voto". Um voto por
+	 * conta, alterável enquanto a enquete estiver aberta — e o total não sobe na
+	 * troca, porque a contagem é recalculada do mapa de votantes.
+	 *
+	 * **Nenhum percentual, em estado nenhum.** Esconder o placar só até o voto
+	 * resolvia metade do problema: com o voto alterável, o percentual ao lado da
+	 * própria escolha convida a trocá-la para acompanhar quem está ganhando, e a
+	 * enquete passa a medir a si mesma. As duas saídas eram tirar o botão de
+	 * alterar ou tirar o número; tirar o número preserva a chance de corrigir um
+	 * clique errado, que num cartão de 343px no celular é acidente plausível.
+	 *
+	 * O resultado não desaparece do site — ele tem lugar próprio, o painel de
+	 * transparência, que é público de propósito e alcança também as encerradas.
+	 *
+	 * O total agregado fica: ele diz quantas pessoas participaram, não quem está
+	 * ganhando, e não favorece alternativa nenhuma.
 	 *
 	 * @param WP_Post $enquete       Enquete.
 	 * @param array[] $opcoes        Alternativas.
-	 * @param int[]   $contagem      Votos por alternativa.
 	 * @param int     $total         Total de votos.
 	 * @param string  $escolha       Alternativa já escolhida, ou vazio.
 	 * @param string  $identificador Prefixo dos IDs de campo.
 	 * @param bool    $ja_votou      Se o usuário já votou.
 	 * @return void
 	 */
-	private static function imprimir_formulario( $enquete, $opcoes, $contagem, $total, $escolha, $identificador, $ja_votou ) {
+	private static function imprimir_formulario( $enquete, $opcoes, $total, $escolha, $identificador, $ja_votou ) {
 		printf(
 			'<form class="rc-enquete__form" method="post" action="%s">',
 			esc_url( admin_url( 'admin-post.php' ) )
@@ -248,7 +261,6 @@ class Reconectar_Enquete_Flutuante {
 
 		foreach ( $opcoes as $indice => $opcao ) {
 			$campo = $identificador . '-op-' . (int) $indice;
-			$votos = isset( $contagem[ $opcao['id'] ] ) ? (int) $contagem[ $opcao['id'] ] : 0;
 
 			echo '<li class="rc-enquete__opcao">';
 
@@ -261,16 +273,23 @@ class Reconectar_Enquete_Flutuante {
 				esc_html( $opcao['texto'] )
 			);
 
-			// O resultado só aparece depois do voto: mostrar o placar antes
-			// conduziria a escolha de quem ainda não decidiu.
-			if ( $ja_votou ) {
-				self::imprimir_resultado( $votos, $total );
-			}
-
 			echo '</li>';
 		}
 
 		echo '</ul>';
+
+		if ( $ja_votou ) {
+			/*
+			 * Sem placar, a opção marcada é a única pista de que o voto foi para o
+			 * servidor — e um radio marcado é indistinguível de um radio que o
+			 * navegador restaurou. A confirmação em texto é o que fecha essa lacuna,
+			 * e é ela que torna a remoção do percentual aceitável.
+			 */
+			printf(
+				'<p class="rc-enquete__confirmacao">%s</p>',
+				esc_html__( 'Seu voto foi registrado.', 'reconectar-core' )
+			);
+		}
 
 		printf(
 			'<button type="submit" class="rc-enquete__enviar">%s</button>',
@@ -290,52 +309,36 @@ class Reconectar_Enquete_Flutuante {
 					)
 				)
 			);
+
+			self::imprimir_link_do_painel();
 		}
 
 		echo '</form>';
 	}
 
 	/**
-	 * Desenha o resultado de uma alternativa.
+	 * Imprime o caminho para o resultado, que saiu do cartão.
 	 *
-	 * Com nenhum voto, imprime texto — nunca `0%`, que exigiria dividir por zero,
-	 * nem um número plausível no lugar dele.
+	 * Tirar o percentual daqui só se sustenta porque o número continua público em
+	 * outro lugar; sem este link, a remoção viraria supressão do dado.
 	 *
-	 * A barra leva `aria-hidden` porque o mesmo número já está no texto ao lado:
-	 * um `role="progressbar"` faria o leitor de tela anunciar o percentual duas
-	 * vezes seguidas.
+	 * A URL pode vir vazia — o painel é uma página do WordPress, e página se
+	 * despublica. Nesse caso nada é impresso, em vez de um link que levaria ao 404
+	 * de quem não está logado enquanto o editor, que está, vê tudo certo.
 	 *
-	 * @param int $votos Votos da alternativa.
-	 * @param int $total Total de votos da enquete.
 	 * @return void
 	 */
-	private static function imprimir_resultado( $votos, $total ) {
-		if ( $total < 1 ) {
-			printf(
-				'<span class="rc-enquete__sem-votos">%s</span>',
-				esc_html__( 'Nenhum voto ainda', 'reconectar-core' )
-			);
+	private static function imprimir_link_do_painel() {
+		$url = Reconectar_Painel_Transparencia::url();
 
+		if ( '' === $url ) {
 			return;
 		}
 
-		$percentual = Reconectar_Proposta_Votacao::percentual( $votos, $total );
-
 		printf(
-			'<span class="rc-enquete__barra" aria-hidden="true"><span class="rc-enquete__preenchimento" style="width: %s%%"></span></span>',
-			esc_attr( round( $percentual, 1 ) )
-		);
-
-		printf(
-			'<span class="rc-enquete__numero">%s</span>',
-			esc_html(
-				sprintf(
-					/* translators: 1: percentual. 2: número de votos. */
-					__( '%1$s%% (%2$d)', 'reconectar-core' ),
-					number_format_i18n( $percentual, 1 ),
-					(int) $votos
-				)
-			)
+			'<p class="rc-enquete__resultado"><a class="rc-enquete__link" href="%s">%s</a></p>',
+			esc_url( $url ),
+			esc_html__( 'Ver o resultado no painel de transparência', 'reconectar-core' )
 		);
 	}
 
