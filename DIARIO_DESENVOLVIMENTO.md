@@ -2946,3 +2946,108 @@ Environments se quiser revisor obrigatório antes do deploy.
 
 Os quatro YAML foram validados (`yaml.safe_load` carrega os quatro). Nada rodou
 contra a instância.
+
+---
+
+## 2026-09-29 — A Transparência atravessa o deploy
+
+**Por que**
+
+Na EC2 a página de transparência não existia, e com ela sumia a entrega inteira
+de enquetes: `reconectar_aviso_de_enquete()` e o item "Votar" da barra inferior
+consultam `Reconectar_Painel_Transparencia::url()` antes de imprimir e desistem
+em silêncio quando ela volta vazia. O comportamento é o certo — não se imprime
+link para o 404 —, e o efeito é uma entrega invisível em produção, com o
+componente que se está investigando funcionando perfeitamente.
+
+A pergunta era qual a forma correta de criar a página e o item de menu. A
+resposta é o `provision.sh`: o passo "Provisionar" do `implantar.yml` o executa
+no destino, então o que estiver escrito nele chega à EC2 sozinho no próximo push
+à `main`. Criar a página pelo painel seria a armadilha do `custom_logo` outra
+vez — configuração local que não atravessa o deploy por caminho nenhum.
+
+**Os três defeitos**
+
+A Transparência ausente era a ponta de três problemas independentes.
+
+1. **A página nunca era criada.** Só era *consumida*, no item de menu e no link
+   do rodapé, e os dois toleram a ausência de propósito. Nada falhava, nada
+   avisava.
+
+2. **Slug de página do WooCommerce depende do idioma ativo na ativação.** O
+   plugin cria as páginas antes de o pacote de idioma estar de pé. Medido:
+   desenvolvimento nasceu em inglês e tem `/shop/` e `/my-account/`; a EC2 nasceu
+   em pt-BR e responde `/loja/` e `/minha-conta/`, com 404 nos dois primeiros. As
+   buscas `--name=shop` e `--name=my-account` não falham — devolvem vazio, e a
+   guarda `[ -n "$id" ] &&` engole o vazio. O menu de produção saiu com "Loja" e
+   "Minha Conta" a menos, e o deploy terminou em verde.
+
+3. **As guardas de idempotência protegem a instalação errada.** Menu e rodapé só
+   são escritos quando estão vazios — é o que os torna idempotentes e o que
+   preserva a edição do administrador. Também é o que garante que criar a página
+   agora não a leve a nenhum dos dois.
+
+**O que foi feito**
+- Bloco "Página de Transparência" no `provision.sh`, **antes** das seções de menu
+  e rodapé, que a consultam. O conteúdo traz `[reconectar_painel_transparencia]`
+  porque `enfileirar_assets()` procura o shortcode no `post_content` — sem ele a
+  página responde 200 e sai sem CSS.
+- `reconectar_id_de_pagina_do_woo()`, que resolve a página pela opção
+  `woocommerce_<chave>_page_id` e confere `post_status`. Substitui a busca por
+  slug nos quatro lugares que ainda a faziam: os itens de menu "Loja" e "Minha
+  Conta" e as colunas 2 e 3 do rodapé. O bloco de carrinho/checkout já fazia
+  certo desde sempre; faltava aplicar o mesmo padrão ao resto.
+- `reconectar_reparar_item_de_menu()`, irmão do reparo do Fórum, para as
+  instalações que já têm menu. Idempotente pelo **`object_id`**: o rótulo é
+  editável no painel e o permalink muda se alguém trocar o slug — que é
+  justamente o que divergiu entre os ambientes.
+- `scripts/reparar-rodape.php`, chamado por `wp eval-file`, acrescentando às
+  colunas 2 e 3 os `<li>` que faltam, antes do `</ul>`, idempotente pelo caminho
+  do href.
+
+**Por que o reparo do rodapé é PHP e o do menu é bash**
+
+O conteúdo do widget é HTML dentro de um array serializado. `wp widget get` **não
+existe**; `wp widget list --format=json` é a única leitura disponível, e devolve o
+texto com escapes Unicode (`Navegação`). Montar a substituição em bash a
+partir disso seria frágil de um jeito que só apareceria em produção. O `eval-file`
+passa por `get_option()`/`update_option()` e deixa o WordPress reserializar — o
+mesmo raciocínio já escrito em `normalizar-urls.php`.
+
+O reparo é aditivo e cirúrgico: insere só o `<li>` que falta e não toca em mais
+nada. Reescrever a coluna inteira seria mais simples e desfaria a edição do
+administrador, que é exatamente o que a guarda de idempotência existe para
+proteger. Sem `</ul>` no conteúdo, ele sai sem escrever — quem trocou a lista por
+outra coisa não merece HTML inválido de volta.
+
+**O que este trabalho não faz**
+- Não converte as páginas do Dokan para a opção `dokan_pages`: os slugs do plugin
+  são iguais nos dois ambientes e buscá-las pelo slug está correto. Seria trocar
+  código que funciona por código equivalente.
+- Não mexe no checkout. A suspeita de que a EC2 estaria no caminho de blocos caiu
+  — o bloco de conversão resolve por `woocommerce_<chave>_page_id`, e os títulos
+  em português na EC2 provam que ele rodou.
+- Não cria nada à mão na EC2, nem por SSH nem pelo painel. Correção que não
+  atravessa o deploy não está pronta.
+
+**Verificação**
+- `bash -n scripts/provision.sh`, e `php -l` no arquivo novo pelo container.
+- `reconectar_id_de_pagina_do_woo` exercitada sob `set -euo pipefail`, que é o
+  ponto frágil: `shop` → 5, `myaccount` → 8, `cart` → 6, `inexistente` → vazio,
+  sem derrubar o script.
+- Provisionamento rodado duas vezes. A primeira acrescentou "Loja" ao menu local
+  — o item faltava aqui também, o que é a prova de que o reparo funciona; a
+  segunda não acrescentou nada. Menu com 7 itens, sem duplicata.
+- Coluna 2 do rodapé mutilada de propósito, reparo rodado duas vezes: 2 links na
+  primeira, 0 na segunda. Estado original restaurado depois.
+- `./scripts/verificar-acessos.sh`: 127 casos, nenhuma falha.
+
+**Pendência**
+
+O caminho "página ausente → criada" não foi exercitado localmente: o comando que
+apagaria a página 19 para reproduzir o cenário da EC2 foi barrado pelo
+classificador de permissões. O mecanismo é o `wp post create` guardado por
+`grep -q .`, idêntico ao dos blocos de Comunidade, Painel de Empresas e
+Categorias, que rodam a cada provisionamento. A prova final é a EC2 depois do
+próximo deploy: `/transparencia/` sai de 404 para 200 com o painel desenhado, e
+"Loja", "Transparência" e "Minha Conta" aparecem no menu.

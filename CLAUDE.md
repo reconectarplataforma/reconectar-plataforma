@@ -516,6 +516,79 @@ existia, era clicável e abria uma página plausível. Os destinos são
 Sem conferir `post_status`, um helper de URL entrega o permalink de uma página
 despublicada — link válido que leva ao 404 para quem não está logado.
 
+### O slug das páginas do WooCommerce sai no idioma ativo na ativação
+
+O plugin cria Loja, Carrinho, Finalizar compra e Minha conta no instante em que é
+**ativado** — antes de o pacote de idioma estar de pé. O slug fica gravado na
+língua daquele momento e não migra depois. Medido:
+
+| | desenvolvimento (nasceu em inglês) | produção (nasceu em pt-BR) |
+| --- | --- | --- |
+| Loja | `/shop/` 200 | `/loja/` 200, `/shop/` **404** |
+| Minha conta | `/my-account/` 200 | `/minha-conta/` 200, `/my-account/` **404** |
+
+Um `wp post list --post_type=page --name=shop --field=ID` não falha nem avisa:
+devolve **vazio**, a guarda `[ -n "$id" ] &&` engole o vazio, e o menu de produção
+sai com "Loja" e "Minha Conta" a menos — sem uma linha de erro no log do deploy,
+que termina em verde. Foi assim que o menu da EC2 ficou com dois itens a menos
+por meses.
+
+A forma correta é a **opção que guarda o ID**, nunca o slug:
+`woocommerce_shop_page_id`, `woocommerce_cart_page_id`,
+`woocommerce_checkout_page_id` e `woocommerce_myaccount_page_id` — esta última
+**sem hífen e sem sublinhado**, ao contrário do slug. Veja
+`reconectar_id_de_pagina_do_woo()` em `scripts/provision.sh`, que ainda confere
+`post_status` por causa da armadilha logo acima.
+
+As páginas do **Dokan** não sofrem disso: ele grava slug em inglês nos dois
+ambientes (`store-listing`, `dashboard`, `my-orders`), e buscá-las pelo slug está
+correto.
+
+### Página criada à mão não atravessa o deploy — e o consumidor dela cala
+
+Corolário da armadilha do `custom_logo`, e a Transparência caiu nela. A página
+`transparencia` era só **consumida** pelo `provision.sh` — item de menu e link do
+rodapé —, e os dois são tolerantes à ausência de propósito ("um rodapé com um
+link a menos é melhor que um link para o 404"). Ninguém a **criava**. Na máquina
+de desenvolvimento ela existia porque alguém a fez pelo painel; em produção,
+`/transparencia/` respondia 404.
+
+O sintoma não é a página faltando: é a **entrega inteira ficando invisível**.
+`reconectar_aviso_de_enquete()` e o item "Votar" da barra inferior consultam
+`Reconectar_Painel_Transparencia::url()` antes de imprimir e desistem em silêncio
+quando ela volta vazia — o comportamento certo, com o efeito de sumir com o
+cartão de enquete, o atalho do cabeçalho e o selo de pendência de uma vez só. A
+investigação vai para o componente, que está correto.
+
+E existir não basta: `enfileirar_assets()` só carrega `transparencia.css` se
+achar `[reconectar_painel_transparencia]` no `post_content`. Página sem o
+shortcode responde 200 e sai sem estilo nenhum.
+
+Ao criar página nova, escreva o bloco no `provision.sh` **antes** das seções de
+menu e de rodapé, que a consultam.
+
+### As guardas de idempotência protegem a instalação errada
+
+Corolário da anterior, e o que faz uma correção parecer entregue sem chegar a
+lugar nenhum. O bloco do menu pula tudo quando já há menu no local `primary`; as
+colunas do rodapé pulam quando já têm widget. Isso é o que os torna idempotentes
+e o que preserva a edição do administrador — e é também o que garante que uma
+instalação provisionada **antes** de a página existir nunca receberá o link dela.
+Criar a página agora não a leva a lugar nenhum.
+
+O reparo é um bloco à parte, aditivo, idempotente por um identificador estável:
+
+- **Menu** — `reconectar_reparar_item_de_menu()`, por `object_id`. Nunca pelo
+  rótulo (o administrador renomeia no painel) nem pela URL (o permalink muda se
+  alguém trocar o slug — que é justamente o que divergiu entre os ambientes).
+- **Rodapé** — `scripts/reparar-rodape.php`, pelo caminho do href, inserindo o
+  `<li>` antes do `</ul>`. Vai em PHP porque o conteúdo é HTML dentro de array
+  serializado: **`wp widget get` não existe**, `wp widget list --format=json` é a
+  única leitura e devolve o texto com escapes Unicode.
+
+Os dois acrescentam no **fim** da lista, sem `--position`: reordenar é um arrasto
+no painel, e o script não desfaz escolha de quem administra.
+
 ### Clearfix do tema pai vira **grid item**
 
 Ao pôr `display: grid` num contêiner que o Storefront limpava com
