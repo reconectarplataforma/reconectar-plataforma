@@ -1,0 +1,127 @@
+/**
+ * Gráfico de votos do painel de transparência.
+ *
+ * O painel já imprimia `.reconectar-proposta__barra` e
+ * `.reconectar-proposta__preenchimento` com `style="width: X%"` — e **nenhuma
+ * das duas jamais desenhou**. Medido na página: `width: 0`, `display: inline`,
+ * fundo transparente. Não era cascata perdida nem especificidade: não havia
+ * regra alguma para essas classes em folha nenhuma do projeto, e `width` não se
+ * aplica a caixa inline não substituída, então nem o atributo inline valia.
+ *
+ * Daí as duas primeiras linhas deste arquivo serem `display: block` na trilha e
+ * na barra. Um `<span>` desenha retângulo quando sai do fluxo inline, nunca
+ * antes — e é o tipo de defeito que não acusa em lugar nenhum: o HTML estava
+ * correto, o percentual estava no atributo, e a página parecia apenas "sem
+ * gráfico ainda".
+ *
+ * As duas exigências de todo CSS de plugin deste repositório valem aqui:
+ *
+ * 1. **`box-sizing` declarado no próprio componente.** O reset do tema não
+ *    alcança o plugin, e a trilha usa `width: 100%` com borda arredondada.
+ * 2. **Token sempre com fallback literal.** O painel é plugin e não pode exigir
+ *    tema nenhum, como já fazem os `--rc-pe-*` do painel de empresas.
+ *
+ * Nenhum `font-size` literal: a escala de nove degraus mora no `:root` do tema.
+ */
+
+.rc-grafico-votos,
+.rc-grafico-votos *,
+.rc-grafico-votos *::before,
+.rc-grafico-votos *::after {
+	box-sizing: border-box;
+}
+
+.rc-grafico-votos {
+	margin: 0.75rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+/*
+ * Rótulo e valor dividem a primeira linha; a barra ocupa a largura inteira
+ * embaixo. Rótulo de alternativa é texto livre e costuma ser longo — "Feira de
+ * alimentos da agricultura familiar" tem 41 caracteres —, e barra horizontal com
+ * rótulo por cima é a única forma que não o espreme nem o corta. Foi por isso
+ * que a rosca e o gráfico de colunas ficaram de fora: os dois empurram o texto
+ * para uma legenda, que separa o nome do dado que ele nomeia.
+ */
+.rc-grafico-votos__linha {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+}
+
+.rc-grafico-votos__linha + .rc-grafico-votos__linha {
+	margin-top: 0.75rem;
+}
+
+.rc-grafico-votos__rotulo {
+	grid-column: 1;
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+.rc-grafico-votos__valor {
+	grid-column: 2;
+	white-space: nowrap;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	font-weight: 600;
+	color: #717171;
+}
+
+.rc-grafico-votos__trilha {
+	grid-column: 1 / -1;
+	display: block;
+	width: 100%;
+	height: 10px;
+	border-radius: 5px;
+	background: #ececec;
+	overflow: hidden;
+}
+
+/*
+ * Roxo institucional sobre a trilha cinza: 7,4:1, bem acima dos 3:1 que o
+ * critério 1.4.11 da WCAG pede de elemento gráfico. O primário da marca mede
+ * 1,9:1 contra a mesma trilha e fica de fora mesmo sendo a cor "óbvia" para um
+ * gráfico da plataforma — ele já reprovou o 1.4.3 uma vez, na home.
+ *
+ * Uma cor só para todas as alternativas, de propósito. Cor por categoria
+ * sugeriria que as alternativas são de naturezas diferentes, e destacar a mais
+ * votada com cor própria seria o mesmo convite ao voto de maioria que tirou o
+ * percentual do cartão flutuante. Quem compara lê o comprimento.
+ */
+.rc-grafico-votos__barra {
+	display: block;
+	height: 100%;
+	border-radius: 5px;
+	background: var( --reconectar-cor-institucional, #663191 );
+}
+
+/*
+ * Alternativa sem voto fica com barra de largura zero — nada desenhado. Uma
+ * largura mínima "para aparecer" desenharia participação que não houve, e o
+ * valor ao lado já diz "0,0% (0 votos)". É a mesma regra que proíbe imprimir
+ * `0%` calculado sobre divisor zero.
+ */
+
+.rc-grafico-votos__vazio {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	color: #717171;
+}
+
+@media ( max-width: 575px ) {
+
+	/*
+	 * A 375px a coluna útil do cartão fica perto de 280px, e o valor à direita
+	 * rouba dela o bastante para quebrar o rótulo em palavra solta. Empilhar
+	 * devolve a linha inteira ao texto.
+	 */
+	.rc-grafico-votos__linha {
+		grid-template-columns: 1fr;
+	}
+
+	.rc-grafico-votos__valor {
+		grid-column: 1;
+	}
+}

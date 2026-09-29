@@ -329,6 +329,15 @@ class Reconectar_Enquete_Flutuante {
 	 * @return void
 	 */
 	private static function imprimir_link_do_painel() {
+		/*
+		 * Na própria página do painel o link levaria de volta para ela, e o cartão
+		 * já cobre parte do gráfico que o leitor veio ver — convidá-lo a ir aonde
+		 * está seria dizer que falta algo à tela.
+		 */
+		if ( Reconectar_Painel_Transparencia::esta_na_pagina() ) {
+			return;
+		}
+
 		$url = Reconectar_Painel_Transparencia::url();
 
 		if ( '' === $url ) {

@@ -22,12 +22,45 @@ defined( 'ABSPATH' ) || exit;
 class Reconectar_Painel_Transparencia {
 
 	/**
-	 * Registra o shortcode.
+	 * Registra o shortcode e a folha do gráfico.
 	 *
 	 * @return void
 	 */
 	public static function init() {
 		add_shortcode( 'reconectar_painel_transparencia', array( __CLASS__, 'renderizar' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_assets' ) );
+	}
+
+	/**
+	 * Enfileira o CSS do gráfico, e só onde o painel existe.
+	 *
+	 * A guarda não é economia de bytes: sem ela, toda página do site carregaria a
+	 * folha de um componente que não desenha em lugar nenhum. É a mesma decisão já
+	 * tomada no componente flutuante de enquete.
+	 *
+	 * `is_singular()` antes do `get_post()` porque em arquivo e em busca o segundo
+	 * devolve o primeiro post do laço — o conteúdo de um item da lista, que nada
+	 * tem a ver com a página pedida.
+	 *
+	 * @return void
+	 */
+	public static function enfileirar_assets() {
+		if ( ! is_singular() ) {
+			return;
+		}
+
+		$pagina = get_post();
+
+		if ( ! $pagina instanceof WP_Post || ! has_shortcode( $pagina->post_content, 'reconectar_painel_transparencia' ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'reconectar-transparencia',
+			RECONECTAR_CORE_URL . 'assets/css/transparencia.css',
+			array(),
+			'0.1.0'
+		);
 	}
 
 	/**
@@ -52,6 +85,21 @@ class Reconectar_Painel_Transparencia {
 		}
 
 		return (string) get_permalink( $pagina );
+	}
+
+	/**
+	 * Se a tela sendo servida é a que publica o painel.
+	 *
+	 * O componente flutuante aparece em todas as telas, inclusive nesta — e aqui
+	 * o convite "ver o resultado no painel de transparência" apontaria para a
+	 * página em que o leitor já está, por cima do gráfico que ele veio ver.
+	 *
+	 * @return bool
+	 */
+	public static function esta_na_pagina() {
+		$pagina = get_page_by_path( 'transparencia' );
+
+		return $pagina instanceof WP_Post && is_page( $pagina->ID );
 	}
 
 	/**
@@ -115,40 +163,62 @@ class Reconectar_Painel_Transparencia {
 										</li>
 									<?php endforeach; ?>
 								</ul>
-								<p class="reconectar-proposta__sem-votos">
+								<p class="rc-grafico-votos__vazio reconectar-proposta__sem-votos">
 									<?php esc_html_e( 'Nenhum voto ainda.', 'reconectar-core' ); ?>
 								</p>
 							<?php else : ?>
-								<ul class="reconectar-proposta__opcoes list-unstyled mt-3">
+								<?php
+								/*
+								 * O gráfico. As classes `rc-grafico-votos__*` são novas, e as
+								 * `reconectar-proposta__*` ficam ao lado porque são o nome público
+								 * do painel desde o começo — remover uma delas quebraria qualquer
+								 * personalização feita por fora.
+								 *
+								 * A trilha e a barra são as duas que **precisavam** de CSS e nunca
+								 * tiveram: `width` inline num `<span>` não desenha nada, porque a
+								 * propriedade não se aplica a caixa inline não substituída. Medido
+								 * na página antes da correção: `width: 0`, fundo transparente. A
+								 * folha `transparencia.css` as põe em `display: block`, e é ela que
+								 * faz o gráfico existir — sem ela o markup volta a ser texto.
+								 *
+								 * A ordem é a cadastrada pelo moderador, nunca a do placar.
+								 * Reordenar por votos poria a mais votada sempre no topo, que é a
+								 * mesma indução ao voto de maioria que tirou o percentual do cartão
+								 * flutuante.
+								 */
+								?>
+								<ul class="rc-grafico-votos reconectar-proposta__opcoes list-unstyled mt-3">
 									<?php
 									foreach ( $opcoes as $opcao ) :
 										$votos      = isset( $contagem[ $opcao['id'] ] ) ? (int) $contagem[ $opcao['id'] ] : 0;
 										$percentual = Reconectar_Proposta_Votacao::percentual( $votos, $total );
 										?>
-										<li class="reconectar-proposta__opcao">
-											<span class="reconectar-proposta__rotulo">
+										<li class="rc-grafico-votos__linha reconectar-proposta__opcao">
+											<span class="rc-grafico-votos__rotulo reconectar-proposta__rotulo">
 												<?php echo esc_html( $opcao['texto'] ); ?>
+											</span>
+											<span class="rc-grafico-votos__valor reconectar-proposta__numero">
+												<?php
+												echo esc_html(
+													sprintf(
+														/* translators: 1: percentual. 2: número de votos. */
+														_n( '%1$s%% (%2$s voto)', '%1$s%% (%2$s votos)', $votos, 'reconectar-core' ),
+														number_format_i18n( $percentual, 1 ),
+														number_format_i18n( $votos )
+													)
+												);
+												?>
 											</span>
 											<?php
 											/*
-											 * A barra é decorativa: o mesmo número já está no texto ao
-											 * lado, então ela leva `aria-hidden`. Um `role="progressbar"`
+											 * A barra é decorativa: o mesmo número já está no texto
+											 * acima, então ela leva `aria-hidden`. Um `role="progressbar"`
 											 * aqui faria o leitor de tela anunciar o percentual duas
 											 * vezes seguidas.
 											 */
 											?>
-											<span class="reconectar-proposta__barra" aria-hidden="true">
-												<span class="reconectar-proposta__preenchimento" style="width: <?php echo esc_attr( round( $percentual, 1 ) ); ?>%"></span>
-											</span>
-											<span class="reconectar-proposta__numero">
-												<?php
-												printf(
-													/* translators: 1: percentual. 2: número de votos. */
-													esc_html__( '%1$s%% (%2$d)', 'reconectar-core' ),
-													esc_html( number_format_i18n( $percentual, 1 ) ),
-													(int) $votos
-												);
-												?>
+											<span class="rc-grafico-votos__trilha reconectar-proposta__barra" aria-hidden="true">
+												<span class="rc-grafico-votos__barra reconectar-proposta__preenchimento" style="width: <?php echo esc_attr( round( $percentual, 1 ) ); ?>%"></span>
 											</span>
 										</li>
 									<?php endforeach; ?>
