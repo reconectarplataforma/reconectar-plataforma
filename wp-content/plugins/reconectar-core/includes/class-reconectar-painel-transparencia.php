@@ -3,9 +3,16 @@
  * Shortcode `[reconectar_painel_transparencia]` — mostra publicamente as
  * enquetes e o resultado de cada alternativa.
  *
- * Somente leitura, e de propósito: votar é no componente flutuante, que aparece
- * em todas as telas enquanto a enquete estiver aberta. Aqui o papel é de
- * arquivo, e alcança também as encerradas.
+ * O painel é o arquivo das enquetes — alcança também as encerradas — e desde
+ * esta versão também vota, ao lado do componente flutuante.
+ *
+ * Aqui o voto acontece **com o placar à vista**, que é o oposto do que decidimos
+ * no cartão flutuante, onde o percentual saiu justamente por convidar a trocar a
+ * escolha para acompanhar a maioria. A diferença que sustenta a exceção: ali o
+ * placar era um acréscimo ao ato de votar; aqui ele **é** o conteúdo da página.
+ * Esconder o gráfico para poder oferecer o voto esvaziaria o painel de
+ * transparência, que é público de propósito. Quem quer votar sem ver o resultado
+ * tem o cartão flutuante, presente em todas as telas.
  *
  * O que ainda depende da definição participativa das regras da plataforma
  * (Atividade 2.10 do edital) é o voto anônimo e a regra de uma-vez-por-
@@ -59,7 +66,7 @@ class Reconectar_Painel_Transparencia {
 			'reconectar-transparencia',
 			RECONECTAR_CORE_URL . 'assets/css/transparencia.css',
 			array(),
-			'0.1.0'
+			'0.2.0'
 		);
 	}
 
@@ -133,9 +140,20 @@ class Reconectar_Painel_Transparencia {
 				$contagem = Reconectar_Proposta_Votacao::contagem( $enquete->ID );
 				$total    = Reconectar_Proposta_Votacao::total_de_votos( $enquete->ID );
 				$aberta   = Reconectar_Proposta_Votacao::esta_aberta( $enquete->ID );
+				$escolha  = Reconectar_Proposta_Votacao::voto_de( $enquete->ID );
+				$ja_votou = '' !== $escolha;
+
+				/*
+				 * `pode_votar()` e não `$aberta && is_user_logged_in()` escrito à mão: a
+				 * regra de quem vota mora num lugar só, e ela também confere o
+				 * `post_status`. Duplicá-la aqui faria o painel oferecer o formulário
+				 * para quem o endpoint recusaria — botão que existe e não funciona.
+				 */
+				$votavel = Reconectar_Proposta_Votacao::pode_votar( $enquete->ID );
+				$ancora  = 'enquete-' . (int) $enquete->ID;
 				?>
 				<div class="col">
-					<article class="reconectar-proposta card h-100" id="enquete-<?php echo esc_attr( $enquete->ID ); ?>">
+					<article class="reconectar-proposta card h-100" id="<?php echo esc_attr( $ancora ); ?>">
 						<div class="card-body">
 							<h3 class="reconectar-proposta__titulo card-title h5">
 								<?php echo esc_html( get_the_title( $enquete ) ); ?>
@@ -148,81 +166,169 @@ class Reconectar_Painel_Transparencia {
 								<p class="reconectar-proposta__vazia">
 									<?php esc_html_e( 'Esta enquete ainda não tem alternativas cadastradas.', 'reconectar-core' ); ?>
 								</p>
-							<?php elseif ( $total < 1 ) : ?>
-								<?php
-								/*
-								 * Total zero imprime texto, nunca `0%`: o percentual exigiria
-								 * dividir por zero, e um zero inventado no lugar seria o número
-								 * plausível que a regra de honestidade de dados proíbe.
-								 */
-								?>
-								<ul class="reconectar-proposta__opcoes list-unstyled mt-3">
-									<?php foreach ( $opcoes as $opcao ) : ?>
-										<li class="reconectar-proposta__opcao">
-											<?php echo esc_html( $opcao['texto'] ); ?>
-										</li>
-									<?php endforeach; ?>
-								</ul>
-								<p class="rc-grafico-votos__vazio reconectar-proposta__sem-votos">
-									<?php esc_html_e( 'Nenhum voto ainda.', 'reconectar-core' ); ?>
-								</p>
 							<?php else : ?>
 								<?php
 								/*
-								 * O gráfico. As classes `rc-grafico-votos__*` são novas, e as
-								 * `reconectar-proposta__*` ficam ao lado porque são o nome público
-								 * do painel desde o começo — remover uma delas quebraria qualquer
-								 * personalização feita por fora.
+								 * Uma lista só, que serve de gráfico e de cédula. Enquanto o voto
+								 * ficou fora daqui, havia três ramos — sem alternativa, sem voto,
+								 * com voto —, e o do meio repetia a lista inteira só para imprimir
+								 * texto puro no lugar das barras. Repetir de novo, agora com radios
+								 * em cada cópia, garantiria que uma delas ficasse para trás na
+								 * próxima mudança.
 								 *
-								 * A trilha e a barra são as duas que **precisavam** de CSS e nunca
-								 * tiveram: `width` inline num `<span>` não desenha nada, porque a
-								 * propriedade não se aplica a caixa inline não substituída. Medido
-								 * na página antes da correção: `width: 0`, fundo transparente. A
-								 * folha `transparencia.css` as põe em `display: block`, e é ela que
-								 * faz o gráfico existir — sem ela o markup volta a ser texto.
-								 *
-								 * A ordem é a cadastrada pelo moderador, nunca a do placar.
-								 * Reordenar por votos poria a mais votada sempre no topo, que é a
-								 * mesma indução ao voto de maioria que tirou o percentual do cartão
-								 * flutuante.
+								 * O que varia por estado é o que a linha **acrescenta**: o radio só
+								 * quando a enquete aceita o voto deste leitor, o valor e a barra só
+								 * quando há voto a mostrar.
 								 */
+								if ( $votavel ) {
+									printf(
+										'<form class="rc-grafico-votos__form" method="post" action="%s">',
+										esc_url( admin_url( 'admin-post.php' ) )
+									);
+
+									printf(
+										'<input type="hidden" name="action" value="%s">',
+										esc_attr( Reconectar_Proposta_Votacao::ACAO_VOTAR )
+									);
+
+									printf( '<input type="hidden" name="enquete" value="%d">', (int) $enquete->ID );
+
+									/*
+									 * O fragmento não viaja na requisição — nem na URL do POST, nem
+									 * no `Referer` —, então ele vai declarado. Sem este campo o
+									 * leitor volta ao topo de uma página de vários cartões e não vê
+									 * o efeito do próprio voto, o que se lê como falha.
+									 */
+									printf( '<input type="hidden" name="ancora" value="%s">', esc_attr( $ancora ) );
+
+									wp_nonce_field( Reconectar_Proposta_Votacao::ACAO_VOTAR . '_' . $enquete->ID );
+								}
 								?>
-								<ul class="rc-grafico-votos reconectar-proposta__opcoes list-unstyled mt-3">
+								<ul class="rc-grafico-votos reconectar-proposta__opcoes list-unstyled mt-3<?php echo $votavel ? ' rc-grafico-votos--votavel' : ''; ?>">
 									<?php
-									foreach ( $opcoes as $opcao ) :
+									foreach ( $opcoes as $indice => $opcao ) :
 										$votos      = isset( $contagem[ $opcao['id'] ] ) ? (int) $contagem[ $opcao['id'] ] : 0;
 										$percentual = Reconectar_Proposta_Votacao::percentual( $votos, $total );
+										$campo      = $ancora . '-op-' . (int) $indice;
 										?>
 										<li class="rc-grafico-votos__linha reconectar-proposta__opcao">
-											<span class="rc-grafico-votos__rotulo reconectar-proposta__rotulo">
-												<?php echo esc_html( $opcao['texto'] ); ?>
-											</span>
-											<span class="rc-grafico-votos__valor reconectar-proposta__numero">
-												<?php
-												echo esc_html(
-													sprintf(
-														/* translators: 1: percentual. 2: número de votos. */
-														_n( '%1$s%% (%2$s voto)', '%1$s%% (%2$s votos)', $votos, 'reconectar-core' ),
-														number_format_i18n( $percentual, 1 ),
-														number_format_i18n( $votos )
-													)
-												);
-												?>
-											</span>
+											<?php if ( $votavel ) : ?>
+												<input
+													type="radio"
+													class="rc-grafico-votos__radio"
+													id="<?php echo esc_attr( $campo ); ?>"
+													name="opcao"
+													value="<?php echo esc_attr( $opcao['id'] ); ?>"
+													<?php checked( $escolha, $opcao['id'] ); ?>
+												>
+												<label class="rc-grafico-votos__rotulo reconectar-proposta__rotulo" for="<?php echo esc_attr( $campo ); ?>">
+													<?php echo esc_html( $opcao['texto'] ); ?>
+												</label>
+											<?php else : ?>
+												<span class="rc-grafico-votos__rotulo reconectar-proposta__rotulo">
+													<?php echo esc_html( $opcao['texto'] ); ?>
+												</span>
+											<?php endif; ?>
+
 											<?php
 											/*
-											 * A barra é decorativa: o mesmo número já está no texto
-											 * acima, então ela leva `aria-hidden`. Um `role="progressbar"`
-											 * aqui faria o leitor de tela anunciar o percentual duas
-											 * vezes seguidas.
+											 * Total zero não imprime percentual nem barra: o cálculo
+											 * exigiria dividir por zero, e um `0%` no lugar seria o
+											 * número plausível que a honestidade de dados proíbe. O
+											 * aviso de "nenhum voto ainda" vem abaixo da lista, uma vez
+											 * só, em vez de repetido em cada alternativa.
+											 *
+											 * As classes `rc-grafico-votos__*` são novas e as
+											 * `reconectar-proposta__*` ficam ao lado porque são o nome
+											 * público do painel desde o começo — remover uma delas
+											 * quebraria personalização feita por fora.
+											 *
+											 * A ordem é a cadastrada pelo moderador, nunca a do placar.
+											 * Reordenar por votos poria a mais votada sempre no topo, e
+											 * aqui, com o radio ao lado, isso não seria só leitura
+											 * enviesada: seria a alternativa líder no caminho do clique.
 											 */
 											?>
-											<span class="rc-grafico-votos__trilha reconectar-proposta__barra" aria-hidden="true">
-												<span class="rc-grafico-votos__barra reconectar-proposta__preenchimento" style="width: <?php echo esc_attr( round( $percentual, 1 ) ); ?>%"></span>
-											</span>
+											<?php if ( $total > 0 ) : ?>
+												<span class="rc-grafico-votos__valor reconectar-proposta__numero">
+													<?php
+													echo esc_html(
+														sprintf(
+															/* translators: 1: percentual. 2: número de votos. */
+															_n( '%1$s%% (%2$s voto)', '%1$s%% (%2$s votos)', $votos, 'reconectar-core' ),
+															number_format_i18n( $percentual, 1 ),
+															number_format_i18n( $votos )
+														)
+													);
+													?>
+												</span>
+												<?php
+												/*
+												 * A barra é decorativa: o mesmo número já está no texto
+												 * ao lado, então ela leva `aria-hidden`. Um
+												 * `role="progressbar"` aqui faria o leitor de tela
+												 * anunciar o percentual duas vezes seguidas.
+												 *
+												 * A trilha e a barra são as duas que **precisavam** de
+												 * CSS e nunca tiveram: `width` inline num `<span>` não
+												 * desenha nada, porque a propriedade não se aplica a
+												 * caixa inline não substituída. Medido na página antes da
+												 * correção: `width: 0`, fundo transparente. É
+												 * `transparencia.css` que as põe em `display: block` —
+												 * sem ela o markup volta a ser texto.
+												 */
+												?>
+												<span class="rc-grafico-votos__trilha reconectar-proposta__barra" aria-hidden="true">
+													<span class="rc-grafico-votos__barra reconectar-proposta__preenchimento" style="width: <?php echo esc_attr( round( $percentual, 1 ) ); ?>%"></span>
+												</span>
+											<?php endif; ?>
 										</li>
 									<?php endforeach; ?>
 								</ul>
+
+								<?php if ( $total < 1 ) : ?>
+									<p class="rc-grafico-votos__vazio reconectar-proposta__sem-votos">
+										<?php esc_html_e( 'Nenhum voto ainda.', 'reconectar-core' ); ?>
+									</p>
+								<?php endif; ?>
+
+								<?php if ( $votavel ) : ?>
+									<?php if ( $ja_votou ) : ?>
+										<p class="rc-grafico-votos__confirmacao">
+											<?php esc_html_e( 'Seu voto está marcado acima.', 'reconectar-core' ); ?>
+										</p>
+									<?php endif; ?>
+									<button type="submit" class="rc-grafico-votos__enviar">
+										<?php
+										echo esc_html(
+											$ja_votou
+												? __( 'Alterar meu voto', 'reconectar-core' )
+												: __( 'Votar', 'reconectar-core' )
+										);
+										?>
+									</button>
+									</form>
+								<?php elseif ( $aberta ) : ?>
+									<?php
+									/*
+									 * Enquete aberta e ninguém logado: o convite, nunca o silêncio.
+									 * Esconder a enquete de quem não entrou tiraria justamente o
+									 * motivo de entrar.
+									 *
+									 * O retorno vem de `home_url( add_query_arg( array() ) )` e não do
+									 * `HTTP_HOST` cru — cabeçalho de requisição é dado do cliente, e a
+									 * allowlist de host desta instalação existe porque um `Host`
+									 * forjado sairia dentro de um link. A âncora entra aqui porque
+									 * este link é GET: aqui o fragmento viaja.
+									 */
+									$retorno = home_url( add_query_arg( array() ) ) . '#' . $ancora;
+									?>
+									<p class="rc-grafico-votos__convite">
+										<a class="rc-grafico-votos__login" href="<?php echo esc_url( wp_login_url( $retorno ) ); ?>">
+											<?php esc_html_e( 'Entre na sua conta para votar', 'reconectar-core' ); ?>
+										</a>
+									</p>
+								<?php endif; ?>
 							<?php endif; ?>
 
 							<p class="reconectar-proposta__placar">

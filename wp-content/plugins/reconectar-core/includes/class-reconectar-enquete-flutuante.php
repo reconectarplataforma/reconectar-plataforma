@@ -75,14 +75,14 @@ class Reconectar_Enquete_Flutuante {
 			'reconectar-enquete',
 			RECONECTAR_CORE_URL . 'assets/css/enquete.css',
 			array(),
-			'0.1.0'
+			'0.2.0'
 		);
 
 		wp_enqueue_script(
 			'reconectar-enquete',
 			RECONECTAR_CORE_URL . 'assets/js/enquete.js',
 			array(),
-			'0.1.0',
+			'0.2.0',
 			array(
 				'strategy'  => 'defer',
 				'in_footer' => true,
@@ -130,6 +130,36 @@ class Reconectar_Enquete_Flutuante {
 			</summary>
 
 			<div class="rc-enquete__corpo">
+				<?php
+				/*
+				 * O × dispensa o componente pelo resto da visita — esconde inclusive a
+				 * pílula. Recolher pelo próprio `<summary>` já era lembrado na sessão,
+				 * então um botão que apenas recolhesse seria um segundo caminho para o
+				 * mesmo efeito, e o usuário que clica num × espera que aquilo saia da
+				 * tela, não que encolha.
+				 *
+				 * Ele mora **dentro** do corpo, e não na barra do gatilho, por duas
+				 * razões medidas. A especificação desencoraja conteúdo interativo dentro
+				 * de `<summary>`, onde o clique no filho ainda alterna o `<details>` e o
+				 * comportamento diverge entre motores — é o tipo de detalhe que este
+				 * repositório já pagou caro. E no celular fechado o gatilho vira um
+				 * círculo de 44×44: não há espaço para um segundo alvo ali, e pôr um
+				 * deixaria dois botões de 22px lado a lado, abaixo do piso do critério
+				 * 2.5.5. Aqui, ele só existe com o painel aberto — que é exatamente o
+				 * que foi pedido.
+				 *
+				 * Dispensar não esconde a participação: as mesmas enquetes seguem no
+				 * painel de transparência, onde agora também se vota.
+				 */
+				?>
+				<button
+					type="button"
+					class="rc-enquete__fechar"
+					data-rc-enquete-fechar
+					title="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
+					aria-label="<?php esc_attr_e( 'Fechar as enquetes nesta visita', 'reconectar-core' ); ?>"
+				><span aria-hidden="true">&times;</span></button>
+
 				<?php foreach ( $enquetes as $enquete ) : ?>
 					<?php self::imprimir_enquete( $enquete ); ?>
 				<?php endforeach; ?>

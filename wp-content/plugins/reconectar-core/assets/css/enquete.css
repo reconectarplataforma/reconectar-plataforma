@@ -114,6 +114,16 @@
 	flex: 1 1 auto;
 }
 
+/*
+ * O cartão dispensado sai da tela por `hidden`. A regra é explícita de
+ * propósito: `[hidden]` vem da folha do navegador, e qualquer `display` de autor
+ * sobre `.rc-enquete` — inclusive um acrescentado adiante por distração — venceria
+ * o atributo e devolveria o cartão à tela de quem acabou de fechá-lo.
+ */
+.rc-enquete[hidden] {
+	display: none;
+}
+
 /* O corpo --------------------------------------------------------------- */
 
 .rc-enquete__corpo {
@@ -123,6 +133,43 @@
 	border: 1px solid #e0e0e0;
 	border-top: 0;
 	border-radius: 0 0 12px 12px;
+}
+
+/*
+ * O × ocupa o canto superior direito do corpo, no fluxo: `margin-left: auto`
+ * empurra o bloco para a direita e as margens negativas o encaixam no padding do
+ * corpo, para não custar uma faixa de 44px dentro de um painel que já tem
+ * `max-height: 70vh`.
+ *
+ * 44×44 de alvo, o piso do critério 2.5.5 — o mesmo do gatilho. O glifo desenha
+ * bem menor que a caixa, e é isso que se quer: alvo grande, marca discreta.
+ * `#595959` sobre branco mede 7,0:1; o `#717171` do projeto mede 4,86:1 e
+ * passaria, mas aqui o elemento é pequeno e isolado, e o degrau a mais não custa
+ * nada.
+ */
+.rc-enquete__fechar {
+	display: block;
+	width: 44px;
+	height: 44px;
+	margin: -0.5rem -0.5rem 0 auto;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: #595959;
+	font-family: inherit;
+	font-size: var( --rc-fonte-xl, 1.5rem );
+	line-height: 1;
+	cursor: pointer;
+}
+
+.rc-enquete__fechar:hover,
+.rc-enquete__fechar:focus {
+	color: #333333;
+}
+
+.rc-enquete__fechar:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: -3px;
 }
 
 .rc-enquete__item + .rc-enquete__item {

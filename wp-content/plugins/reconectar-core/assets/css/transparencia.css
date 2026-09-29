@@ -56,9 +56,40 @@
 	margin-top: 0.75rem;
 }
 
+/*
+ * Com o formulário de voto a linha ganha uma coluna à esquerda para o radio. O
+ * modificador vai na lista, não na linha: quem decide é o estado da enquete, e
+ * repetir a decisão em cada `<li>` abriria espaço para uma linha divergir das
+ * outras.
+ */
+.rc-grafico-votos--votavel .rc-grafico-votos__linha {
+	grid-template-columns: auto 1fr auto;
+}
+
+.rc-grafico-votos__radio {
+	grid-column: 1;
+	align-self: center;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var( --reconectar-cor-institucional, #663191 );
+}
+
 .rc-grafico-votos__rotulo {
 	grid-column: 1;
 	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+/*
+ * O rótulo vira `<label>` no modo votável, e aí a linha inteira dele é área de
+ * clique — alvo bem maior que os 18px do radio, que é o que o critério 2.5.5 da
+ * WCAG pede na prática. `display: block` porque `<label>` nasce inline e a caixa
+ * de clique pararia no texto.
+ */
+.rc-grafico-votos--votavel .rc-grafico-votos__rotulo {
+	grid-column: 2;
+	display: block;
+	cursor: pointer;
 }
 
 .rc-grafico-votos__valor {
@@ -67,6 +98,10 @@
 	font-size: var( --rc-fonte-sm, 0.875rem );
 	font-weight: 600;
 	color: #717171;
+}
+
+.rc-grafico-votos--votavel .rc-grafico-votos__valor {
+	grid-column: 3;
 }
 
 .rc-grafico-votos__trilha {
@@ -110,6 +145,54 @@
 	color: #717171;
 }
 
+.rc-grafico-votos__confirmacao {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	color: #717171;
+}
+
+/*
+ * Largura total e 44px de altura mínima — o alvo de toque do critério 2.5.5, o
+ * mesmo piso já adotado no botão do cartão flutuante. Roxo institucional sobre
+ * branco mede 9,6:1; o primário da marca mediria 2,30:1 e reprova o 1.4.3, como
+ * já reprovou uma vez na home.
+ */
+.rc-grafico-votos__enviar {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	margin-top: 0.75rem;
+	padding: 0.625rem 1rem;
+	border: 0;
+	border-radius: 4px;
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #fff;
+	font-family: inherit;
+	font-size: var( --rc-fonte-base, 1rem );
+	cursor: pointer;
+}
+
+.rc-grafico-votos__enviar:hover,
+.rc-grafico-votos__enviar:focus {
+	background: #52276f;
+	color: #fff;
+}
+
+/*
+ * Contorno próprio, e em amarelo de destaque: o foco padrão do navegador é uma
+ * linha escura, que sobre o roxo do botão praticamente some.
+ */
+.rc-grafico-votos__enviar:focus-visible,
+.rc-grafico-votos__radio:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-grafico-votos__convite {
+	margin: 0.75rem 0 0;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+}
+
 @media ( max-width: 575px ) {
 
 	/*
@@ -123,5 +206,18 @@
 
 	.rc-grafico-votos__valor {
 		grid-column: 1;
+	}
+
+	/*
+	 * A coluna do radio sobrevive ao empilhamento — ele precisa ficar ao lado do
+	 * rótulo, não acima dele —, e o valor desce para a coluna do texto, alinhado
+	 * com o rótulo que ele mede.
+	 */
+	.rc-grafico-votos--votavel .rc-grafico-votos__linha {
+		grid-template-columns: auto 1fr;
+	}
+
+	.rc-grafico-votos--votavel .rc-grafico-votos__valor {
+		grid-column: 2;
 	}
 }

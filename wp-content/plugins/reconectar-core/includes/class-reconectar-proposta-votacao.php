@@ -1087,6 +1087,19 @@ class Reconectar_Proposta_Votacao {
 			$destino = get_permalink( $enquete_id );
 		}
 
+		/*
+		 * O fragmento nunca chega ao servidor — o navegador não o envia, nem no
+		 * `Referer` —, então o formulário o declara num campo próprio. Sem isso,
+		 * votar no painel de transparência, que empilha um cartão por enquete,
+		 * devolveria o leitor ao topo da página: o voto aconteceu e o resultado
+		 * dele fica fora da tela, o que se lê como "não funcionou".
+		 */
+		$ancora = isset( $_POST['ancora'] ) ? sanitize_key( wp_unslash( $_POST['ancora'] ) ) : '';
+
+		if ( '' !== $ancora ) {
+			$destino = strtok( $destino, '#' ) . '#' . $ancora;
+		}
+
 		wp_safe_redirect( $destino );
 		exit;
 	}
