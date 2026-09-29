@@ -1,0 +1,302 @@
+/**
+ * Componente flutuante de enquete.
+ *
+ * Duas exigências que este repositório já pagou para aprender, e que valem para
+ * todo CSS de plugin:
+ *
+ * 1. **`box-sizing` declarado aqui dentro.** O reset do tema não alcança o
+ *    plugin, e um `width: 100%` que "funciona" com o Storefront presente estoura
+ *    sem ele — medido uma vez a 375px, campo de 398px numa coluna de 375.
+ * 2. **Token sempre com fallback literal.** O componente não pode exigir tema
+ *    nenhum; é o mesmo motivo pelo qual os `--rc-pe-*` do painel de empresas
+ *    trazem valor de reserva.
+ *
+ * Nenhum `font-size` literal: a escala de nove degraus mora no `:root` do tema,
+ * e o piso é `--rc-fonte-2xs` (12px).
+ */
+
+.rc-enquete,
+.rc-enquete *,
+.rc-enquete *::before,
+.rc-enquete *::after {
+	box-sizing: border-box;
+}
+
+.rc-enquete {
+	/*
+	 * 20 parecia o valor certo — é o patamar dos painéis flutuantes do projeto,
+	 * sugestões da busca e seletor de município — e está errado. Aqueles dois
+	 * vivem **dentro** do cabeçalho e só competem entre irmãos; este aqui é fixo
+	 * no documento e compete com o cabeçalho inteiro.
+	 *
+	 * Varrido o documento, estes são todos os patamares que existem acima de 5:
+	 *
+	 *   .site-header.rc-cabecalho   999   position: relative
+	 *   #wpadminbar               99999   (o WordPress, não o projeto)
+	 *   .rc-barra-inferior           30
+	 *   .rc-busca__sugestoes         20
+	 *   .rc-municipio__lista         20
+	 *
+	 * Com 20, o gatilho some sob o cabeçalho sempre que a viewport for baixa o
+	 * bastante para o cartão alcançá-lo — medido a 824×513, o topo do cartão caía
+	 * atrás do menu. 1000 fica acima do cabeçalho e continua abaixo da barra de
+	 * administração.
+	 *
+	 * Isso **não** contraria a decisão de que nada da página passa por cima da
+	 * barra inferior: no celular o componente é ancorado acima dela por cálculo,
+	 * e os dois nunca se cruzam em geometria — o empilhamento não chega a ser
+	 * consultado.
+	 */
+	z-index: 1000;
+
+	position: fixed;
+	right: var( --rc-espaco, 1rem );
+	bottom: var( --rc-espaco, 1rem );
+	width: 320px;
+	max-width: calc( 100vw - 2 * var( --rc-espaco, 1rem ) );
+	border-radius: 12px;
+	background: #ffffff;
+	box-shadow: 0 4px 20px rgba( 0, 0, 0, 0.18 );
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: #333333;
+}
+
+/* O gatilho ------------------------------------------------------------- */
+
+.rc-enquete__gatilho {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	/* 44px de alvo, o mínimo do critério 2.5.5 da WCAG. */
+	min-height: 44px;
+	padding: 0.625rem 0.875rem;
+	border-radius: 12px;
+	cursor: pointer;
+	/*
+	 * Roxo institucional com texto branco: 9,6:1. O primário da marca mede
+	 * 2,30:1 sobre branco e já reprovou o critério 1.4.3 uma vez, na home.
+	 */
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #ffffff;
+	font-weight: 600;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	/* O triângulo nativo do `<details>`, nos dois motores. */
+	list-style: none;
+}
+
+.rc-enquete__gatilho::-webkit-details-marker {
+	display: none;
+}
+
+.rc-enquete[open] .rc-enquete__gatilho {
+	border-radius: 12px 12px 0 0;
+}
+
+.rc-enquete__gatilho:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-enquete__icone {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: rgba( 255, 255, 255, 0.22 );
+}
+
+.rc-enquete__gatilho-texto {
+	flex: 1 1 auto;
+}
+
+/* O corpo --------------------------------------------------------------- */
+
+.rc-enquete__corpo {
+	max-height: min( 70vh, 560px );
+	overflow-y: auto;
+	padding: 0.875rem;
+	border: 1px solid #e0e0e0;
+	border-top: 0;
+	border-radius: 0 0 12px 12px;
+}
+
+.rc-enquete__item + .rc-enquete__item {
+	margin-top: 1rem;
+	padding-top: 1rem;
+	border-top: 1px solid #e0e0e0;
+}
+
+.rc-enquete__titulo {
+	margin: 0 0 0.625rem;
+	font-size: var( --rc-fonte-base, 1rem );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	font-weight: 600;
+	color: #333333;
+}
+
+.rc-enquete__opcoes {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-enquete__opcao {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: 0.25rem 0.5rem;
+	padding: 0.25rem 0;
+}
+
+.rc-enquete__radio {
+	grid-column: 1;
+	margin: 0;
+	width: 18px;
+	height: 18px;
+	accent-color: var( --reconectar-cor-institucional, #663191 );
+}
+
+.rc-enquete__rotulo {
+	grid-column: 2;
+	cursor: pointer;
+}
+
+/*
+ * A barra e o número ocupam a coluna do rótulo: alinhados sob o texto, nunca sob
+ * o controle. Em leitura (deslogado) não há radio, e o `grid-column` explícito
+ * mantém o mesmo desenho nos dois casos.
+ */
+.rc-enquete__barra,
+.rc-enquete__numero,
+.rc-enquete__sem-votos {
+	grid-column: 2;
+}
+
+.rc-enquete__barra {
+	display: block;
+	height: 6px;
+	border-radius: 3px;
+	background: #ececec;
+	overflow: hidden;
+}
+
+.rc-enquete__preenchimento {
+	display: block;
+	height: 100%;
+	border-radius: 3px;
+	background: var( --reconectar-cor-primaria, #31beb1 );
+}
+
+.rc-enquete__numero,
+.rc-enquete__sem-votos,
+.rc-enquete__total {
+	font-size: var( --rc-fonte-xs, 0.8125rem );
+	color: #717171;
+}
+
+.rc-enquete__total {
+	margin: 0.5rem 0 0;
+}
+
+.rc-enquete__enviar {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	margin-top: 0.75rem;
+	padding: 0.5rem 0.875rem;
+	border: 0;
+	border-radius: 8px;
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #ffffff;
+	font-family: inherit;
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.rc-enquete__enviar:hover,
+.rc-enquete__enviar:focus-visible {
+	background: #52277a;
+}
+
+.rc-enquete__enviar:focus-visible {
+	outline: 3px solid var( --reconectar-cor-destaque, #f1bf3d );
+	outline-offset: 2px;
+}
+
+.rc-enquete__convite {
+	margin: 0.75rem 0 0;
+}
+
+/*
+ * O link padrão do tema é `#31BEB1` — 2,30:1 sobre branco, reprovado. O roxo
+ * institucional passa com folga, e vai declarado aqui porque o componente não
+ * pode contar com o tema.
+ */
+.rc-enquete__login {
+	color: var( --reconectar-cor-institucional, #663191 );
+	font-weight: 600;
+	text-decoration: underline;
+}
+
+/* Celular --------------------------------------------------------------- */
+
+@media ( max-width: 767px ) {
+
+	/*
+	 * A 375px a coluna útil tem 343px, e um cartão de 320 cobriria a leitura
+	 * inteira. Fechado, o componente é só a pílula; aberto, o painel cresce no
+	 * lugar dela, com a mesma âncora inferior.
+	 *
+	 * A âncora soma a altura da barra inferior ao refúgio da área segura do
+	 * aparelho. Fora do tema, os dois tokens caem para 56px e 0px, que é o que o
+	 * tema declara.
+	 */
+	.rc-enquete {
+		right: var( --rc-espaco, 1rem );
+		bottom: calc(
+			var( --rc-barra-altura, 56px ) + var( --rc-barra-refugio, 0px ) + 12px
+		);
+		width: auto;
+		max-width: none;
+	}
+
+	.rc-enquete:not( [open] ) .rc-enquete__gatilho {
+		width: 44px;
+		height: 44px;
+		padding: 0;
+		border-radius: 50%;
+		justify-content: center;
+	}
+
+	/*
+	 * Fechado, o rótulo sai do olho e fica para o leitor de tela. A variante no
+	 * fluxo (sem `position`) seria mais segura contra ancestral não posicionado,
+	 * mas aqui geraria line box dentro da pílula e a deformaria: o absoluto tem
+	 * âncora garantida, porque `.rc-enquete` é `position: fixed`.
+	 */
+	.rc-enquete:not( [open] ) .rc-enquete__gatilho-texto {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		border: 0;
+		overflow: hidden;
+		clip-path: inset( 50% );
+		white-space: nowrap;
+	}
+
+	.rc-enquete[open] {
+		left: var( --rc-espaco, 1rem );
+	}
+
+	.rc-enquete[open] .rc-enquete__corpo {
+		max-height: 60vh;
+	}
+}

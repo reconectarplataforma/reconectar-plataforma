@@ -36,8 +36,9 @@ class Reconectar_Migracoes {
 	 *
 	 * 1 — renomeia `_reconectar_vendedor_ativo` para `_reconectar_loja_ativa`.
 	 * 2 — promove Moderadores e Administradores a `bbp_moderator` no fórum.
+	 * 3 — apaga as metas de contagem favor/contra das enquetes.
 	 */
-	const VERSAO = 2;
+	const VERSAO = 3;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -78,8 +79,34 @@ class Reconectar_Migracoes {
 
 		self::renomear_meta_de_loja_ativa();
 		self::promover_moderadores_no_forum();
+		self::descartar_contagem_binaria_das_enquetes();
 
 		update_option( self::OPCAO_VERSAO, self::VERSAO );
+	}
+
+	/**
+	 * Apaga as metas de contagem do esqueleto binário das enquetes.
+	 *
+	 * `_reconectar_votos_favor` e `_reconectar_votos_contra` vieram do MVP em que
+	 * a proposta era a favor ou contra. A enquete passou a ter alternativas
+	 * cadastradas pelo moderador, e o placar deixou de ser um par de contadores:
+	 * hoje sai do mapa de votantes, recalculado a cada leitura.
+	 *
+	 * **Não é conversão de dados, e não precisa ser.** Nenhum produtor jamais
+	 * gravou nessas chaves — `grep` no repositório inteiro só encontra leitura, no
+	 * painel de transparência —, e a carga de demonstração nunca criou proposta.
+	 * Não há voto antigo a preservar; há duas chaves mortas a remover, para que a
+	 * próxima leitura do banco não sugira um formato que o código não fala mais.
+	 *
+	 * A ressalva do `CLAUDE.md` sobre cache — colher os IDs antes do `UPDATE` e
+	 * chamar `clean_user_cache()` — é da **usermeta** e não se aplica aqui:
+	 * `delete_post_meta_by_key()` invalida o cache de post por conta própria.
+	 *
+	 * @return void
+	 */
+	public static function descartar_contagem_binaria_das_enquetes() {
+		delete_post_meta_by_key( '_reconectar_votos_favor' );
+		delete_post_meta_by_key( '_reconectar_votos_contra' );
 	}
 
 	/**

@@ -17,6 +17,7 @@ define( 'RECONECTAR_CORE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-proposta-votacao.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-transparencia.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-enquete-flutuante.php';
 
 // A faixa de aviso de dados de demonstração vive aqui, e não no tema, para
 // não depender de qual tema esteja ativo: o aviso precisa continuar de pé
@@ -81,6 +82,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamen
 function reconectar_core_init() {
 	Reconectar_Proposta_Votacao::init();
 	Reconectar_Painel_Transparencia::init();
+	Reconectar_Enquete_Flutuante::init();
 	Reconectar_Aviso_Demo::init();
 	// Antes de `Reconectar_Permissoes`: as duas se penduram em `init`, e a
 	// migração de dados roda em prioridade menor — ver o PHPDoc de
