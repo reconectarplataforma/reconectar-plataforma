@@ -14,6 +14,14 @@
  * cartão recolhido continua na tela como pílula, esperando um clique; o cartão
  * dispensado sai inteiro. Uma chave só faria o × equivaler ao `<summary>`, que é
  * justamente o que o usuário já tinha e pediu para complementar.
+ *
+ * **Não há botão de trazer o cartão de volta, e isso é deliberado.** Quem clicou
+ * no × disse "some"; devolvê-lo na mesma visita é o que a dispensa existe para
+ * evitar. O caminho até a enquete não se perde junto: o atalho "Enquetes" do
+ * cabeçalho e o item "Votar" da barra inferior seguem na tela, com o selo de
+ * pendência, e levam ao painel de transparência — onde moram a cédula completa e
+ * o gráfico, que o cartão nunca teve. O cartão volta sozinho em sessão nova ou
+ * quando uma enquete nova entra em cartaz, pela assinatura logo abaixo.
  */
 ( function () {
 	'use strict';
