@@ -6,13 +6,23 @@
  * O painel é o arquivo das enquetes — alcança também as encerradas — e desde
  * esta versão também vota, ao lado do componente flutuante.
  *
- * Aqui o voto acontece **com o placar à vista**, que é o oposto do que decidimos
- * no cartão flutuante, onde o percentual saiu justamente por convidar a trocar a
- * escolha para acompanhar a maioria. A diferença que sustenta a exceção: ali o
- * placar era um acréscimo ao ato de votar; aqui ele **é** o conteúdo da página.
- * Esconder o gráfico para poder oferecer o voto esvaziaria o painel de
- * transparência, que é público de propósito. Quem quer votar sem ver o resultado
- * tem o cartão flutuante, presente em todas as telas.
+ * **O gráfico só é público depois do encerramento.** Enquanto a enquete aceita
+ * voto, o leitor comum vê as alternativas e a cédula, nunca o placar: um parcial
+ * à vista no momento da escolha convida a acompanhar a maioria, e é a mesma
+ * razão pela qual o percentual já havia saído do cartão flutuante. Quem
+ * administra a enquete vê o parcial em tempo real, com o aviso de que aquele
+ * número ainda não é público.
+ *
+ * Uma versão anterior deste arquivo justificava o contrário — que aqui o placar
+ * **era** o conteúdo da página e por isso podia acompanhar o voto. A regra
+ * mudou por decisão do projeto, e o argumento antigo tem um furo que vale
+ * registrar para ninguém o refazer: o painel continua sendo o lugar do
+ * resultado, só que no tempo certo. Ele não fica vazio no meio disso — a
+ * participação aparece, e as enquetes encerradas seguem com o gráfico inteiro.
+ *
+ * O que decide é `Reconectar_Proposta_Votacao::pode_ver_resultado()`, num lugar
+ * só: o cartão flutuante e o painel precisam contar a mesma história, e um link
+ * que promete resultado onde não há se lê como defeito.
  *
  * O que ainda depende da definição participativa das regras da plataforma
  * (Atividade 2.10 do edital) é o voto anônimo e a regra de uma-vez-por-
@@ -66,7 +76,7 @@ class Reconectar_Painel_Transparencia {
 			'reconectar-transparencia',
 			RECONECTAR_CORE_URL . 'assets/css/transparencia.css',
 			array(),
-			'0.2.0'
+			'0.3.0'
 		);
 	}
 
@@ -151,6 +161,14 @@ class Reconectar_Painel_Transparencia {
 				 */
 				$votavel = Reconectar_Proposta_Votacao::pode_votar( $enquete->ID );
 				$ancora  = 'enquete-' . (int) $enquete->ID;
+
+				/*
+				 * Aberta, a enquete só mostra o placar a quem a administra. A regra
+				 * inteira mora no método — aqui fica apenas a pergunta, para que mudar o
+				 * critério não exija caçar condições espalhadas pelo template.
+				 */
+				$ver_resultado = Reconectar_Proposta_Votacao::pode_ver_resultado( $enquete->ID );
+				$parcial       = $ver_resultado && $aberta;
 				?>
 				<div class="col">
 					<article class="reconectar-proposta card h-100" id="<?php echo esc_attr( $ancora ); ?>">
@@ -247,9 +265,13 @@ class Reconectar_Painel_Transparencia {
 											 * Reordenar por votos poria a mais votada sempre no topo, e
 											 * aqui, com o radio ao lado, isso não seria só leitura
 											 * enviesada: seria a alternativa líder no caminho do clique.
+											 *
+											 * `$ver_resultado` guarda as duas saídas juntas, e não só a
+											 * barra: o texto "40,0% (2 votos)" é o mesmo dado, e esconder
+											 * o desenho deixando o número ao lado não esconderia nada.
 											 */
 											?>
-											<?php if ( $total > 0 ) : ?>
+											<?php if ( $ver_resultado && $total > 0 ) : ?>
 												<span class="rc-grafico-votos__valor reconectar-proposta__numero">
 													<?php
 													echo esc_html(
@@ -286,10 +308,35 @@ class Reconectar_Painel_Transparencia {
 									<?php endforeach; ?>
 								</ul>
 
-								<?php if ( $total < 1 ) : ?>
-									<p class="rc-grafico-votos__vazio reconectar-proposta__sem-votos">
-										<?php esc_html_e( 'Nenhum voto ainda.', 'reconectar-core' ); ?>
+								<?php
+								/*
+								 * O aviso de reserva existe para que a ausência do placar se leia
+								 * como regra e não como tela quebrada: o painel se chama
+								 * transparência, e sumir com o dado sem dizer por quê é o oposto
+								 * do nome.
+								 *
+								 * Ele **substitui** o "nenhum voto ainda" em vez de somar-se a
+								 * ele — com o resultado fechado, dizer que ninguém votou já seria
+								 * placar. O de parcial, ao contrário, convive: quem administra vê
+								 * o gráfico e precisa saber das duas coisas, que não é público e
+								 * que ainda está vazio.
+								 */
+								?>
+								<?php if ( ! $ver_resultado ) : ?>
+									<p class="rc-grafico-votos__reserva">
+										<?php esc_html_e( 'O resultado é publicado aqui quando a enquete encerrar. Até lá ele fica fechado, para que o voto de ninguém seja levado pelo de outro.', 'reconectar-core' ); ?>
 									</p>
+								<?php else : ?>
+									<?php if ( $total < 1 ) : ?>
+										<p class="rc-grafico-votos__vazio reconectar-proposta__sem-votos">
+											<?php esc_html_e( 'Nenhum voto ainda.', 'reconectar-core' ); ?>
+										</p>
+									<?php endif; ?>
+									<?php if ( $parcial ) : ?>
+										<p class="rc-grafico-votos__parcial">
+											<?php esc_html_e( 'Resultado parcial: enquanto a enquete estiver aberta, só quem a administra vê estes números.', 'reconectar-core' ); ?>
+										</p>
+									<?php endif; ?>
 								<?php endif; ?>
 
 								<?php if ( $votavel ) : ?>
@@ -331,6 +378,16 @@ class Reconectar_Painel_Transparencia {
 								<?php endif; ?>
 							<?php endif; ?>
 
+							<?php
+							/*
+							 * O total sobrevive à reserva do resultado de propósito, e a
+							 * distinção não é sutileza: ele conta **participação**, não
+							 * preferência. Saber que 40 pessoas já votaram não inclina ninguém a
+							 * uma alternativa — é o placar por alternativa que faz isso —, e é o
+							 * único sinal de vida que a enquete aberta dá a quem chega. Sem ele,
+							 * uma consulta movimentada e uma abandonada ficam idênticas na tela.
+							 */
+							?>
 							<p class="reconectar-proposta__placar">
 								<span class="reconectar-proposta__votos-total badge text-bg-secondary">
 									<?php

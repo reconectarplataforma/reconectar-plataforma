@@ -152,6 +152,37 @@
 }
 
 /*
+ * Os dois avisos sobre o placar. Ambos ganham faixa lateral em vez de fundo
+ * colorido: o cartão do painel já é branco sobre branco, e uma tarja cheia no
+ * meio dele competiria com o gráfico — que é o que o leitor veio ver quando o
+ * gráfico existe.
+ *
+ * `#595959` sobre branco mede 7,0:1. O `#717171` usado nos textos de apoio mede
+ * 4,86:1 e passaria, mas estes dois parágrafos são a explicação de uma ausência:
+ * quem não os ler conclui que a tela quebrou.
+ */
+.rc-grafico-votos__reserva,
+.rc-grafico-votos__parcial {
+	margin: 0.75rem 0 0;
+	padding: 0.5rem 0 0.5rem 0.75rem;
+	border-left: 3px solid var( --reconectar-cor-institucional, #663191 );
+	font-size: var( --rc-fonte-sm, 0.875rem );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: #595959;
+}
+
+/*
+ * O parcial usa o amarelo de destaque porque ele avisa de um estado passageiro
+ * e só aparece para quem administra — a cor distingue "informação para você" de
+ * "regra da plataforma", que é o que a faixa roxa diz. Amarelo aqui é a borda,
+ * nunca o texto: `#f1bf3d` sobre branco mede 1,7:1 e reprovaria o critério 1.4.3
+ * na hora.
+ */
+.rc-grafico-votos__parcial {
+	border-left-color: var( --reconectar-cor-destaque, #f1bf3d );
+}
+
+/*
  * Largura total e 44px de altura mínima — o alvo de toque do critério 2.5.5, o
  * mesmo piso já adotado no botão do cartão flutuante. Roxo institucional sobre
  * branco mede 9,6:1; o primário da marca mediria 2,30:1 e reprova o 1.4.3, como

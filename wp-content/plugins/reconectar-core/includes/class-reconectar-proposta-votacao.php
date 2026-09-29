@@ -349,6 +349,36 @@ class Reconectar_Proposta_Votacao {
 	}
 
 	/**
+	 * O placar desta enquete pode ser publicado para quem está lendo?
+	 *
+	 * **Enquanto a enquete está aberta, o resultado é privado.** Publicar o
+	 * parcial convida a acompanhar a maioria, e o painel de transparência é a
+	 * tela pública da plataforma — o mesmo motivo pelo qual o percentual já havia
+	 * saído do cartão flutuante. Encerrada, o placar é público para todo mundo:
+	 * publicá-lo é a razão de o painel existir.
+	 *
+	 * Quem administra a enquete vê o parcial em tempo real, porque ele precisa
+	 * acompanhar a consulta que conduz. Isso não abre brecha de indução: o
+	 * moderador vê o número **da enquete dele**, não de todas.
+	 *
+	 * A conferência é `edit_post` e não a capacidade crua: "o moderador daquela
+	 * enquete" é quem pode editá-la, e a meta cap já resolve papel, autoria e os
+	 * filtros de `Reconectar_Permissoes` — inclusive o que nega escrita ao
+	 * Administrador de empresas fora da allowlist de post types. Conferir
+	 * `CAP_GERIR_ENQUETES` direto responderia "sim" a quem o editor recusaria.
+	 *
+	 * @param int $enquete_id ID da enquete.
+	 * @return bool
+	 */
+	public static function pode_ver_resultado( $enquete_id ) {
+		if ( ! self::esta_aberta( $enquete_id ) ) {
+			return true;
+		}
+
+		return current_user_can( 'edit_post', (int) $enquete_id );
+	}
+
+	/**
 	 * As enquetes publicadas e abertas hoje, mais recente primeiro.
 	 *
 	 * A vigência é resolvida **em PHP**, de propósito. As duas rotas óbvias do

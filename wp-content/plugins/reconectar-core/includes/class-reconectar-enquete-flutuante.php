@@ -259,7 +259,10 @@ class Reconectar_Enquete_Flutuante {
 	 * clique errado, que num cartão de 343px no celular é acidente plausível.
 	 *
 	 * O resultado não desaparece do site — ele tem lugar próprio, o painel de
-	 * transparência, que é público de propósito e alcança também as encerradas.
+	 * transparência, onde é publicado no encerramento e fica para sempre. A
+	 * reserva enquanto a enquete corre nasceu aqui e passou a valer lá também:
+	 * esconder o percentual no cartão e publicá-lo na página seguinte não era
+	 * proteção nenhuma, era um clique a mais.
 	 *
 	 * O total agregado fica: ele diz quantas pessoas participaram, não quem está
 	 * ganhando, e não favorece alternativa nenhuma.
@@ -340,7 +343,7 @@ class Reconectar_Enquete_Flutuante {
 				)
 			);
 
-			self::imprimir_link_do_painel();
+			self::imprimir_link_do_painel( $enquete->ID );
 		}
 
 		echo '</form>';
@@ -349,16 +352,29 @@ class Reconectar_Enquete_Flutuante {
 	/**
 	 * Imprime o caminho para o resultado, que saiu do cartão.
 	 *
-	 * Tirar o percentual daqui só se sustenta porque o número continua público em
-	 * outro lugar; sem este link, a remoção viraria supressão do dado.
+	 * O rótulo depende de quem lê. O cartão só existe para enquete **aberta**, e
+	 * com o placar reservado até o encerramento o link antigo — "Ver o resultado
+	 * no painel de transparência" — prometia ao leitor comum uma tela que não
+	 * mostraria resultado nenhum. Promessa que a página seguinte desmente se lê
+	 * como defeito, e o painel se chama transparência.
+	 *
+	 * Por isso o texto passa a dizer **quando** o número sai, e o link continua:
+	 * ele leva à enquete inteira, com as alternativas, a janela e as encerradas ao
+	 * lado. Quem administra a enquete vê o parcial lá e recebe o rótulo direto.
+	 *
+	 * Quem decide é `Reconectar_Proposta_Votacao::pode_ver_resultado()`, a mesma
+	 * chamada que o painel usa — o cartão e o painel têm de contar a mesma
+	 * história, e duplicar a regra aqui abriria espaço para uma divergir da outra
+	 * na próxima mudança.
 	 *
 	 * A URL pode vir vazia — o painel é uma página do WordPress, e página se
 	 * despublica. Nesse caso nada é impresso, em vez de um link que levaria ao 404
 	 * de quem não está logado enquanto o editor, que está, vê tudo certo.
 	 *
+	 * @param int $enquete_id ID da enquete.
 	 * @return void
 	 */
-	private static function imprimir_link_do_painel() {
+	private static function imprimir_link_do_painel( $enquete_id ) {
 		/*
 		 * Na própria página do painel o link levaria de volta para ela, e o cartão
 		 * já cobre parte do gráfico que o leitor veio ver — convidá-lo a ir aonde
@@ -374,10 +390,14 @@ class Reconectar_Enquete_Flutuante {
 			return;
 		}
 
+		$rotulo = Reconectar_Proposta_Votacao::pode_ver_resultado( $enquete_id )
+			? __( 'Ver o resultado no painel de transparência', 'reconectar-core' )
+			: __( 'O resultado sai no painel de transparência quando a enquete encerrar', 'reconectar-core' );
+
 		printf(
 			'<p class="rc-enquete__resultado"><a class="rc-enquete__link" href="%s">%s</a></p>',
 			esc_url( $url ),
-			esc_html__( 'Ver o resultado no painel de transparência', 'reconectar-core' )
+			esc_html( $rotulo )
 		);
 	}
 
