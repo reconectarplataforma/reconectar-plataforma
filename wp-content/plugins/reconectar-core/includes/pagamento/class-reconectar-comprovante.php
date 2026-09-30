@@ -133,6 +133,15 @@ class Reconectar_Comprovante {
 		add_action( 'dokan_order_listing_row_before_action_field', array( __CLASS__, 'coluna_celula' ) );
 		add_action( 'dokan_order_content_inside_after', array( __CLASS__, 'formularios_de_confirmacao' ) );
 
+		// Interface nova do painel (`vendor_layout_style = latest`): a lista de
+		// pedidos é React e lê `/dokan/v1/orders`, então nenhum dos ganchos de
+		// template acima dispara nela. O dado chega pela API e a coluna, pelo
+		// script; o detalhe do pedido continua sendo template PHP nas duas
+		// interfaces, e o painel dele serve às duas.
+		add_filter( 'dokan_rest_prepare_shop_order_object', array( __CLASS__, 'dados_na_api_do_painel' ), 10, 2 );
+		add_action( 'dokan_order_detail_after_order_general_details', array( __CLASS__, 'painel_no_detalhe' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'carregar_script_do_painel' ), 20 );
+
 		add_filter( 'posts_clauses', array( __CLASS__, 'priorizar_conferencia' ), 10, 2 );
 	}
 
@@ -507,9 +516,16 @@ class Reconectar_Comprovante {
 		$nome = ! empty( $dados['nome'] ) ? $dados['nome'] : basename( $caminho );
 		$mime = ! empty( $dados['mime'] ) ? $dados['mime'] : 'application/octet-stream';
 
+		// `inline` porque o pedido é **ver** o comprovante: PDF, JPG e PNG — a
+		// lista fechada de `mimes()`, conferida pelo conteúdo no envio — abrem
+		// no próprio navegador, e o botão de salvar dele continua ali. Com
+		// `attachment` a loja baixava um arquivo por pedido só para conferir um
+		// valor, e a pasta de downloads virava arquivo de dado bancário alheio.
+		$disposicao = in_array( $mime, array_values( self::mimes() ), true ) ? 'inline' : 'attachment';
+
 		nocache_headers();
 		header( 'Content-Type: ' . $mime );
-		header( 'Content-Disposition: attachment; filename="' . rawurlencode( $nome ) . '"' );
+		header( 'Content-Disposition: ' . $disposicao . '; filename="' . rawurlencode( $nome ) . '"' );
 		header( 'Content-Length: ' . filesize( $caminho ) );
 		// `X-Content-Type-Options` porque o arquivo é conteúdo de terceiro: sem
 		// ele um navegador antigo pode adivinhar o tipo e interpretar como HTML
@@ -935,12 +951,7 @@ class Reconectar_Comprovante {
 			return;
 		}
 
-		$meios = array(
-			Reconectar_Pagamento_Direto::GATEWAY_PIX,
-			Reconectar_Pagamento_Direto::GATEWAY_TRANSFERENCIA,
-		);
-
-		if ( ! in_array( $pedido->get_payment_method(), $meios, true ) ) {
+		if ( ! self::aplica( $pedido ) ) {
 			printf(
 				'<span class="rc-comprovante-coluna__vazio" aria-hidden="true">&mdash;</span><span class="screen-reader-text">%s</span>',
 				esc_html__( 'Não se aplica a este meio de pagamento.', 'reconectar-core' )
@@ -1032,6 +1043,203 @@ class Reconectar_Comprovante {
 	 */
 	private static function id_do_formulario( $pedido_id ) {
 		return 'rc-confirmar-' . (int) $pedido_id;
+	}
+
+	/**
+	 * Diz se o sub-pedido foi pago por um meio que passa por comprovante.
+	 *
+	 * Um pedido pago por outro meio nunca passou por este módulo, e dizer "Não
+	 * enviado" nele seria cobrar da loja um documento que ninguém pediu ao
+	 * comprador. É a guarda que impede a coluna e o painel de mentir.
+	 *
+	 * @param WC_Order $pedido Sub-pedido da loja.
+	 * @return bool
+	 */
+	private static function aplica( $pedido ) {
+		$meios = array(
+			Reconectar_Pagamento_Direto::GATEWAY_PIX,
+			Reconectar_Pagamento_Direto::GATEWAY_TRANSFERENCIA,
+		);
+
+		return $pedido instanceof WC_Order && in_array( $pedido->get_payment_method(), $meios, true );
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Interface nova do painel da loja
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Diz se a requisição é uma tela do painel da loja, em qualquer interface.
+	 *
+	 * Mais largo que `esta_na_lista_de_pedidos()` de propósito: na interface
+	 * nova a lista é uma rota React, e a query var `orders` não é a única
+	 * porta para ela.
+	 *
+	 * @return bool
+	 */
+	public static function esta_no_painel_da_loja() {
+		return function_exists( 'dokan_is_seller_dashboard' ) && dokan_is_seller_dashboard();
+	}
+
+	/**
+	 * Acrescenta o estado do comprovante a cada pedido de `/dokan/v1/orders`.
+	 *
+	 * É daqui que a coluna da lista React lê. A guarda é a mesma de `baixar()`
+	 * — `loja_pode()` —, não a permissão do endpoint: a URL levada na resposta
+	 * já vem com nonce, e ela só deve existir para quem a rota de download vai
+	 * atender. Quem não passa recebe a resposta do Dokan intacta, sem a chave.
+	 *
+	 * A URL sai com o nonce do usuário da requisição REST, que é o mesmo da
+	 * sessão do navegador (cookie mais `X-WP-Nonce`), então vale no clique.
+	 *
+	 * @param WP_REST_Response $resposta Resposta já montada pelo Dokan.
+	 * @param WC_Order         $pedido   Sub-pedido da linha.
+	 * @return WP_REST_Response
+	 */
+	public static function dados_na_api_do_painel( $resposta, $pedido ) {
+		if ( ! $resposta instanceof WP_REST_Response || ! $pedido instanceof WC_Order || ! self::loja_pode( $pedido ) ) {
+			return $resposta;
+		}
+
+		$dados       = $resposta->get_data();
+		$comprovante = self::comprovante( $pedido );
+		$enviado     = ! empty( $comprovante['arquivo'] );
+
+		// Só o que a coluna consome. O nome original do arquivo fica de fora:
+		// a lista não o mostra, e a resposta desta rota vai inteira para o
+		// navegador a cada página da lista.
+		$dados['rc_comprovante'] = array(
+			'aplica'  => self::aplica( $pedido ),
+			'enviado' => $enviado,
+			// `wp_nonce_url()` devolve a URL já passada por `esc_html()`, com
+			// `&amp;` entre os argumentos. Num atributo HTML o navegador desfaz
+			// a entidade; em JSON ela chega literal ao `href`, o nonce vira o
+			// argumento `amp;_wpnonce`, e o clique cai na recusa genérica de
+			// link expirado.
+			'url'     => $enviado ? html_entity_decode( self::url_de_download( $pedido ), ENT_QUOTES, 'UTF-8' ) : '',
+		);
+
+		$resposta->set_data( $dados );
+
+		return $resposta;
+	}
+
+	/**
+	 * Carrega o script que põe a coluna e a ação na lista React de pedidos.
+	 *
+	 * Sem build: o arquivo usa `wp.element` e `wp.hooks` globais, as mesmas
+	 * instâncias que o Dokan usa — e é por isso que as duas entram como
+	 * dependência, e não um pacote próprio: um `@wordpress/hooks` empacotado à
+	 * parte teria outro registro de filtros, e a tabela nunca os veria.
+	 *
+	 * @return void
+	 */
+	public static function carregar_script_do_painel() {
+		if ( ! self::esta_no_painel_da_loja() ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'reconectar-comprovante-painel',
+			RECONECTAR_CORE_URL . 'assets/js/comprovante-painel.js',
+			array( 'wp-hooks', 'wp-element' ),
+			'0.1.0',
+			true
+		);
+		wp_localize_script(
+			'reconectar-comprovante-painel',
+			'reconectarComprovantePainel',
+			array(
+				'titulo'       => __( 'Comprovante', 'reconectar-core' ),
+				'ver'          => __( 'Ver', 'reconectar-core' ),
+				'verAcao'      => __( 'Ver comprovante', 'reconectar-core' ),
+				/* translators: %s: número do pedido. */
+				'verLeitor'    => __( 'o comprovante do pedido %s (abre em nova aba)', 'reconectar-core' ),
+				'naoEnviado'   => __( 'Não enviado', 'reconectar-core' ),
+				'naoAplica'    => __( 'Não se aplica a este meio de pagamento.', 'reconectar-core' ),
+			)
+		);
+	}
+
+	/**
+	 * Imprime o painel do comprovante no detalhe do pedido do painel da loja.
+	 *
+	 * O detalhe é `orders/details.php` nas duas interfaces do Dokan, e é a
+	 * única tela da interface nova em que a loja pode **confirmar** o
+	 * recebimento: a lista React não tem onde pendurar o botão que a coluna
+	 * antiga tinha. O `<form>` sai direto aqui porque o gancho fica entre os
+	 * painéis, fora dos três formulários do template (status, nota e
+	 * rastreio) — não há aninhamento a contornar, ao contrário da lista.
+	 *
+	 * O `id` do painel é a âncora de `voltar()`, que devolve a loja a este
+	 * ponto da página depois de confirmar, com o aviso logo acima do botão.
+	 *
+	 * @param WC_Order $pedido Sub-pedido aberto.
+	 * @return void
+	 */
+	public static function painel_no_detalhe( $pedido ) {
+		if ( ! $pedido instanceof WC_Order || ! self::aplica( $pedido ) || ! self::loja_pode( $pedido ) ) {
+			return;
+		}
+
+		$comprovante = self::comprovante( $pedido );
+		?>
+		<div class="rc-comprovante-detalhe" style="width:100%">
+			<div class="dokan-panel dokan-panel-default" id="<?php echo esc_attr( self::ancora( $pedido->get_id() ) ); ?>">
+				<div class="dokan-panel-heading"><strong><?php esc_html_e( 'Comprovante de pagamento', 'reconectar-core' ); ?></strong></div>
+				<div class="dokan-panel-body rc-comprovante-coluna">
+					<?php
+					self::imprimir_aviso();
+
+					if ( empty( $comprovante['arquivo'] ) ) {
+						printf(
+							'<p class="rc-comprovante-coluna__pendente">%s</p>',
+							esc_html__( 'O comprador ainda não enviou o comprovante deste pagamento.', 'reconectar-core' )
+						);
+					} else {
+						$quando = ! empty( $comprovante['enviado_em'] )
+							? mysql2date( get_option( 'date_format' ) . ' \à\s ' . get_option( 'time_format' ), $comprovante['enviado_em'] )
+							: '';
+
+						printf(
+							'<p><a class="rc-comprovante-coluna__link" href="%1$s" target="_blank" rel="noopener">%2$s<span class="screen-reader-text"> %3$s</span></a>%4$s</p>',
+							esc_url( self::url_de_download( $pedido ) ),
+							esc_html( ! empty( $comprovante['nome'] ) ? $comprovante['nome'] : __( 'Ver comprovante', 'reconectar-core' ) ),
+							esc_html__( '(abre em nova aba)', 'reconectar-core' ),
+							'' !== $quando
+								? ' <span class="rc-comprovante-coluna__pendente">' . esc_html(
+									sprintf(
+										/* translators: %s: data e hora do envio. */
+										__( 'enviado em %s', 'reconectar-core' ),
+										$quando
+									)
+								) . '</span>'
+								: ''
+						);
+					}
+
+					if ( self::confirmado( $pedido ) ) {
+						printf(
+							'<p>%s</p>',
+							esc_html__( 'Pagamento confirmado.', 'reconectar-core' )
+						);
+					} elseif ( ! empty( $comprovante['arquivo'] ) ) {
+						?>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="<?php echo esc_attr( self::ACAO_CONFIRMAR ); ?>">
+							<input type="hidden" name="pedido" value="<?php echo esc_attr( $pedido->get_id() ); ?>">
+							<?php wp_nonce_field( self::ACAO_CONFIRMAR . '_' . $pedido->get_id() ); ?>
+							<button class="rc-comprovante-coluna__confirmar" type="submit">
+								<?php esc_html_e( 'Confirmar pagamento recebido', 'reconectar-core' ); ?>
+							</button>
+						</form>
+						<?php
+					}
+					?>
+				</div>
+			</div>
+		</div>
+		<?php
 	}
 
 	/**

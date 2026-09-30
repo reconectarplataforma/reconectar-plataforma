@@ -116,7 +116,9 @@ class Reconectar_Pagamento_Direto {
 		// A lista de pedidos do painel da loja consome o mesmo arquivo: a coluna
 		// de comprovante é `.rc-comprovante-coluna`, irmã dos blocos do
 		// comprador, e separar em dois CSS duplicaria os tokens `--rc-pg-*`.
-		$no_painel = class_exists( 'Reconectar_Comprovante' ) && Reconectar_Comprovante::esta_na_lista_de_pedidos();
+		// O teste é o painel inteiro, não só a query var `orders`: na interface
+		// nova a lista é rota React, e a coluna dela sairia sem estilo.
+		$no_painel = class_exists( 'Reconectar_Comprovante' ) && Reconectar_Comprovante::esta_no_painel_da_loja();
 
 		if ( ! is_checkout() && ! is_wc_endpoint_url( 'view-order' ) && ! $no_painel ) {
 			return;

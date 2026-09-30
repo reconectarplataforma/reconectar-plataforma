@@ -401,3 +401,15 @@
 .rc-comprovante-coluna__form {
 	display: none;
 }
+
+/* No detalhe do pedido o botão tem a largura do texto: a coluna estreita que o
+   esticava a 100% não existe ali, e um botão da largura do painel lê como
+   barra, não como ação. */
+.rc-comprovante-detalhe .rc-comprovante-coluna__confirmar {
+	display: inline-block;
+	width: auto;
+}
+
+.rc-comprovante-detalhe .rc-comprovante-coluna__link {
+	display: inline;
+}
