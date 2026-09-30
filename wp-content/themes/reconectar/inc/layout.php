@@ -315,3 +315,37 @@ function reconectar_renomear_vendedor_no_carrinho( $dados_do_item ) {
 	return $dados_do_item;
 }
 add_filter( 'woocommerce_get_item_data', 'reconectar_renomear_vendedor_no_carrinho', 11 );
+
+/**
+ * Tira do conteúdo o link "Editar" que o tema pai imprime a quem pode editar.
+ *
+ * `edit_post_link()` sai no fim do `.entry-content` de todo template que o
+ * Storefront usa para conteúdo único. Medido com uma requisição autenticada como
+ * Super Administrador, ele aparece na página institucional, no tópico do fórum e
+ * no produto — três telas em que o botão fica **dentro** do texto que o visitante
+ * lê, misturando ferramenta de edição com conteúdo publicado. A edição continua
+ * onde sempre esteve: no `/wp-admin` e no item "Editar" da barra superior, que
+ * este filtro não toca.
+ *
+ * Não é `remove_action`: o Storefront chama a função direto no template, sem
+ * gancho, então não há o que remover — e sobrescrever `content-page.php`,
+ * `content-single.php` e o template de produto no tema filho criaria três cópias
+ * de arquivo de terceiro para apagar uma linha em cada.
+ *
+ * O filtro alcança a âncora, não o invólucro: `edit_post_link()` faz
+ * `echo $before . apply_filters( 'edit_post_link', … ) . $after`, de modo que o
+ * `<div class="edit-link">` sobrevive vazio no DOM. Quem o esconde é
+ * `.edit-link:empty` em `marketplace.css`, e o comentário de lá registra por que
+ * a alternativa — filtrar `get_edit_post_link`, que faria a função desistir antes
+ * do `$before` — foi descartada.
+ *
+ * A guarda de `is_admin()` é literal ao que se pediu: fora do painel, nada; no
+ * painel, o que o WordPress montou.
+ *
+ * @param string $link Âncora que o WordPress montou para editar o post.
+ * @return string String vazia no front-end; o link original no painel.
+ */
+function reconectar_remover_link_de_edicao_no_conteudo( $link ) {
+	return is_admin() ? $link : '';
+}
+add_filter( 'edit_post_link', 'reconectar_remover_link_de_edicao_no_conteudo' );
