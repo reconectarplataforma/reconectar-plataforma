@@ -91,6 +91,43 @@
 	overflow-wrap: anywhere;
 }
 
+/* A `<figure>` do navegador nasce com `margin: 1em 40px`, e aqueles 40px saem do
+   lado de dentro do cartão da loja — o QR apareceria recuado em relação a todo o
+   resto do bloco. */
+.rc-pagamento__qr {
+	margin: 0 0 1rem;
+}
+
+/* O `<svg>` sai sem `width` nem `height` de propósito: só `viewBox`, para que a
+   medida seja decidida aqui. O preço é que ele fica sem dimensão intrínseca —
+   com razão de aspecto, mas sem tamanho —, e o navegador é livre para lhe dar os
+   300×150 do elemento substituído padrão. Daí a medida explícita.
+
+   `max-width` vai ao lado de `width` pela armadilha registrada no CLAUDE.md:
+   teto herdado de tema ou plugin não disputa cascata com a largura que a gente
+   escreve, então quem só declara `width` pode ter a regra aplicada e a tela
+   igual. E a borda delimita a zona de silêncio, que é branca e está **dentro**
+   do `viewBox` — sem ela o QR parece ter uma sobra de espaço inexplicada. */
+.rc-pagamento__qr-imagem {
+	display: block;
+	width: 12.5rem;
+	max-width: 100%;
+	height: auto;
+	background: #fff;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 6px;
+}
+
+.rc-pagamento__qr-legenda {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: var( --rc-pg-texto-suave );
+	/* A legenda é frase, não rótulo: a medida curta existe para ela não esticar
+	   até a borda do cartão numa tela larga. */
+	max-width: 24rem;
+	margin: 0.5rem 0 0;
+}
+
 .rc-pagamento__codigo {
 	display: block;
 	font-size: var( --rc-pg-fonte-xs );
@@ -133,13 +170,20 @@
 	min-height: 1.4em;
 }
 
-/* #CF6442 sobre branco mede 4,51:1— passa raspando no 4,5:1 do critério 1.4.3,
-   e é por isso que o alerta não usa nenhum tom mais claro que ele. */
-.rc-pagamento__alerta,
-.rc-pagamento__diferenca {
-	font-size: var( --rc-pg-fonte-sm );
+/* #CF6442 sobre branco mede 4,51:1 — passa raspando no 4,5:1 do critério 1.4.3,
+   e é por isso que o alerta não usa nenhum tom mais claro que ele.
+
+   Este é o único seletor do arquivo que não pode depender dos tokens `--rc-pg-*`:
+   `payment_fields()` imprime o alerta **irmão** do bloco, dentro da `.payment_box`
+   do WooCommerce, onde não existe ancestral `.rc-pagamento` para declará-los. Uma
+   custom property indefinida em `color` invalida a declaração, e o aviso sairia na
+   cor herdada do corpo — parágrafo comum no lugar de alerta, numa tela de
+   pagamento. Os literais valem nos dois lugares; o alerta de `imprimir_instrucao()`
+   sai dentro do bloco e não perde nada com eles. */
+.rc-pagamento__alerta {
+	font-size: var( --rc-fonte-sm, 0.875rem );
 	line-height: var( --rc-entrelinha-compacta, 1.4 );
-	color: var( --rc-pg-secundaria );
+	color: var( --reconectar-cor-secundaria, #CF6442 );
 	margin: 0.5rem 0 0;
 }
 
@@ -156,4 +200,204 @@
 	.rc-pagamento__copiar {
 		width: 100%;
 	}
+}
+
+/* ==========================================================================
+   Comprovante — o lado do comprador
+
+   O bloco mora dentro de `.rc-pagamento__loja`, portanto herda os tokens
+   `--rc-pg-*` declarados lá em cima. A linha pontilhada no topo é o que separa
+   "como pagar" de "já paguei": são dois assuntos no mesmo cartão, e sem a
+   divisa o formulário parece continuação da instrução.
+   ========================================================================== */
+
+.rc-comprovante {
+	border-top: 1px dashed var( --rc-pg-borda );
+	padding-top: 1rem;
+	margin-top: 1rem;
+}
+
+.rc-comprovante__titulo {
+	font-size: var( --rc-pg-fonte-base );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.5rem;
+}
+
+.rc-comprovante__aviso {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	border-radius: 6px;
+	padding: 0.6rem 0.75rem;
+	margin: 0 0 0.75rem;
+}
+
+/* Verde e vermelho não podem ser o **único** canal da distinção — critério 1.4.1
+   da WCAG 2.1. Quem separa os dois avisos é o texto, que diz o que aconteceu; a
+   cor só reforça. Os dois tons foram escolhidos para passar de 4,5:1 sobre o
+   próprio fundo, que é por isso que nenhum deles é o tom de marca. */
+.rc-comprovante__aviso--ok {
+	background: #eef8f2;
+	color: #1d6b42;
+}
+
+.rc-comprovante__aviso--erro {
+	background: #fbeeea;
+	color: #9c3a1e;
+}
+
+.rc-comprovante__enviado {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.75rem;
+}
+
+/* O nome original do arquivo vem do comprador e pode não ter espaço nenhum —
+   `comprovante-pix-20260930-120000.pdf` estoura a coluna no celular sem isto. */
+.rc-comprovante__arquivo {
+	overflow-wrap: anywhere;
+}
+
+.rc-comprovante__data,
+.rc-comprovante__apoio {
+	font-size: var( --rc-pg-fonte-xs );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-comprovante__apoio {
+	margin: 0.4rem 0 0;
+}
+
+.rc-comprovante__rotulo {
+	display: block;
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.35rem;
+}
+
+/* O Storefront veste campo de formulário por seletor de atributo — (0,1,1), que
+   vence uma classe sozinha. `input[type="file"]` não está naquela lista, mas a
+   classe repetida custa nada e é o que impede a próxima versão do tema de
+   alcançar este campo. */
+.rc-comprovante__arquivo-campo.rc-comprovante__arquivo-campo {
+	display: block;
+	width: 100%;
+	max-width: 24rem;
+	font: inherit;
+	font-size: var( --rc-pg-fonte-sm );
+	background: #fff;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 6px;
+	padding: 0.5rem;
+}
+
+.rc-comprovante__arquivo-campo:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+.rc-comprovante__botao {
+	font: inherit;
+	font-size: var( --rc-pg-fonte-sm );
+	background: var( --rc-pg-primaria );
+	/* #31BEB1 mede 2,30:1 com branco — ver `.rc-pagamento__copiar`. */
+	color: #1a1a1a;
+	border: 0;
+	border-radius: 6px;
+	padding: 0.6rem 1.1rem;
+	margin-top: 0.75rem;
+	cursor: pointer;
+}
+
+.rc-comprovante__botao:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Comprovantes — a coluna na lista de pedidos do painel da loja
+
+   A célula é filha de uma tabela de terceiro, e é isso que torna este bloco
+   pequeno: largura, borda, padding e o empilhamento no celular vêm do
+   `dokan-table`, que já trata `data-title` por `::before` — medido, todas as
+   células do Dokan trazem esse atributo, e a nossa segue a convenção. Escrever
+   aqui o que ele já faz duplicaria a regra e a faria brigar por cascata.
+
+   Os tokens `--rc-pg-*` precisam ser declarados de novo: a célula mora fora de
+   qualquer `.rc-pagamento`, e custom property indefinida em `font-size`
+   invalida a declaração — o texto sairia no tamanho herdado do Dokan. É a mesma
+   lição de `.rc-pagamento__alerta`.
+   ========================================================================== */
+
+.rc-comprovante-coluna {
+	--rc-pg-primaria: var( --reconectar-cor-primaria, #31BEB1 );
+	--rc-pg-texto-suave: #717171;
+
+	--rc-pg-fonte-xs: var( --rc-fonte-xs, 0.8125rem );
+	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+
+	box-sizing: border-box;
+}
+
+.rc-comprovante-coluna *,
+.rc-comprovante-coluna *::before,
+.rc-comprovante-coluna *::after {
+	box-sizing: inherit;
+}
+
+/* O link e o botão empilham porque a coluna é estreita — a tabela tem nove
+   colunas —, e lado a lado o botão seria o primeiro a ser comprimido. */
+.rc-comprovante-coluna__link,
+.rc-comprovante-coluna__confirmar {
+	display: block;
+}
+
+.rc-comprovante-coluna__link {
+	font-size: var( --rc-pg-fonte-sm );
+	overflow-wrap: anywhere;
+	margin-bottom: 0.4rem;
+}
+
+/* "Não enviado" é ausência de dado, não dado — a cor suave é o que impede que
+   seja lido como valor preenchido. O itálico não substitui a cor: é o segundo
+   canal, para quem não distingue os tons. */
+.rc-comprovante-coluna__pendente {
+	font-size: var( --rc-pg-fonte-xs );
+	font-style: italic;
+	color: var( --rc-pg-texto-suave );
+}
+
+/* O traço é decorativo e sai do fluxo de leitura por `aria-hidden`; quem
+   precisa da informação recebe o `.screen-reader-text` ao lado. */
+.rc-comprovante-coluna__vazio {
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-comprovante-coluna__confirmar {
+	font: inherit;
+	font-size: var( --rc-pg-fonte-xs );
+	background: var( --rc-pg-primaria );
+	/* Ver `.rc-pagamento__copiar`: sobre a primária o texto é escuro. */
+	color: #1a1a1a;
+	border: 0;
+	border-radius: 6px;
+	/* O padding vertical é o que leva o alvo aos 44px do critério 2.5.5 da WCAG
+	   2.1 sem depender de `height`, que a tabela poderia esticar. */
+	padding: 0.55rem 0.7rem;
+	cursor: pointer;
+	white-space: nowrap;
+	width: 100%;
+}
+
+.rc-comprovante-coluna__confirmar:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+/* Os formulários dos botões saem depois da tabela, fora do `<form>` de ações em
+   massa do Dokan — ver `Reconectar_Comprovante::$confirmacoes_pendentes`. Só
+   carregam campos ocultos, então `display: none` não esconde nada de ninguém e
+   evita que o navegador reserve a linha de cada um. */
+.rc-comprovante-coluna__form {
+	display: none;
 }

@@ -37,8 +37,10 @@ class Reconectar_Migracoes {
 	 * 1 — renomeia `_reconectar_vendedor_ativo` para `_reconectar_loja_ativa`.
 	 * 2 — promove Moderadores e Administradores a `bbp_moderator` no fórum.
 	 * 3 — apaga as metas de contagem favor/contra das enquetes.
+	 * 4 — reescreve as regras de permalink pela aba de comprovantes do painel.
+	 * 5 — reescreve as regras outra vez, pela remoção daquela aba.
 	 */
-	const VERSAO = 3;
+	const VERSAO = 5;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -80,8 +82,38 @@ class Reconectar_Migracoes {
 		self::renomear_meta_de_loja_ativa();
 		self::promover_moderadores_no_forum();
 		self::descartar_contagem_binaria_das_enquetes();
+		self::reescrever_permalinks();
 
 		update_option( self::OPCAO_VERSAO, self::VERSAO );
+	}
+
+	/**
+	 * Reescreve as regras de permalink, uma vez.
+	 *
+	 * Query var do painel do Dokan — criada ou removida — só passa a valer depois
+	 * de um flush. Numa instalação recém-provisionada o `provision.sh` faz isso;
+	 * numa que já está de pé, ninguém faz, e o sintoma é mudo nas duas direções:
+	 * ao criar, o item aparece no menu lateral, o link existe e a tela responde
+	 * 404 sem uma linha no log; ao remover, a regra segue gravada apontando para
+	 * um template que não existe mais.
+	 *
+	 * O passo se repete por isso: a versão 4 acompanhou a criação da aba de
+	 * comprovantes, a 5 acompanha a remoção dela em favor de uma coluna na lista
+	 * de pedidos.
+	 *
+	 * `flush_rewrite_rules()` é caro e por isso mora aqui, no mecanismo que roda
+	 * uma vez por instalação, e não num gancho de carga de página.
+	 *
+	 * **O flush não acontece aqui dentro.** As migrações rodam em `init`
+	 * prioridade 5, e nessa altura nem o Dokan nem o bbPress registraram as
+	 * regras deles — regenerar agora gravaria um conjunto sem o painel da loja e
+	 * sem o fórum, derrubando as duas áreas de uma vez. `wp_loaded` é o primeiro
+	 * gancho em que todo `init` já passou.
+	 *
+	 * @return void
+	 */
+	private static function reescrever_permalinks() {
+		add_action( 'wp_loaded', 'flush_rewrite_rules' );
 	}
 
 	/**

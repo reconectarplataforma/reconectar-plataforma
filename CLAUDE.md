@@ -187,6 +187,234 @@ impossível. A divisão em sub-pedidos do Dokan não entra nessa conta — ele p
 e olhar só para `woocommerce_store_api_checkout_update_order_meta`, que está
 vazio, leva à conclusão errada.
 
+### Meta de sub-pedido do Dokan exige prioridade ≥ 30 na gravação
+
+O Dokan divide o pedido em `woocommerce_checkout_update_order_meta`, e o mapa
+medido daquele gancho é:
+
+```
+[10] Dokan\Order\Hooks::split_vendor_orders
+[20] dokan_sync_insert_order
+```
+
+Na 10 os sub-pedidos **ainda não existem**; na 20 as tabelas paralelas do Dokan
+ainda não foram preenchidas. Um `add_action` no padrão — sem terceiro argumento,
+portanto prioridade 10 — roda antes dos dois e não tem o que atualizar. O sintoma
+não é erro: é `_payment_method` ficando com o valor do pai em todos os filhos, e
+a tela de agradecimento imprimindo o mesmo meio para lojas que escolheram meios
+diferentes — um número plausível numa tela de pagamento.
+`Reconectar_Pagamento_Direto::gravar_meios_no_pedido()` vai na **30**.
+
+### `WC_AJAX::update_order_review()` grava `chosen_payment_method` antes do `do_action`
+
+A ordem, medida: o método lê `payment_method` do POST e grava em
+`WC()->session->set( 'chosen_payment_method', … )` **antes** de disparar
+`woocommerce_checkout_update_order_review`. Um callback pendurado ali que tente
+corrigir aquela chave da sessão escreve depois — e perde, porque o fragmento de
+pagamento já foi montado com o valor anterior.
+
+O `set` daquele callback só tem efeito no carregamento **por GET** da página, o
+que torna o defeito seletivo: recarregar mostra o certo, trocar o meio mostra o
+errado, e a investigação vai para o JavaScript, que está correto. Quem impõe o
+gateway na submissão de verdade é `impor_meio_representativo()` em
+`woocommerce_checkout_posted_data`, que roda em `get_posted_data()`, antes de
+`validate_checkout()`.
+
+### `order` no CSS inverte a pintura, não o foco
+
+Trocar a ordem visual de dois blocos com `order` numa grade ou num flex deixa a
+ordem de **tabulação** e a de leitura do leitor de tela como estavam no DOM. Para
+dois cartões pequenos isso é tolerável; para os dois blocos do checkout — o
+pedido inteiro e os dados de cobrança — significa tabular por trinta campos na
+ordem contrária à que se lê, o que reprova o critério 2.4.3 da WCAG 2.1.
+
+A inversão pedida no checkout foi feita movendo o gancho: `reconectar_checkout_pedido()`
+saiu de `woocommerce_checkout_order_review` para
+`woocommerce_checkout_before_customer_details`. O fragmento continua funcionando
+— o seletor `.rc-checkout__pedido` não depende de posição.
+
+### O gancho `wp` não alcança `?wc-ajax=`
+
+`?wc-ajax=` entra por um caminho curto do WooCommerce, sem `wp`, sem
+`template_redirect` e sem `wp_loaded` completo. Um `remove_action` escrito em
+`wp` — a escolha natural, porque cobre o carregamento da página — **não roda** na
+requisição AJAX, e o fragmento volta a trazer o que o carregamento inicial havia
+removido.
+
+O sintoma chega depois e é mudo: a tela nasce correta e ganha a cópia indevida no
+primeiro recálculo — trocar meio de pagamento, aplicar cupom, sair do CEP. Quem
+investigar o carregamento não encontra nada.
+
+O WooCommerce oferece **duas** rotas para a mesma ação, e as duas precisam do
+gancho: `wc_ajax_<ação>` e `wp_ajax_woocommerce_<ação>` / `wp_ajax_nopriv_…`. Veja
+`reconectar_checkout_tirar_privacidade()`.
+
+### `class_exists` numa guarda `||` curto-circuita antes do autoload
+
+`if ( ! class_exists( 'Foo' ) || ! Foo::bar() )` parece defensivo e é o oposto:
+com a classe ainda não carregada, o primeiro termo é verdadeiro, o segundo
+**nunca roda**, e a função devolve o recuo — lista vazia, meio nenhum — sem que
+nada tenha falhado. Como a chamada que dispararia o autoload está no termo
+curto-circuitado, a classe segue não carregada para sempre naquela requisição.
+
+O sintoma é a tela sair correta em alguns carregamentos e vazia em outros,
+conforme a ordem em que outro código tiver carregado a classe antes.
+
+### `wc_cart_totals_subtotal_html()` já devolve o subtotal **promocional**
+
+Com produto em promoção no carrinho, a função imprime a soma dos preços
+**vigentes**, não a dos preços cheios. Uma linha "Produtos (N)" alimentada por
+ela, seguida de uma linha "Desconto do produto", produz três números que não
+fecham — medido, antes da correção:
+
+```
+Produtos (4)           R$ 283,90
+Desconto do produto    -R$ 4,10
+Você pagará            R$ 283,90
+```
+
+Numa tela de pagamento isso é pior que a linha de desconto não existir: o
+comprador não tem como saber qual dos três está certo. A soma dos preços cheios
+é `WC_Cart::get_subtotal()` mais o desconto de promoção apurado, e o imposto do
+subtotal entra se `display_prices_including_tax()` disser que sim — hoje
+irrelevante nesta instalação (`woocommerce_calc_taxes = no`), que é exatamente a
+razão de a divergência não aparecer em teste. Veja
+`reconectar_checkout_subtotal_cheio_html()`.
+
+### O Dokan recusa cupom de plataforma em carrinho multi-loja
+
+Medido, a resposta de `?wc-ajax=apply_coupon` com três lojas no carrinho:
+`Este cupom é inválido para multiple vendedores.` Não há erro visível na tela
+além dessa linha, e o cupom simplesmente não entra. Para exercitar a linha de
+cupom do resumo é preciso montar carrinho de **uma loja só** — do contrário a
+investigação vai para o código do cupom, que está correto.
+
+### O filtro de fragmentos do checkout aceita **qualquer** seletor
+
+`WC_AJAX::update_order_review()` devolve o array de
+`woocommerce_update_order_review_fragments` e o `checkout.js` do WooCommerce faz
+`$( chave ).replaceWith( valor )` em cada par — a chave é um seletor livre, não
+uma lista fechada. É por isso que o resumo autoral (`.rc-checkout__resumo`) pode
+morar **fora** do `#order_review`, na outra coluna da grade, e ainda acompanhar
+cupom e recálculo de frete sem recarregar a página. Medido: cupom de R$ 10 sobre
+R$ 246,00 levou o resumo a R$ 236,00 na mesma requisição AJAX.
+
+A contrapartida é a armadilha. Um bloco de totais **sem** fragmento registrado
+não dá erro nenhum: ele fica no ar com o valor de antes do cupom, e o comprador
+lê um total plausível e errado numa tela de pagamento — o pior lugar do projeto
+para isso acontecer. Quem escrever linha de total nova fora do `#order_review`
+registra o seletor no filtro **no mesmo commit**.
+
+E o botão pode sair do `#payment` junto: o `checkout.js` liga em `submit` do
+`form.checkout`, e o `<form>` serializa todo campo que esteja dentro dele
+independentemente da posição visual. O nonce, o `_wp_http_referer` e o bloco de
+termos seguem em `.place-order`, dentro do fragmento de pagamento; só o
+`<button>` muda de lugar, com `woocommerce_order_button_html` devolvendo string
+vazia. Medido: pedido criado normalmente com o botão na coluna da direita.
+
+### As funções de total do WooCommerce **imprimem**, e uma delas devolve `<tr>`
+
+`wc_cart_totals_subtotal_html()`, `wc_cart_totals_coupon_html()`,
+`wc_cart_totals_fee_html()`, `wc_cart_totals_order_total_html()` e
+`wc_cart_totals_shipping_html()` (`includes/wc-cart-functions.php`) dão `echo` e
+devolvem `null`. Usá-las como valor — `'<dd>' . wc_cart_totals_subtotal_html() . '</dd>'`
+— imprime o número **antes** do `<dd>`, fora de ordem. Ou se captura com
+`ob_start()`/`ob_get_clean()`, ou não se monta markup em volta delas. As duas
+exceções que **devolvem** string são `wc_cart_totals_coupon_label( $cupom, false )`
+e `wc_cart_totals_shipping_method_label( $rate )`.
+
+Duas assimetrias que custam tempo:
+
+- **`wc_cart_totals_coupon_label()` já traz o prefixo.** Ela devolve
+  "Cupom: &lt;código&gt;", com o rótulo traduzido pelo filtro
+  `woocommerce_cart_totals_coupon_label`. Envolvê-la num
+  `sprintf( 'Cupom %s', … )` sai na tela como **"Cupom Cupom: teste-resumo"**.
+- **`wc_cart_totals_shipping_html()` produz markup de tabela.** Ela imprime
+  `<tr class="shipping">…</tr>`, porque no template original o `tfoot` é de uma
+  `<table>`. Dentro de um `<dl>` o navegador **expulsa** a `<tr>` para fora do
+  elemento pai — o valor do frete aparece solto abaixo do card, e o CSS do card
+  não o alcança. Para lista de definição, monte a linha à mão com
+  `wc_cart_totals_shipping_method_label( $rate )`.
+
+### `.site { overflow-x: hidden }` do Storefront mata todo `position: sticky`
+
+Irmã da armadilha do carrossel, e mais silenciosa. Declarar `overflow` em um eixo
+faz o outro computar `auto`: o elemento vira **scroll container**. `position: sticky`
+adere ao scrollport do ancestral rolável mais próximo — e um scrollport que não
+rola nunca desloca o elemento. O computed style segue dizendo `position: sticky`,
+o `top` está lá, o DevTools não acusa nada, e o card simplesmente sobe com a
+página.
+
+Medido no `#page` do checkout, rolando de 400 em 400 a posição do card:
+
+| | y a cada rolagem |
+| --- | --- |
+| com `overflow-x: hidden` | `530 → 130 → -370 → -1070` (linear: não adere) |
+| com `overflow-x: clip` | `530 → 130 → 16 → 16 → 16` |
+
+`clip` recorta igual e **não** cria scroll container. A correção fica escopada à
+página que precisa dela, nunca global: o `hidden` do Storefront é o que segura o
+transbordo horizontal no celular, e trocá-lo em todo lugar reabre aquele defeito.
+
+### O `address-i18n.js` reordena as `.form-row` no init, sem avisar por evento
+
+Recolher campos de cobrança num `<details>` parece trivial e não é. O
+`address-i18n.js` do WooCommerce reordena as `.form-row` por prioridade com
+`appendTo( wrapper )` — o que puxa de volta tudo o que já foi movido para dentro
+do colapse. E isso acontece no **init** do checkout, depois de um script de
+rodapé, **sem** passar por `country_to_state_changed`: escutar aquele evento
+cobre a troca de país e não cobre o carregamento.
+
+O sintoma é o pior tipo: o `<details>` está no DOM, com o corpo **vazio**, e os
+dez campos de volta à vista. A tela parece apenas não ter recebido a melhoria.
+Medido no carregamento, antes da correção: `corpo = 0 elementos, wrapper = 11
+filhos`, com o colapse vazio em primeiro lugar.
+
+A correção é `MutationObserver` em `childList`, e ela **exige guarda**: o próprio
+`appendChild` gera registro de mutação (reanexar nó já presente conta como
+mutação), então sem um `precisaOrganizar()` que responda "nada a fazer" o par
+observador/organizador entra em laço infinito. Veja
+`assets/js/checkout.js`.
+
+### Ida e volta em codec autoral é cega ao erro que os dois lados compartilham
+
+O QR Code do PIX (`includes/pagamento/funcoes-qrcode.php`) é um codificador do
+ISO/IEC 18004 escrito aqui, pelas mesmas três ausências do BR Code: sem
+dependência externa, sem etapa de compilação e sem chamada de rede — o payload
+carrega a chave PIX, que costuma ser o CPF de uma pessoa, e não pode sair pela
+rede nem por query string. Escrever o codificador traz junto o problema de
+prová-lo, e a prova óbvia não serve.
+
+Codificar e decodificar com o **mesmo** código responde "igual" a qualquer
+defeito que esteja nas duas pontas. `reconectar_qr_posicoes_de_formato()` punha
+o bit 7 da segunda cópia do formato sobre o **módulo escuro fixo**, em
+`( $lado - 8, 8 )`: a tabela de posições estava errada, o decodificador lia por
+ela, e os 16 casos de ida e volta passavam — texto idêntico, síndromes em zero.
+
+Quem pegou foi confrontar **duas tabelas independentes**: contar os módulos
+livres da matriz e conferir contra `(codewords × 8) + bits de resto` da tabela de
+blocos. Sobrava exatamente um módulo, nas quinze versões — e "exatamente um, em
+todas" não se explica por acaso. Ao verificar codec autoral, procure a segunda
+fonte de verdade; sem ela a verificação mede a si mesma.
+
+Os números que fecham, para quem for mexer: V1 208 livres = 208 bits + 0 resto;
+V2 359 = 352 + 7; V7 1568 = 1568 + 0; V14 4651 = 4648 + 3; V15 5243 = 5240 + 3.
+O BR Code real de uma loja sai em **V8**, 49×49 módulos.
+
+### Gerador de Reed-Solomon com as duas linhas trocadas sai recíproco
+
+Irmã da anterior, e o motivo de os síndromes existirem na verificação. Em
+`reconectar_qr_polinomio_gerador()`, o índice 0 é o coeficiente **líder**, e quem
+o mantém ali é multiplicar por `x` — o termo α^i desce uma posição. Trocar os
+dois lados do `foreach` multiplica por `(α^i + x)` em vez de `(x + α^i)` e produz
+o polinômio **recíproco**: para grau 2, `[2,3,1]` em vez de `[1,3,2]`.
+
+O líder deixa de ser 1, o gerador deixa de ser mônico, e a divisão sintética não
+zera mais o coeficiente da vez. O sintoma não toca os dados: o código sai com
+tamanho certo, o texto decodifica corretamente, **só a correção sai inválida** —
+e todo leitor recusa a imagem ao conferir os síndromes. Uma verificação que só
+compare o texto lido com o original dá tudo por certo.
+
 ### Os passos do assistente do Dokan escutam `updated_option`, não `added_option`
 
 O assistente de configuração (`Admin\OnboardingSetup\AdminSetupGuide`) põe a
@@ -232,6 +460,128 @@ Para gravar chave dentro de opção-mapa use `reconectar_gravar_chave_de_opcao()
 exceção é o laço dos gateways do WooCommerce, logo abaixo dela: ali a chave
 `enabled` ausente **é** informação — significa gateway no padrão de fábrica, que
 já vem desligado —, e criá-la escreveria configuração para repetir o que já vale.
+
+### Aba nova no painel do Dokan exige flush de reescrita
+
+Os três ganchos que criam a aba — `dokan_query_var_filter`,
+`dokan_get_dashboard_nav` e `dokan_load_custom_template` — não bastam. A query
+var nova só passa a valer depois de as regras de reescrita serem regeneradas.
+
+Numa instalação recém-provisionada o `provision.sh` faz o flush no fim, e por
+isso o defeito não aparece em ambiente novo. Numa instalação que já está de pé,
+ninguém faz — e o sintoma é mudo do jeito mais caro: **o item aparece no menu
+lateral, o link existe, e a tela responde 404**, sem uma linha no log. Quem
+investigar vai para os ganchos, que estão corretos.
+
+O lugar do flush é `Reconectar_Migracoes`, que é o mecanismo que existe para
+rodar uma vez por instalação. Veja `reescrever_permalinks()` — e a armadilha
+seguinte, que é sobre **onde** ele roda.
+
+**Remover a aba exige o mesmo flush**, e é fácil esquecer porque não há tela nova
+para conferir: a regra segue gravada apontando para um template que já não
+existe. Por isso `VERSAO` subiu duas vezes pela mesma aba — 4 na criação, 5 na
+remoção. Uma instalação parada em `4` não rodaria nada.
+
+### `flush_rewrite_rules()` em `init` prioridade 5 apaga as regras de terceiros
+
+`flush_rewrite_rules()` não "atualiza" o conjunto: ele **regenera** a partir do
+que estiver registrado naquele instante. As migrações rodam em `init` prioridade
+5, e nessa altura nem o Dokan nem o bbPress registraram as deles.
+
+O resultado é um conjunto gravado sem o painel da loja e sem o fórum — as duas
+áreas caem de uma vez, e a migração se marca como aplicada, então rodar de novo
+não conserta. O reparo manual é `wp rewrite flush`; **qualquer instalação que já
+tenha rodado a migração defeituosa precisa dele**.
+
+`wp_loaded` é o primeiro gancho em que todo `init` já passou. Agendar o flush
+para lá de dentro da migração — `add_action( 'wp_loaded', 'flush_rewrite_rules' )`
+— mantém a garantia de rodar uma vez e regenera com tudo registrado.
+
+### `wp_posts.post_status` é `varchar(20)`, e o `sql_mode` não é estrito
+
+Medido nesta instalação:
+`ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION` — sem
+`STRICT_TRANS_TABLES`. Um slug de status acima de 20 caracteres é **truncado no
+`INSERT`, em silêncio**, e o pedido fica com um valor que não casa com nenhum
+status registrado: `wc_get_order_statuses()` não o encontra, e a tela imprime o
+slug cru no lugar do rótulo.
+
+O prefixo `wc-` conta. `wc-conferencia` tem 14 e passa; um
+`wc-aguardando-analise-do-comprovante`, que era o nome natural, teria 36 e
+chegaria ao banco como `wc-aguardando-analis`. Nada falha, nada é registrado, e a
+investigação vai para o registro do status — que está correto.
+
+HPOS está desligado nesta instalação (`wp_wc_orders` não existe); ligado, a
+coluna equivalente tem folga maior, mas o limite do `wp_posts` volta a valer na
+sincronização.
+
+### A tabela de pedidos do painel do Dokan mora dentro de um `<form>`
+
+Medido, na ordem em que sai no HTML:
+
+```
+[0]  <!--dokan_order_content_inside_before-->
+[5]  <form id="order-filter" method="POST" class="dokan-form-inline">
+[6]    <table class="dokan-table dokan-table-striped">   ← as células da lista
+[10] </form>
+[11] <!--dokan_order_content_inside_after-->
+```
+
+Com campos `status`, `security`, `_wp_http_referer` e `bulk_orders[]`. Um
+`<form method="post">` impresso numa célula seria **aninhado**: o navegador
+descarta o interno, e o botão passa a submeter as **ações em massa** do Dokan —
+sem erro, sem aviso, e com um efeito plausível na tela.
+
+`formaction` no botão também não serve: o POST leva todos os campos acima, e no
+dia em que o Dokan trocar `security` por `_wpnonce`, `check_admin_referer()` leria
+o nonce **dele** e recusaria com a mensagem genérica de link expirado.
+
+O caminho é o **atributo `form` do HTML5**, que define o form owner e sobrepõe o
+ancestral: `<button form="rc-confirmar-492">` na célula, e o
+`<form id="rc-confirmar-492">` correspondente impresso em
+`dokan_order_content_inside_after` — que sai fora do form de terceiro. Medido: o
+form do Dokan ocupa os bytes `4..17781`; os nossos começam em `17802` e `18216`,
+cada botão acha o seu, e nenhum campo de terceiro é serializado. Veja
+`Reconectar_Comprovante::formularios_de_confirmacao()`.
+
+### `dokan_order_content_inside_before`/`_after` são de `orders/orders`, não de `orders/listing`
+
+Armadilha de **medição**, e das caras: a tabela sai de `orders/listing`, então é
+ele que se renderiza para medir a lista. Só que os dois hooks de antes e depois da
+tabela pertencem ao template **pai**, e uma medição que carregue apenas o
+`listing` não os dispara.
+
+O sintoma é o pior possível num script de verificação: os `<form>` do rodapé
+**não aparecem**, e a ausência parece defeito do código que acabou de ser
+escrito. Dispare os dois à mão em volta do `dokan_get_template_part( 'orders/listing', … )`.
+
+Vale a lição geral: ao medir template de terceiro, os hooks que você espera podem
+estar num arquivo acima do que você renderizou.
+
+### `dokan_get_vendor_orders` reordena só a página corrente
+
+O filtro recebe o array **já cortado** pela paginação — 10 por página, medido. Um
+`usort` ali reordena a página visível e deixa o pedido prioritário na página 3
+exatamente onde estava. Para ordenação que atravesse a paginação, o lugar é
+`posts_clauses`.
+
+### A lista de pedidos do painel se identifica por `_dokan_vendor_id`, não por `post_author`
+
+Medido em `posts_clauses`:
+
+```
+orderby: wp_posts.post_date DESC
+join:    INNER JOIN wp_postmeta ON ( wp_posts.ID = wp_postmeta.post_id )
+where:   AND ( wp_postmeta.meta_key = '_dokan_vendor_id'
+               AND CAST(wp_postmeta.meta_value AS SIGNED) IN ('23') )
+         AND wp_posts.post_type = 'shop_order' AND (…lista de status…)
+```
+
+Isso é o que permite reconhecer a consulta **dentro** do próprio `posts_clauses`,
+por `post_type` mais a presença daquela meta no `where` já montado. A alternativa
+— setar uma flag global em `woocommerce_order_query_args` e consumi-la no
+`posts_orderby` — tem janela de corrida: qualquer outra query que rode no meio
+herda a ordenação. Veja `Reconectar_Comprovante::priorizar_conferencia()`.
 
 ### bbPress e BuddyPress estão ativos
 
@@ -352,6 +702,40 @@ ele inverte a resposta e dá por segura uma trava que não foi consultada.
 O código do `eval` roda depois do `init`, então o papel dinâmico que o bbPress
 aplica naquele gancho não está no usuário: capacidades de fórum respondem "SIM"
 onde o navegador responde 403. Para medir de verdade, `wp --user=<login> eval …`.
+
+E o caminho inverso também engana: um nonce gerado por `wp --user=… eval
+'wp_create_nonce( … )'` **não vale no navegador**. `wp_create_nonce()` mistura o
+token de sessão (`wp_get_session_token()`), que no CLI é vazio e no navegador vem
+do cookie de login. O nonce sai com aparência perfeita e é recusado — e a
+mensagem é a genérica de link expirado, que não diz que a causa é essa.
+
+### `form.action` em JS é sombreado por um `<input name="action">`
+
+Armadilha de **verificação**, não de produção, e capaz de dar por testada uma
+trava que nunca foi exercitada. Num `HTMLFormElement`, um campo filho com
+`name="action"` — que todo formulário de `admin-post.php` tem — sombreia a
+propriedade `action` do elemento: `f.action` devolve o `HTMLInputElement`, não a
+URL.
+
+Usado como destino de `fetch`, ele vira a string `[object HTMLInputElement]` no
+caminho. Medido: POST para
+`/checkout/order-received/493/[object%20HTMLInputElement]`, **status 200**, página
+plausível, nenhuma recusa disparada — quatro testes de segurança "passando" sem
+ter tocado no servidor. `f.getAttribute( 'action' )` é o caminho.
+
+### Nonce por pedido recusa antes da trava de propriedade
+
+Corolário da anterior, e a razão de um teste de "pedido de outro comprador" nunca
+medir o que pensa medir. Quando a ação do nonce inclui o id
+(`check_admin_referer( ACAO . '_' . $pedido_id )`), trocar o `pedido=` numa URL
+montada à mão invalida o nonce — e a recusa vem da **primeira** guarda, com a
+mensagem genérica de link expirado, idêntica à de um id inexistente.
+
+Isso é a propriedade desejada: por HTTP a trava de propriedade não é alcançável,
+porque o servidor só emite o nonce a quem já tem o direito. Mas significa que
+verificá-la exige outro instrumento — `ReflectionClass` sobre o método privado,
+com `wp_set_current_user()` variando o ator. Sem isso, a matriz de permissões
+fica medida só na primeira camada.
 
 ### Nem toda negação do `/wp-admin` sai com 403
 
@@ -554,11 +938,12 @@ de desenvolvimento ela existia porque alguém a fez pelo painel; em produção,
 `/transparencia/` respondia 404.
 
 O sintoma não é a página faltando: é a **entrega inteira ficando invisível**.
-`reconectar_aviso_de_enquete()` e o item "Votar" da barra inferior consultam
-`Reconectar_Painel_Transparencia::url()` antes de imprimir e desistem em silêncio
-quando ela volta vazia — o comportamento certo, com o efeito de sumir com o
-cartão de enquete, o atalho do cabeçalho e o selo de pendência de uma vez só. A
-investigação vai para o componente, que está correto.
+Todo consumidor de `Reconectar_Painel_Transparencia::url()` confere o retorno
+antes de imprimir e desiste em silêncio quando ele volta vazio — o comportamento
+certo, com o efeito de sumir com o cartão de enquete inteiro de uma vez só. A
+investigação vai para o componente, que está correto. (Os dois atalhos que
+caíram nisto — o aviso do cabeçalho e o item "Votar" da barra inferior — foram
+removidos depois; a armadilha é do padrão, não deles.)
 
 E existir não basta: `enfileirar_assets()` só carrega `transparencia.css` se
 achar `[reconectar_painel_transparencia]` no `post_content`. Página sem o
@@ -720,6 +1105,26 @@ custam tempo se descobertas depois:
   sem isso a renomeação cria duplicata, e `get_user_meta( …, true )` passa a
   devolver uma das duas arbitrariamente.
 
+### A soma de referência de uma diferença não é a soma da lista impressa
+
+Quando uma tela mostra parcelas e declara "a diferença até o total é X", a
+tentação é somar o que está na tela — e é errado sempre que a tela **filtra**
+alguma parcela.
+
+Medido na prévia de pagamento do checkout, com três lojas e uma delas sem chave
+PIX: os cartões impressos somavam R$ 38,00 + R$ 118,00, o total do carrinho era
+R$ 248,00, e a frase saía "a diferença de R$ 92,00 é de frete e outros
+acréscimos". Não havia linha de frete naquele carrinho: os R$ 92,00 eram os
+produtos da loja que a prévia tinha deixado de fora. Número plausível, causa
+inventada, numa tela de pagamento — exatamente o que a regra de honestidade de
+dados proíbe.
+
+A soma de referência tem de ser a do **conjunto inteiro** (`array_sum( $valores )`,
+todas as lojas do carrinho), não a do subconjunto exibido; quem explica a parcela
+ausente é o alerta que nomeia a loja, não a aritmética. E o defeito só apareceu
+**na medição**: lido, o código parecia correto, porque a variável que acumulava
+era a mesma que desenhava os cartões.
+
 ### O diretório do plugin é `includes/`, não `inc/`
 
 `inc/` é a convenção do **tema**. Confundir os dois leva a criar arquivo em
@@ -857,6 +1262,31 @@ provisionamento diria "já definida" sobre um cabeçalho em fallback.
 Vale para qualquer opção que guarde ID de anexo — ícone do site, imagem de
 cabeçalho, capa de página. Configuração feita pelo Customizer local não chega ao
 servidor por nenhum caminho: ou entra no `provision.sh`, ou é refeita à mão lá.
+
+### Arquivo em `uploads/` é público — e `uploads/` não atravessa o deploy
+
+Duas consequências do mesmo fato, e as duas mordem quem grava arquivo enviado por
+usuário.
+
+**Público.** `/wp-content/uploads/` é servido direto pelo Apache, sem passar pelo
+WordPress: nenhuma capacidade é consultada, e o nome do arquivo costuma ser
+adivinhável (`comprovante-1.pdf`). A Media Library ainda o exibe na listagem de
+mídia para todo perfil com `upload_files`. Para dado pessoal — comprovante
+bancário traz nome, valor e conta — isso é o oposto do que a LGPD pede, e o
+edital cobra.
+
+O arranjo que este projeto usa está em `Reconectar_Comprovante::diretorio()`:
+subdiretório próprio, `.htaccess` com `Require all denied` **e** `deny from all`,
+`index.php` vazio contra listagem, nome gerado por `wp_generate_password( 32,
+false )`, e entrega por rota autoral que confere direito antes do `readfile()`.
+O nome imprevisível é a camada que sobrevive a uma troca para nginx, em que o
+`.htaccess` vira inerte.
+
+**Não sincronizado.** `git ls-files wp-content/` devolve só os dois diretórios
+autorais, e o `rsync` do deploy segue esse recorte. Arquivo enviado por usuário
+existe **apenas** no servidor que o recebeu: não está no Git, não vem do
+`provision.sh` e não tem origem nenhuma para ser restaurado. Backup de `uploads/`
+é responsabilidade da infraestrutura, e nada no repositório o substitui.
 
 ### Fora do `localhost`, o site depende de `WP_URL` apontar para o host público
 

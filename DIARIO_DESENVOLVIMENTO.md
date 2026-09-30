@@ -3051,3 +3051,695 @@ classificador de permissões. O mecanismo é o `wp post create` guardado por
 Categorias, que rodam a cada provisionamento. A prova final é a EC2 depois do
 próximo deploy: `/transparencia/` sai de 404 para 200 com o painel desenhado, e
 "Loja", "Transparência" e "Minha Conta" aparecem no menu.
+
+---
+
+## 2026-09-29 — O PIX ganha QR Code, desenhado aqui dentro
+
+**O problema**
+
+O BR Code já era montado desde a entrega do pagamento direto — TLV do EMV mais
+CRC16 —, mas só saía como texto para copiar e colar. Quem paga pelo celular
+tem a câmera na mão e o app do banco aberto: o copia-e-cola obriga a selecionar
+44 a 80 caracteres numa tela pequena, e o cabeçalho de `funcoes-pix.php` já
+declarava a lacuna.
+
+**Por que o codificador é autoral**
+
+Pelas mesmas três ausências que o BR Code respeita: sem dependência externa, sem
+etapa de compilação e sem chamada de rede. Um gerador em JavaScript exigiria
+versionar biblioteca de terceiros, contra a regra de não introduzir build; um
+serviço de imagem exigiria mandar o payload pela rede — e o payload **contém a
+chave PIX, que costuma ser o CPF de uma pessoa**.
+
+É a mesma razão pela qual a saída é **SVG embutido no HTML, nunca `<img src>`**.
+Um `src` com o payload em query string publicaria a chave na URL, que vai para o
+log do servidor, para o histórico do navegador e para o cabeçalho `Referer` de
+qualquer link clicado depois. Medido no HTML entregue: o payload não aparece no
+SVG, e a chave não aparece no SVG.
+
+**O que foi feito**
+- `includes/pagamento/funcoes-qrcode.php`: codificador do ISO/IEC 18004 em modo
+  byte, correção M, versões 1 a 15 (teto de 415 bytes). Reed-Solomon sobre
+  GF(256) com `0x11D`, intercalação de blocos em dois grupos, format info
+  BCH(15,5) em duas cópias, version info BCH(18,6) a partir da V7, as oito
+  máscaras com as quatro penalidades, e a colocação em zigue-zague.
+- Saída em um único `<path>` com corridas horizontais: a V8 tem 2.401 módulos, e
+  um `<rect>` por módulo multiplicaria o HTML por vários. Medido, o BR Code real
+  sai em 8,9 KB e 632 corridas. Zona de silêncio de 4 módulos **dentro** do
+  `viewBox`, não como margem CSS — quem recortar a imagem leva a margem junto.
+- `Reconectar_Gateway_Pix::imprimir_instrucao()` imprime o QR numa `<figure>`
+  com legenda, **só quando `$contexto === 'tela'`**. No e-mail ele não entra:
+  SVG embutido é removido por Gmail e Outlook, e `data:` é bloqueado como imagem
+  externa — sairia um retângulo vazio sobre o copia-e-cola que funciona. Mesmo
+  raciocínio do botão de copiar, que também é exclusivo da tela.
+- As três classes em `assets/css/pagamento.css`. O `<svg>` sai sem `width` nem
+  `height`, só com `viewBox`, e por isso fica **sem dimensão intrínseca**: o
+  navegador é livre para lhe dar os 300×150 do elemento substituído padrão. A
+  medida é declarada no CSS, em `width` **e** `max-width`, pela armadilha já
+  registrada de teto herdado que não disputa cascata.
+
+**Dois defeitos reais, e o que cada um ensinou**
+
+1. **O gerador de Reed-Solomon saiu recíproco.** As duas linhas do `foreach`
+   estavam trocadas, o que multiplica por `(α^i + x)` em vez de `(x + α^i)`. Para
+   grau 2 o resultado era `[2,3,1]` no lugar de `[1,3,2]`. O líder deixa de ser 1,
+   o gerador deixa de ser mônico, e a divisão sintética não zera mais o
+   coeficiente da vez. O sintoma não toca os dados: código de tamanho certo,
+   texto certo, **só a correção inválida** — recusado por qualquer leitor ao
+   conferir os síndromes.
+
+2. **O bit 7 do formato caía sobre o módulo escuro fixo.** A segunda cópia é
+   partida em sete bits na coluna 8 e oito na linha 8, não em oito e sete: o
+   oitavo módulo daquela coluna é o módulo escuro, em `( $lado - 8, 8 )`.
+
+   O segundo é o que vale registrar. A verificação de ida e volta **não podia**
+   tê-lo pegado: o decodificador lê pela mesma tabela de posições e concorda com
+   o erro. Passavam os 16 casos, com texto idêntico e síndromes em zero. Quem
+   pegou foi confrontar duas tabelas independentes — contar os módulos livres da
+   matriz contra `(codewords × 8) + bits de resto` da tabela de blocos. Sobrava
+   exatamente um módulo, nas quinze versões.
+
+**Verificação**
+- Ida e volta em 16 casos: o BR Code real de uma loja (V8, 49×49, máscara 2) e um
+  caso por versão no limite de capacidade, com texto de bytes variados para que
+  as penalidades tenham o que medir. Todos com síndromes de Reed-Solomon em zero
+  e texto idêntico ao original.
+- Geometria nas quinze versões, fechando exatamente: V1 208 = 208 + 0; V2 359 =
+  352 + 7; V7 1568 = 1568 + 0; V14 4651 = 4648 + 3; V15 5243 = 5240 + 3.
+- Limites declarados: 416 bytes recusados, 412 cabem em V15, texto vazio devolve
+  string vazia.
+- Na tela de um pedido real com duas lojas: dois QR Codes, 200×200 px cada
+  (módulo de 3,5 px), alinhados com o resto do cartão. A 375px o QR cabe no
+  cartão de 343px sem transbordo — `scrollWidth` igual a `clientWidth`, o teste
+  que a armadilha do carrossel deixou.
+
+**Pendência**
+
+Nenhum decodificador externo estava disponível para a prova final: medido no
+host, `zbarimg` ausente e `python3` sem `qrcode` e sem `cv2`. Nada foi instalado.
+**O teste de aceitação é apontar o app de um banco real para o QR Code na tela do
+pedido** — só o usuário pode fazer isso, e é o que fecha a entrega.
+
+A chave PIX no **checkout**, pedida junto, é trabalho à parte e ainda não foi
+feita: hoje ela aparece só depois de fechar o pedido, o que é desenho e não
+defeito — a descrição do gateway diz isso ao comprador. Antecipá-la exige valor
+por loja no carrinho (função que não existe), `carregar_assets()` alcançando o
+checkout, e uma decisão sobre o `txid`, que sem pedido fechado sairia como `***`
+e deixaria a loja sem número para conciliar. É a entrega registrada logo abaixo.
+
+---
+
+## 2026-09-29 — A chave de recebimento aparece no checkout, antes de fechar
+
+**O problema**
+
+Com três produtos de três lojas no carrinho, o comprador escolhia PIX e não via
+chave nenhuma: `payment_fields()` imprimia só a descrição do gateway e, quando
+alguma loja não recebia, o alerta. A chave e o valor apareciam na tela de
+agradecimento — depois de o pedido existir.
+
+Não era defeito, era desenho, e o desenho estava errado pelo motivo que importa:
+**dois produtos de duas lojas são dois pagamentos**, e descobrir isso só depois de
+finalizar é descobrir tarde. Quem paga quer saber para quem vai transferir antes
+de confirmar, não depois.
+
+**A decisão: prévia sem código de pagar**
+
+No checkout saem os dados de recebimento de cada loja e quanto de **produto** cabe
+a ela. Não sai BR Code nem QR Code, por duas razões que não são de layout:
+
+- **Sem pedido não há `txid`.** O código sairia com o campo vazio, e a loja
+  receberia um PIX sem número para conciliar com nada.
+- **O valor ainda muda.** Frete, cupom e endereço alteram o total depois desta
+  tela. Um código lido aqui pode pagar um valor que deixou de ser devido.
+
+O código com o valor exato e o número do pedido continua onde estava: tela de
+agradecimento e e-mail. A descrição dos dois gateways foi reescrita para dizer
+isso — a antiga prometia a chave "depois de fechar o pedido", o que passou a ser
+falso.
+
+**O que foi feito**
+- `Reconectar_Pagamento_Direto::valores_do_carrinho()` — valor de produtos por
+  loja, somando `line_total` com `line_tax`, que é o item **depois** do cupom (o
+  desconto é rateado por item antes de chegar ali). `lojas_do_carrinho()` passou a
+  derivar dela: duas varreduras do carrinho escritas em paralelo são duas
+  respostas que podem divergir sobre quem recebe.
+- `total_do_carrinho()` com `get_total( 'edit' )`. Sem o contexto `edit` o
+  WooCommerce devolve o total **formatado em HTML**, com símbolo de moeda, e a
+  subtração viraria zero em silêncio.
+- `Reconectar_Gateway_Direto::imprimir_previa()`, chamada por `payment_fields()`
+  entre a descrição e o alerta. Um cartão por loja **que recebe**: nome, "Produtos
+  desta loja: R$ …" e os dados do meio. Quem não recebe já é nomeada pelo alerta,
+  e um cartão vazio diria duas vezes a mesma coisa — a segunda parecendo falha.
+- Contexto novo `checkout` no terceiro parâmetro de `imprimir_instrucao()`. Não é
+  variação de layout: ali `$pedido` chega **nulo**, então nada que dependa do
+  número do pedido pode sair. O PIX para na `<dl>`; a transferência sai igual nos
+  três contextos, e ali isso é seguro, porque conta bancária não embute valor nem
+  número de pedido.
+- `carregar_assets()` passou a conferir `is_checkout()` no lugar de
+  `is_wc_endpoint_url( 'order-received' )`. A função cobre as **duas** telas — o
+  agradecimento é endpoint da própria página de checkout —, e sem o checkout na
+  conta a prévia sairia sem grade, sem cartão e sem borda: não uma tela feia, uma
+  lista de rótulos soltos que ninguém lê como dado de pagamento.
+- Bloco `.rc-pagamento--previa` no CSS. A prévia mora dentro da `.payment_box` do
+  WooCommerce, que já tem fundo e padding próprios: margem menor, cartão mais
+  enxuto, e nenhum título — quem dá o título é o rótulo do rádio logo acima.
+
+**O defeito que a medição pegou**
+
+A frase da diferença mentia. Medido no checkout real com três lojas, uma sem chave
+PIX: os cartões somavam R$ 38,00 + R$ 118,00, o carrinho fechava em R$ 248,00, e a
+tela declarava "a diferença de R$ 92,00 é de frete e outros acréscimos". Não havia
+frete naquele carrinho — os R$ 92,00 eram os produtos da loja excluída da lista.
+
+A soma de referência passou a ser a de **todas** as lojas do carrinho, não a dos
+cartões impressos. Lendo o código não havia o que estranhar: a variável que
+acumulava era a mesma que desenhava os cartões, e a aritmética estava certa para
+o que fora escrito. Está registrado como armadilha no `CLAUDE.md`.
+
+A diferença, quando existe, é **declarada e nunca rateada**. Frete e acréscimos
+não têm dono neste ponto — o Dokan só os atribui ao criar os sub-pedidos —, e
+dividir por conta própria daria um número plausível e errado numa tela de
+pagamento.
+
+**Verificação**
+
+Checkout real, três lojas (duas com chave PIX, uma sem):
+
+| Medida | Valor |
+| --- | --- |
+| prévias na página | 2, uma por gateway |
+| cartões na prévia do PIX | 2 — R$ 38,00 e R$ 118,00 |
+| alerta | nomeia a loja que não recebe |
+| QR, código e botão copiar na prévia | ausentes, os três |
+| diferença, carrinho sem frete | nenhuma |
+| diferença, com taxa de R$ 17,50 | total R$ 265,50, diferença R$ 17,50 |
+
+O caminho com diferença real foi exercitado com um `mu-plugin` temporário que
+lançava a taxa, removido depois da medição. A 375px a prévia cabe: `scrollWidth`
+igual a `clientWidth`, nada além de x=336, e a grade de dados vira coluna única —
+o teste que a armadilha do carrossel deixou.
+
+**Pendência**
+
+Nenhuma no código. Segue valendo o teste de aceitação da entrega anterior:
+apontar o app de um banco real para o QR Code na tela do pedido.
+
+---
+
+## 2026-09-29 — O checkout vira cards, colapses e um resumo que acompanha
+
+O checkout clássico entregava a tela crua do WooCommerce: dois blocos lado a
+lado, sem hierarquia, com a tabela de itens misturada aos totais e ao seletor de
+pagamento. O pedido foi reorganizá-la em cards, empilhar dados do comprador e
+dados do pedido, recolher o que é secundário em colapses, e pôr um resumo da
+compra à direita, com o botão de finalizar dentro dele.
+
+O mesmo pedido **retirou a prévia de recebimento** entregue horas antes, nesta
+mesma sessão. Verbatim: *"Dados de pagamento só precisa aparecer na tela de
+pedido finalizado com as informações de pagamento."* Não é retrabalho perdido: os
+dois comentários longos da prévia — a armadilha da soma de referência e a
+proibição de ratear a diferença — já tinham virado entradas do `CLAUDE.md`, e o
+conhecimento sobreviveu à remoção do código.
+
+**O que foi feito**
+- `inc/marketplace/checkout.php`, novo, registrado na lista explícita do
+  `functions.php`. Ele **substitui o callback** de
+  `woocommerce_checkout_order_review` em vez de sobrescrever o template: medido
+  em `$wp_filter`, nenhum terceiro pendura nada nos 21 hooks do checkout, e com
+  isso a entrega não precisou ler um só arquivo gitignored do WooCommerce.
+- Itens agrupados por loja num `<details>` cada, a primeira aberta. A posse vem
+  de `post_author`, a mesma fonte de `Reconectar_Pagamento_Direto::valores_do_carrinho()`
+  — duas varreduras do carrinho escritas em paralelo são duas respostas que podem
+  divergir sobre quem recebe.
+- Resumo da compra em `woocommerce_checkout_after_order_review`, irmão do
+  `#order_review` e filho direto do `form.checkout`. Subtotal, cupom, frete,
+  taxas e total saem das funções públicas de `wc-cart-functions.php`, **nunca
+  recalculados**.
+- Botão finalizar movido para dentro do resumo: `woocommerce_order_button_html`
+  devolve string vazia e o botão real vai no `<aside>`. Nonce, referer e termos
+  continuam em `.place-order`, e o `<form>` serializa tudo independentemente da
+  posição visual.
+- Fragmentos AJAX próprios (`.rc-checkout__resumo` e `.rc-checkout__pedido`) em
+  `woocommerce_update_order_review_fragments`. Sem eles o resumo congelaria no
+  valor de antes do cupom — um número plausível e errado numa tela de pagamento.
+- `assets/js/checkout.js`, novo: recolhe endereço, complemento, empresa, país,
+  estado e CEP num `<details>`, deixando à vista nome, sobrenome, telefone e
+  e-mail. Nasce aberto se algum obrigatório de dentro estiver vazio, e reabre com
+  foco no campo reprovado em `checkout_error`.
+- Retirada da prévia: `imprimir_previa()` inteira, o ramo `checkout` de
+  `imprimir_instrucao()`, o bloco `.rc-pagamento--previa` do CSS. As descrições
+  ficaram em uma frase — *"Ao finalizar, daremos instruções para pagar."* no PIX,
+  *"Ao finalizar, daremos os dados bancários para transferir."* na transferência.
+  Sobrevivem intactos `is_available()`, `validar_checkout()`, o alerta que nomeia
+  a loja sem chave, e o QR Code da tela de agradecimento.
+
+**Três defeitos que só a medição pegou**
+
+O primeiro matou o resumo inteiro. `position: sticky` adere ao scrollport do
+ancestral rolável mais próximo, e o Storefront declara `.site { overflow-x:
+hidden }` — `hidden` num eixo faz o outro computar `auto`, então o `#page` vira
+scroll container que **não rola**. O computed style seguia dizendo `sticky`, e o
+card descia com a página: medido, `530 → 130 → -370 → -1070`, linear. A correção
+é `overflow-x: clip`, que recorta sem criar scroll container; depois dela,
+`530 → 130 → 16 → 16 → 16`.
+
+O segundo esvaziava o colapse. O `address-i18n.js` do WooCommerce reordena as
+`.form-row` por prioridade com `appendTo( wrapper )` no **init** do checkout —
+depois do nosso script, que roda síncrono no rodapé, e sem passar por
+`country_to_state_changed`, que era o único gancho de reaplicação. Medido na
+carga: corpo com zero elementos e os dez campos de volta à vista, numa tela que
+parece apenas não ter recebido a melhoria. Trocado por um `MutationObserver` com
+guarda contra laço.
+
+O terceiro é de texto: `wc_cart_totals_coupon_label()` já devolve
+"Cupom: &lt;código&gt;", e envolvê-la num `sprintf( 'Cupom %s', … )` imprimia
+"Cupom Cupom: teste-resumo".
+
+**Verificação**
+
+Fluxo fechado duas vezes, até a tela de agradecimento:
+
+| Medida | Valor |
+| --- | --- |
+| cards na tela | 5 — dados, observações, pedido, pagamento, resumo |
+| 1136px, resumo ao rolar | trava em `y = 16`; `x = 767`, largura 320 |
+| 375px | coluna única de 343px, resumo **último** card, `position: static` |
+| 375px, `scrollTo( 600, 0 )` → `scrollX` | `0` — sem transbordo horizontal |
+| colapse de endereço | seis campos dentro, quatro fora, reaberto no erro |
+| PIX no checkout | "Ao finalizar, daremos instruções para pagar." |
+| varredura de "chave/CPF/agência/conta" no form | zero |
+| cupom de R$ 10 sobre R$ 246,00 | resumo foi a R$ 236,00 pelo fragmento |
+| tela de agradecimento, PIX | QR em SVG, copia-e-cola, botão copiar, um bloco por loja |
+| tela de agradecimento, transferência | três blocos, um por loja |
+
+Os pedidos e o cupom de teste foram removidos ao final, com as linhas de
+`wp_dokan_orders` e `wp_dokan_vendor_balance` junto — apagar o pedido no
+WooCommerce não limpa as tabelas paralelas do Dokan, e linha órfã vira
+faturamento fantasma no painel da loja.
+
+**Pendência**
+
+A linha de frete do resumo tem quatro ramos e só o primeiro foi exercitado: não
+há zona nem método de envio configurado, e a Store API confirma
+`needs_shipping: false`. Segue valendo o teste de aceitação da entrega anterior:
+apontar o app de um banco real para o QR Code.
+
+---
+
+## 2026-09-30 — Cada loja escolhe o seu meio, e o resumo passa a fechar
+
+O checkout redesenhado na véspera recebeu sete refinamentos, com três capturas de
+um checkout de referência em anexo. Dois deles mudaram arquitetura; os outros
+cinco são de tela.
+
+O mais caro é o item (4), verbatim: *"a forma de pagamento deve estar atrelada ao
+colapse da loja para quando houve outros tipos de pagamento."* Entre duas
+leituras possíveis, o usuário escolheu a literal — **"Cada loja escolhe o seu
+meio"**, com gravação real em cada sub-pedido do Dokan, não um rótulo decorativo.
+
+**O que foi feito**
+
+- **Escolha por loja.** Um `<fieldset>` de rádios `rc_pagamento[<loja_id>]`
+  dentro do colapse de cada loja, com os meios que **aquela** loja aceita. Seis
+  métodos novos em `Reconectar_Pagamento_Direto`: `meios_da_loja()`,
+  `meio_escolhido()`, `meios_escolhidos()`, `guardar_escolha()`,
+  `validar_meios_por_loja()` e `gravar_meios_no_pedido()`.
+- **`is_available()` virou união.** Bastava uma loja do carrinho aceitar o meio
+  para o gateway existir; a recusa desceu para o nível da loja, onde o comprador
+  pode fazer algo a respeito. `validar_checkout()` saiu dos dois gateways,
+  centralizada em `validar_meios_por_loja()`.
+- **Gravação em três lugares.** `META_MEIOS` no pedido pai, `_payment_method` em
+  cada sub-pedido, e `_payment_method_title` do pai listando os meios usados —
+  o WooCommerce processa um gateway por submissão, e o id técnico do pai não é
+  lido por humano nenhum.
+- **Item (6), a inversão.** `reconectar_checkout_pedido()` migrou de
+  `woocommerce_checkout_order_review` para
+  `woocommerce_checkout_before_customer_details`. Inversão de DOM, não de
+  pintura: `order` no CSS teria deixado a tabulação percorrendo trinta campos na
+  ordem contrária à leitura.
+- **Item (7), a privacidade.** Removida do card de pagamento e reimpressa abaixo
+  do botão, no resumo — o texto acompanha o ato que qualifica.
+- **Itens (1), (3) e (5).** Rádio + ícone SVG + nome + linha de apoio, com fundo
+  destacado na opção escolhida; miniatura do produto em cada item do pedido;
+  ícones desenhados no próprio gateway, por `icone()`, e não por
+  `WC_Payment_Gateway::$icon`, que monta `<img src>`.
+- **Item (2), o resumo.** "Produtos (N)", "Desconto do produto" em verde,
+  cupons, "Você pagará" com o meio escolhido abaixo, e "Você economizou".
+- `assets/js/checkout.js` ganhou uma segunda IIFE: `change` no rádio dispara
+  `update_checkout`, e o par `update_checkout`/`updated_checkout` guarda e
+  restaura quais colapses estavam abertos e qual rádio tinha o foco. Isso corrige
+  também um incômodo que já existia: aplicar cupom fechava todos os colapses.
+
+**Quatro defeitos que só a medição pegou**
+
+O primeiro estava numa tela de pagamento, que é o pior lugar do projeto para
+número errado. `wc_cart_totals_subtotal_html()` devolve o subtotal **já
+promocional**, então a linha "Produtos" não conversava com a de desconto logo
+abaixo — medido: `R$ 283,90 − R$ 4,10 = R$ 283,90`. Três números que não fecham, e
+o comprador sem saber qual deles está certo. Corrigido por
+`reconectar_checkout_subtotal_cheio_html()`, que soma o desconto de promoção ao
+`get_subtotal()`; medido depois: `R$ 288,00 − R$ 4,10 = R$ 283,90`.
+
+O segundo repintava a privacidade removida. O gancho `wp` **não alcança**
+`?wc-ajax=update_order_review`, então o `remove_action` do carregamento não roda
+no fragmento: a tela nascia correta e ganhava a segunda cópia no primeiro
+recálculo. Três `add_action` cobrem as duas rotas AJAX do WooCommerce.
+
+O terceiro é de ordem de execução. `WC_AJAX::update_order_review()` grava
+`chosen_payment_method` do POST **antes** de disparar
+`woocommerce_checkout_update_order_review` — quem corrigir a sessão naquele
+gancho escreve depois e perde. Quem impõe o gateway de verdade é
+`impor_meio_representativo()`, em `woocommerce_checkout_posted_data`.
+
+O quarto é do Dokan e não é defeito nosso: ele **recusa cupom de plataforma em
+carrinho multi-loja**, com a resposta `Este cupom é inválido para multiple
+vendedores.` Descoberto tentando exercitar a linha de cupom do resumo; a
+verificação foi refeita com carrinho de uma loja só.
+
+**Verificação**
+
+Pedido 483 fechado no navegador, com três lojas e dois meios:
+
+| Medida | Valor |
+| --- | --- |
+| `_reconectar_meios_por_loja` (pai) | `{"26":"reconectar_pix","25":"reconectar_transferencia","23":"reconectar_transferencia"}` |
+| `_payment_method_title` (pai) | `PIX e Transferência bancária` |
+| sub-pedidos 484 / 485 / 486 | `reconectar_pix` / `reconectar_transferencia` / `reconectar_transferencia` |
+| tela de agradecimento | três blocos, QR Code só no da Casa Viva |
+| e-mail do pedido | três blocos, dados de cada meio, QR ausente de propósito |
+| regressão do pedido 236 (sem a meta) | PIX nos três blocos, idêntico a antes |
+| resumo com promoção, multi-loja | `R$ 288,00 − R$ 4,10 = R$ 283,90` |
+| resumo com promoção e cupom, loja única | `R$ 88,00 − R$ 9,10 − R$ 10,00 = R$ 68,90`; economia `R$ 19,10` |
+| contraste do verde `#0E7A5F` sobre branco | 5,29:1 — passa o 1.4.3 |
+| troca de meio e fragmento | escolhas persistem; colapses abertos e foco preservados |
+| `./scripts/verificar-acessos.sh` | 127 casos, exit 0 |
+
+**Pendências**
+
+O frete riscado da captura de referência **não foi implementado**: não existe
+neste projeto um valor de frete anterior para riscar, e inventá-lo violaria a
+regra de honestidade de dados. A linha de frete segue com três dos quatro ramos
+sem exercício, pela mesma ausência de zona de envio da entrega anterior. E segue
+valendo o teste de aceitação que só o cliente pode fazer: apontar o app de um
+banco real para o QR Code.
+
+---
+
+## 2026-09-30 — O comprador anexa o comprovante, a loja confere e confirma
+
+> **Revisada no mesmo dia.** A aba `/dashboard/comprovantes/` descrita abaixo foi
+> removida em favor de uma coluna na lista de pedidos, e o envio passou a mudar o
+> status do sub-pedido — ver a entrada seguinte. O registro fica como está: é o
+> estado em que a entrega foi verificada, e a decisão que a substituiu só faz
+> sentido lida contra ela.
+
+**O que faltava**
+
+A instrução de pagamento fechava metade do ciclo. O comprador recebia chave, QR
+Code e dados bancários, pagava por fora — e não tinha como dizer que pagou. A
+loja só descobria olhando o próprio extrato, sem saber a qual pedido aquele
+crédito pertencia. O pedido do usuário foi um campo de upload nas duas telas em
+que a instrução já aparece, com o arquivo chegando ao vendedor.
+
+**O que foi feito**
+
+- **`includes/pagamento/class-reconectar-comprovante.php`** (novo) — a classe
+  inteira: armazenamento protegido, as três rotas de `admin-post.php` (enviar,
+  baixar, confirmar), o campo nas telas do comprador e a consulta do painel.
+- **`includes/pagamento/painel-comprovantes.php`** (novo) — a aba
+  **Comprovantes** do painel da loja, em `/dashboard/comprovantes/`. Markup
+  apenas; quem consulta e quem autoriza é a classe, na separação que
+  `includes/painel-empresas/` já estabelece.
+- **`class-reconectar-pagamento-direto.php`** — uma chamada a
+  `Reconectar_Comprovante::campo()` no laço por loja de `imprimir_instrucoes()`,
+  guardada por `'tela' === $contexto`, e a aba do painel na condição de
+  enfileiramento de `carregar_assets()`.
+- **`assets/css/pagamento.css`** — `.rc-comprovante` (o card do comprador) e
+  `.rc-comprovantes` (a tabela do painel).
+- **`class-reconectar-migracoes.php`** — `VERSAO = 4`, com o passo que reescreve
+  as regras de permalink.
+- **`docs/PAGAMENTOS.md`** e **`CLAUDE.md`** — a seção do ciclo completo e cinco
+  armadilhas novas.
+
+**Três decisões que moldam o resto**
+
+**Um comprovante por loja, não por pedido.** A meta vai no **sub-pedido do
+Dokan**, não no pai. Num carrinho de três lojas há três pagamentos, três meios e
+três comprovantes; um arquivo único faria o vendedor A enxergar o comprovante do
+pagamento feito ao vendedor B — nome, valor e conta de terceiro, exatamente o
+que a LGPD veda. `lojas_do_pedido()` já entregava o sub-pedido de cada loja, e o
+dono sai de `dokan_get_seller_id_by_order()`, nunca de `post_author`, que sob
+HPOS não é a fonte da verdade.
+
+**O arquivo mora fora da Media Library.** Um anexo em `uploads/` é servido pelo
+Apache sem passar por capacidade nenhuma, e aparece na biblioteca para qualquer
+perfil com `upload_files`. O diretório `uploads/reconectar-comprovantes/` tem
+três camadas: `.htaccess` com `Require all denied` e `deny from all` (2.4 e
+2.2), `index.php` vazio contra listagem, e nome de arquivo por
+`wp_generate_password( 32, false )` — esta terceira é a que sobrevive a uma
+troca para nginx, em que o `.htaccess` vira inerte. O nome original do comprador
+vai só para a meta, para exibição.
+
+**A confirmação não move o pedido pai.** `Confirmar pagamento recebido` leva o
+**sub-pedido** daquela loja a *Em preparação* e registra nota com autor e data.
+Numa compra multi-loja o pai continua aguardando até a última confirmar:
+sincronizá-lo exigiria decidir o que significa "metade pago", e inventar essa
+semântica é pior que declará-la.
+
+**A armadilha que quase derrubou duas áreas**
+
+A query var nova da aba só passa a valer depois de um flush de reescrita, e uma
+instalação já provisionada não o recebe sozinha — o item aparece no menu, o link
+existe, e a tela responde **404 sem uma linha no log**. O flush entrou como
+passo 4 de `Reconectar_Migracoes`, que é o mecanismo que existe para isso.
+
+Só que as migrações rodam em `init` **prioridade 5**, e nessa altura nem o Dokan
+nem o bbPress registraram as regras deles. `flush_rewrite_rules()` ali dentro
+regenera a partir do que está registrado **naquele instante** e grava um
+conjunto sem o painel da loja e sem o fórum: as duas áreas caem de uma vez, a
+migração se marca como aplicada, e rodar de novo não conserta. `wp_loaded` é o
+primeiro gancho em que todo `init` já passou — daí
+`add_action( 'wp_loaded', 'flush_rewrite_rules' )`.
+
+A instalação local caiu nisso e foi reparada com `wp rewrite flush`. **Qualquer
+instalação que já tenha rodado a migração defeituosa precisa do mesmo reparo**;
+uma provisionada do zero não, porque o `provision.sh` faz flush no fim.
+
+**Duas armadilhas de instrumentação, não de código**
+
+Custaram mais que os defeitos. A primeira: `f.action` em JavaScript é
+**sombreado** por um `<input name="action">` do próprio formulário — devolve o
+`HTMLInputElement`, e usá-lo como URL de `fetch` posta para
+`…/[object%20HTMLInputElement]`, que responde **200**. Quatro testes de segurança
+"passaram" sem ter tocado no servidor. `f.getAttribute('action')` é o caminho.
+
+A segunda: nonce gerado por `wp --user=… eval 'wp_create_nonce(…)'` **não vale
+no navegador**. `wp_create_nonce()` mistura `wp_get_session_token()`, vazio no
+CLI e vindo do cookie `wordpress_logged_in_*` no navegador. O nonce sai com
+aparência perfeita e é recusado com a mensagem genérica de link expirado, que
+não revela a causa.
+
+Isso levou ao resultado que fecha o item: com `check_admin_referer( ACAO . '_' .
+$pedido_id )`, **a trava de propriedade não é alcançável por HTTP** — trocar o
+`pedido=` invalida o nonce e a recusa vem da primeira guarda, porque o servidor
+só emite o nonce a quem já tem o direito. Não é lacuna de verificação: é a
+propriedade desejada. Medi a segunda camada por `ReflectionClass` sobre o método
+privado, variando o ator com `wp_set_current_user()`.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| lint por container, 5 arquivos | limpos |
+| campo nas telas 1 e 2, upload e download | uma vez por loja, nome original preservado |
+| URL direta do arquivo, da listagem, do `index.php` e do `.htaccess` | **403** nas quatro |
+| rota de download deslogado, com e sem nonce | 403, `text/html`, sem o arquivo |
+| aba do painel, isolamento entre duas lojas | listas não se cruzam |
+| confirmação | sub-pedido a *Em preparação*, nota com autor e data |
+| painel a 375px | `window.scrollX` = 0 |
+| recusas: `.exe`, acima de 5 MB, sem nonce, pedido alheio | todas com mensagem, nenhum aviso PHP |
+| regressão do e-mail: 27 templates, 2 estados de pedido | nenhum `<form`, `enctype`, `type="file"` nem a rota |
+| `./scripts/verificar-acessos.sh` | 127 casos, exit 0 |
+
+**Três desvios do plano aprovado**
+
+Conscientes, e nenhum muda o comportamento acordado:
+
+- O plano previa uma constante `TIPOS` com as extensões; ficou o método
+  `mimes()`, devolvendo o mapa `ext => mime` que `wp_check_filetype_and_ext()`
+  exige como terceiro argumento. A lista efetiva é a mesma.
+- `TAMANHO_MAX` saiu como literal `5242880` em vez de `5 * MB_IN_BYTES`, para
+  não depender da ordem de definição de constante do núcleo.
+- O estado "comprovante enviado" não tem botão *Enviar outro*: o formulário fica
+  sempre visível abaixo do resumo do que foi enviado. Sem JavaScript e com um
+  passo a menos.
+
+**Pendências**
+
+O caminho multi-loja não foi exercitado: não há localmente um pedido de várias
+lojas aguardando pagamento, e o campo por sub-pedido só se prova com um. O
+`time_format` da instalação está no padrão em inglês (`g:i a`), e a data do
+comprovante sai "às 2:17 pm" — o `provision.sh` não o fixa. A âncora
+`#rc-comprovante-<id>` que o redirect do painel carrega não tem alvo na tabela.
+E ficaram resíduos de teste no pedido 491: duas notas de transição, um
+comprovante sintético e o pedido em `preparacao` com `_reconectar_pagamento_confirmado`
+gravado. (Removidos junto com os da entrega seguinte — ver o fim desta página.)
+
+---
+
+## 2026-09-30 — O comprovante volta para a lista de pedidos, e o pagamento ganha status próprio
+
+**O que mudou de entendimento**
+
+Esta entrada **revisa a anterior**, do mesmo dia. A aba própria do painel
+(`/dashboard/comprovantes/`) estava implementada, verificada e documentada; o
+usuário a viu funcionando e pediu outra coisa:
+
+> a funcionalidade de comprovantes poderia ficar tudo na mesma lista de pedidos,
+> criar um item a mais na tabela para baixar o comprovante ou então 1 item de
+> ação.
+>
+> Assim que for enviado o comprovante alterar o status para aguardando análise de
+> comprovante, ou algo nesse sentido e esses pedidos deve ser listado de forma
+> cronológica e prioritária já que o cliente em tese ja teria pago o pedido.
+
+Ele está certo, e a razão é simples: o comprovante é um dado *do pedido*. Numa
+aba separada, a loja cruzava duas telas para agir sobre a mesma linha — e a lista
+de pedidos, que é onde ela decide o que fazer, não distinguia o pedido pago do
+não pago.
+
+**A premissa do plano anterior estava errada, e a medição mostrou onde**
+
+O plano aprovado da entrega anterior registrou, verbatim:
+
+> ancorar ali criaria um acoplamento novo a terceiro, que quebra em atualização e
+> cuja confirmação exigiria ler o fonte gitignored do plugin.
+
+A primeira metade era fato (o projeto não usava nenhum hook de tela de pedido do
+Dokan). A segunda era falsa nas duas pontas: **os hooks existem e são públicos**,
+e estabelecer isso **não exigiu ler uma linha do fonte do plugin**. A técnica foi
+executar o template de terceiro sob `wp eval`, capturando os hooks disparados com
+`add_action( 'all', … )` e o SQL com `posts_clauses` — medir o contrato observando
+o comportamento. Vale registrar como método: "exigiria ler o fonte" é uma
+conclusão que merece ser testada antes de virar decisão de arquitetura.
+
+**O que foi feito**
+
+- **`class-reconectar-status-pedido.php`** — `CONFERENCIA = 'wc-conferencia'`,
+  posicionada **antes** de `PREPARACAO` no array de `rotulos()`, que é o que
+  ordena o seletor do painel. `considerar_pagos()` **não** a inclui.
+- **`class-reconectar-pagamento-direto.php`** — `conferencia` entra em
+  `STATUS_AGUARDANDO`, e `carregar_assets()` passa a enfileirar o CSS na lista de
+  pedidos do painel.
+- **`class-reconectar-comprovante.php`** — saem os quatro métodos da aba, a
+  constante `QUERY_VAR` e os três hooks que a criavam; entram a transição de
+  status no fim de `processar_envio()`, o par `coluna_cabecalho()`/`coluna_celula()`,
+  `formularios_de_confirmacao()` e `priorizar_conferencia()`.
+- **`includes/pagamento/painel-comprovantes.php`** — removido.
+- **`assets/css/pagamento.css`** — sai `.rc-comprovantes` (a tabela da aba, com as
+  38 linhas de `@media` que refaziam o responsivo); entra `.rc-comprovante-coluna`,
+  pequeno porque herda largura, borda e empilhamento do `dokan-table`.
+- **`class-reconectar-migracoes.php`** — `VERSAO = 5`: a remoção da query var
+  exige outro flush, e uma instalação já em `4` não rodaria nada.
+
+**O ciclo ganhou um degrau, e ele não é "pago"**
+
+```
+Aguardando pagamento → Pagamento em conferência → Em preparação
+```
+
+O degrau do meio existe porque sem ele o pedido pago e o não pago ficam
+indistinguíveis na lista da loja. Não entra em `considerar_pagos()` de propósito:
+o comprovante chegou, o dinheiro ainda não foi conferido, e contar ali
+contaminaria os relatórios do WooCommerce com receita não verificada.
+
+A linha crítica é `conferencia` em `STATUS_AGUARDANDO`. `confirmado()` é
+`! has_status( STATUS_AGUARDANDO )` — sem ela, um pedido que **acabou de receber**
+comprovante passaria a contar como confirmado, e o campo sumiria da tela do
+comprador e o botão da lista da loja, os dois em silêncio.
+
+**A tabela de terceiro proíbe o desenho óbvio**
+
+A lista de pedidos do Dokan mora **dentro** de um `<form>` dele, com `status`,
+`security`, `_wp_http_referer` e `bulk_orders[]`. Um `<form>` na célula seria
+aninhado: o navegador descarta o interno e o botão passa a submeter as ações em
+massa, sem erro. E `formaction` não resolve — o POST levaria os campos de
+terceiro junto, e no dia em que o Dokan trocar `security` por `_wpnonce`,
+`check_admin_referer()` leria o nonce **dele** e recusaria com a mensagem
+genérica de link expirado.
+
+O caminho é o atributo `form` do HTML5: o `<button form="rc-confirmar-492">` fica
+na célula e o `<form id="rc-confirmar-492">` sai em
+`dokan_order_content_inside_after`, fora do form de terceiro. Medido: o form do
+Dokan ocupa os bytes `4..17781`; os nossos começam em `17802` e `18216`.
+
+**"Cronológica e prioritária" é uma cláusula de `ORDER BY`, não um `usort`**
+
+`priorizar_conferencia()` age em `posts_clauses`. Sobre o resultado não daria:
+`dokan_get_vendor_orders` é filtro sobre a **página corrente**, cortada em 10, e
+reordenar ali deixaria o pedido em conferência na página 3 exatamente onde
+estava.
+
+A query se reconhece por `post_type` mais a presença de `_dokan_vendor_id` no
+`where` já montado — o Dokan filtra por essa meta, **nunca por `post_author`**, e
+é isso que dispensa uma flag global com janela de corrida. Dentro do grupo
+prioritário o mais antigo vem primeiro; fora dele o `CASE` devolve `NULL` para
+todas as linhas, que empatam e caem no `post_date DESC` original.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| lint por container, 4 arquivos | limpos |
+| `post_status` no banco, direto do MySQL | `wc-conferencia` **[14 chars] íntegro** — cabe no `varchar(20)` |
+| `confirmado()` em pedido recém-enviado | `false` nos dois (492, 493) |
+| ordem devolvida na loja 24 | `492 (12:57) → 493 (13:07) → 491 → 238 → 234` |
+| simetria da tabela | 9 `<th>`, 9 células em **todas** as 5 linhas |
+| posição dos nossos `<form>` | 17802 e 18216, **fora** dos bytes 4..17781 do Dokan |
+| nonces | 2 distintos em 2 formulários |
+| a coluna não mente | 238 (`reconectar_cartao`) → traço neutro; 234 (PIX sem arquivo) → *Não enviado* |
+| a aba sumiu | `reconectar_migracoes_versao` = 5; `wp rewrite list \| grep -ci comprovante` = 0 |
+| `./scripts/verificar-acessos.sh` | 127 casos, exit 0 |
+
+**Uma armadilha de instrumentação, das caras**
+
+`dokan_order_content_inside_before`/`_after` pertencem a `orders/orders`, **não** a
+`orders/listing`. Uma medição que renderize só o `listing` — a escolha natural,
+porque é dele que sai a tabela — não vê os `<form>` do rodapé, e a ausência parece
+defeito do código que acabou de ser escrito. A medição correta dispara os dois
+hooks à mão em volta do `dokan_get_template_part()`.
+
+**Pendências**
+
+Dois itens de verificação não foram exercitados porque o classificador de modo
+automático negou o preenchimento dos campos de senha no navegador: o isolamento
+real do POST (`b.form.id` e `new FormData( b.form ).getAll( 'bulk_orders[]' )` no
+DevTools) e a tabela a 375px (`window.scrollTo( 600, 0 ); window.scrollX`). A
+estrutura que os sustenta está medida por CLI; o que falta é o clique.
+
+A medição deixou os pedidos **492 e 493 em `wc-conferencia`**, com meta de
+comprovante, um PDF de 30 bytes cada e uma nota "Medição: comprovante enviado." —
+estado útil para abrir `/dashboard/orders/` e ver a coluna, mas resíduo de teste,
+somado ao do 491 registrado na entrada anterior. **Removido a pedido do usuário,
+no mesmo dia**: os três voltaram a `on-hold`, perderam as duas metas do fluxo, os
+arquivos saíram do disco e as notas de teste foram apagadas — restando em cada um
+só as quatro do ciclo original (a transição do gateway e as três falhas de e-mail
+do ambiente).
+
+A remoção rendeu duas lições. **As notas do próprio pedido são o registro de
+estado que o diário não tinha**: o status anterior do 492 não estava escrito em
+lugar nenhum, e a nota da transição o guardava — inventar um valor plausível ali
+teria sido exatamente o que a regra de honestidade de dados proíbe. E a lista de
+notas a apagar tem de ser **allowlist do que fica**, nunca lista do que sai:
+`update_status()` grava uma nota nova de transição, que só existe depois do
+`save()` e portanto não pode ser enumerada antes — foram as notas 215, 216 e 217,
+criadas pela própria limpeza e apagadas por ela.
+
+Conferido por três fontes independentes depois: nenhuma linha de
+`_reconectar_comprovante` ou `_reconectar_pagamento_confirmado` na `postmeta`,
+zero PDFs no diretório de comprovantes, e `post_status = wc-on-hold` lido direto
+do MySQL nos três. O preço é que o clique real no botão de confirmar — o item de
+verificação que restava — só volta a ser exercitável depois que um comprovante
+novo for enviado.

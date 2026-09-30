@@ -42,7 +42,30 @@ abstract class Reconectar_Gateway_Direto extends WC_Payment_Gateway {
 			'woocommerce_update_options_payment_gateways_' . $this->id,
 			array( $this, 'process_admin_options' )
 		);
-		add_action( 'woocommerce_after_checkout_validation', array( $this, 'validar_checkout' ), 10, 2 );
+	}
+
+	/**
+	 * Devolve o ícone do meio, em SVG embutido.
+	 *
+	 * Não é `WC_Payment_Gateway::$icon` nem o filtro `woocommerce_gateway_icon`:
+	 * os dois montam `<img src>`, e um arquivo de imagem não herda as cores do
+	 * tema nem acompanha o contraste do modo escuro. Quem consome isto é a
+	 * renderização autoral de meios por loja, no colapse do checkout.
+	 *
+	 * O padrão genérico existe para que um meio futuro — cartão, boleto — não
+	 * precise declarar o próprio ícone só para aparecer na tela.
+	 *
+	 * O retorno é **literal do código**, sem nenhum dado de usuário, e por isso
+	 * sai por `echo` direto: `wp_kses_post()` descartaria o `<svg>` inteiro, que
+	 * não está em `$allowedposttags`.
+	 *
+	 * @return string SVG do ícone.
+	 */
+	public function icone() {
+		return '<svg class="rc-meio-icone" viewBox="0 0 32 32" role="presentation" focusable="false" aria-hidden="true">'
+			. '<circle cx="16" cy="16" r="16" fill="currentColor" opacity="0.14"/>'
+			. '<path d="M9 12h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Zm0 3h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'
+			. '</svg>';
 	}
 
 	/**
@@ -77,10 +100,15 @@ abstract class Reconectar_Gateway_Direto extends WC_Payment_Gateway {
 	/**
 	 * Imprime os dados de recebimento de uma loja.
 	 *
-	 * @param int      $loja_id  Identificador da loja.
-	 * @param float    $valor    Valor que cabe a esta loja.
-	 * @param WC_Order $pedido   Pedido ou sub-pedido da loja.
-	 * @param string   $contexto `tela` ou `email`.
+	 * Os dois contextos existem porque o e-mail não executa JavaScript e vários
+	 * clientes removem SVG embutido: o que é interativo ou depende de imagem
+	 * gerada sai só em `tela`. O pedido existe nos dois — estes blocos saem
+	 * **depois** do fechamento, nunca no checkout.
+	 *
+	 * @param int           $loja_id  Identificador da loja.
+	 * @param float         $valor    Valor que cabe a esta loja.
+	 * @param WC_Order|null $pedido   Pedido ou sub-pedido da loja.
+	 * @param string        $contexto `tela` ou `email`.
 	 * @return void
 	 */
 	abstract public function imprimir_instrucao( $loja_id, $valor, $pedido, $contexto = 'tela' );
@@ -166,7 +194,12 @@ abstract class Reconectar_Gateway_Direto extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Imprime a descrição e, quando for o caso, quem não recebe por aqui.
+	 * Imprime a descrição e quem não recebe por aqui.
+	 *
+	 * Nenhum dado de recebimento sai no checkout: chave PIX, conta bancária, QR
+	 * Code e copia-e-cola são da tela de agradecimento e do e-mail, onde o número
+	 * do pedido e o valor definitivo de cada loja já existem. Aqui a descrição diz
+	 * apenas que as instruções vêm depois.
 	 *
 	 * @return void
 	 */
@@ -194,37 +227,6 @@ abstract class Reconectar_Gateway_Direto extends WC_Payment_Gateway {
 					),
 					implode( ', ', $sem_dados )
 				)
-			)
-		);
-	}
-
-	/**
-	 * Recusa o pedido quando alguma loja do carrinho não recebe por aqui.
-	 *
-	 * Deixar passar produziria um pedido que ninguém consegue pagar por inteiro:
-	 * o comprador veria instrução para uma loja e silêncio para a outra.
-	 *
-	 * @param array $campos Campos do checkout.
-	 * @param mixed $erros  Objeto de erros do WooCommerce.
-	 * @return void
-	 */
-	public function validar_checkout( $campos, $erros ) {
-		if ( empty( $campos['payment_method'] ) || $campos['payment_method'] !== $this->id ) {
-			return;
-		}
-
-		$sem_dados = $this->lojas_sem_dados();
-
-		if ( ! $sem_dados || ! is_object( $erros ) ) {
-			return;
-		}
-
-		$erros->add(
-			'reconectar_pagamento_indisponivel',
-			sprintf(
-				/* translators: %s: lista de nomes de lojas. */
-				esc_html__( 'Não é possível fechar o pedido: %s não recebe por este meio de pagamento.', 'reconectar-core' ),
-				esc_html( implode( ', ', $sem_dados ) )
 			)
 		);
 	}
