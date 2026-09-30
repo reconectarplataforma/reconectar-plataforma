@@ -26,6 +26,16 @@ defined( 'ABSPATH' ) || exit;
 class Reconectar_Status_Pedido {
 
 	/**
+	 * Comprovante de pagamento enviado, aguardando a conferência da loja.
+	 *
+	 * O slug é curto de propósito: `wp_posts.post_status` é `varchar(20)` e o
+	 * `sql_mode` desta instalação não tem `STRICT_TRANS_TABLES`, então um slug
+	 * mais longo seria truncado **em silêncio** e o pedido ficaria gravado com um
+	 * status que não casa com nenhum registrado.
+	 */
+	const CONFERENCIA = 'wc-conferencia';
+
+	/**
 	 * Pedido pago, com a loja separando/produzindo os itens.
 	 */
 	const PREPARACAO = 'wc-preparacao';
@@ -61,12 +71,17 @@ class Reconectar_Status_Pedido {
 	 * As chaves trazem o prefixo `wc-` porque é assim que o status é gravado no
 	 * banco; `wc_order_statuses` também espera esse formato.
 	 *
+	 * A ordem do array é o que ordena o seletor de status na interface:
+	 * `inserir_no_fluxo()` cola este array inteiro logo depois de `wc-processing`,
+	 * preservando a ordem interna.
+	 *
 	 * @return array<string,string>
 	 */
 	public static function rotulos() {
 		return array(
-			self::PREPARACAO => __( 'Em preparação', 'reconectar-core' ),
-			self::ENVIADO    => __( 'Enviado', 'reconectar-core' ),
+			self::CONFERENCIA => __( 'Pagamento em conferência', 'reconectar-core' ),
+			self::PREPARACAO  => __( 'Em preparação', 'reconectar-core' ),
+			self::ENVIADO     => __( 'Enviado', 'reconectar-core' ),
 		);
 	}
 
@@ -136,6 +151,11 @@ class Reconectar_Status_Pedido {
 	 * WooCommerce não souber disso, a venda some dos relatórios e a data de
 	 * pagamento não é gravada. Aqui o prefixo `wc-` não entra: estes dois
 	 * filtros trabalham com o status "cru".
+	 *
+	 * `conferencia` fica de fora de propósito, e a lista é escrita à mão por
+	 * causa disso: naquele status o comprovante chegou, mas ninguém conferiu se o
+	 * dinheiro caiu. Declará-lo pago lançaria receita não verificada nos
+	 * relatórios do WooCommerce.
 	 *
 	 * @param string[] $status Lista de status considerados pagos.
 	 * @return string[]

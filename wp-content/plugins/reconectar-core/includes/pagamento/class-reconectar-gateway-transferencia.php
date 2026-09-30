@@ -77,7 +77,7 @@ class Reconectar_Gateway_Transferencia extends Reconectar_Gateway_Direto {
 	 * @return string Descrição.
 	 */
 	protected function descricao_padrao() {
-		return __( 'Transfira o valor para a conta de cada loja, que aparece depois de fechar o pedido. A loja confirma o recebimento e o pedido segue.', 'reconectar-core' );
+		return __( 'Ao finalizar, daremos os dados bancários para transferir.', 'reconectar-core' );
 	}
 
 	/**
@@ -87,6 +87,22 @@ class Reconectar_Gateway_Transferencia extends Reconectar_Gateway_Direto {
 	 */
 	protected function descricao_administrativa() {
 		return __( 'O comprador transfere direto para a conta de cada loja. O dinheiro não passa pela plataforma, e não há confirmação automática: a loja confirma o recebimento mudando o status do pedido. A conta é cadastrada pela própria loja em Configurações → Pagamento, na dashboard dela.', 'reconectar-core' );
+	}
+
+	/**
+	 * Ícone da transferência: a fachada de banco, em círculo.
+	 *
+	 * Mesma moldura do ícone do PIX — círculo de 32, traço de 2,2 — para que os
+	 * dois se alinhem na mesma linha do colapse sem ajuste de CSS por meio.
+	 *
+	 * @return string SVG do ícone.
+	 */
+	public function icone() {
+		return '<svg class="rc-meio-icone rc-meio-icone--transferencia" viewBox="0 0 32 32" role="presentation" focusable="false" aria-hidden="true">'
+			. '<circle cx="16" cy="16" r="16" fill="currentColor" opacity="0.14"/>'
+			. '<path d="M16 8 25 13H7Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>'
+			. '<path d="M10 16v5M16 16v5M22 16v5M7 24h18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
+			. '</svg>';
 	}
 
 	/**
@@ -124,10 +140,14 @@ class Reconectar_Gateway_Transferencia extends Reconectar_Gateway_Direto {
 	/**
 	 * Imprime os dados bancários da loja.
 	 *
-	 * @param int      $loja_id  Identificador da loja.
-	 * @param float    $valor    Valor que cabe a esta loja.
-	 * @param WC_Order $pedido   Pedido ou sub-pedido da loja.
-	 * @param string   $contexto `tela` ou `email`.
+	 * Os dois contextos saem iguais, e aqui isso é seguro: uma conta bancária não
+	 * embute valor nem número de pedido, ao contrário do BR Code do PIX, e não
+	 * depende de JavaScript nem de imagem gerada. Daí o `unset()` logo abaixo.
+	 *
+	 * @param int           $loja_id  Identificador da loja.
+	 * @param float         $valor    Valor que cabe a esta loja.
+	 * @param WC_Order|null $pedido   Pedido ou sub-pedido da loja.
+	 * @param string        $contexto `tela` ou `email`.
 	 * @return void
 	 */
 	public function imprimir_instrucao( $loja_id, $valor, $pedido, $contexto = 'tela' ) {

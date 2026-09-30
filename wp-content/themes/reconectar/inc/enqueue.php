@@ -126,6 +126,33 @@ function reconectar_enqueue_assets() {
 			true
 		);
 	}
+
+	/*
+	 * Só no checkout, e não na tela de agradecimento — que é um endpoint da mesma
+	 * página, onde não há formulário de cobrança para recolher.
+	 *
+	 * Este é o único script do tema que declara `jquery`, e a razão é de mecânica,
+	 * não de conveniência: `checkout_error` e `country_to_state_changed` são
+	 * disparados pelo `.trigger()` do jQuery, que não cria evento DOM real — um
+	 * `addEventListener` nativo nunca seria chamado. No checkout o WooCommerce já
+	 * carrega o seu, então a dependência não acrescenta requisição nenhuma.
+	 */
+	if ( function_exists( 'is_checkout' ) && is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) {
+		wp_enqueue_script(
+			'reconectar-checkout',
+			$theme_uri . '/assets/js/checkout.js',
+			array( 'jquery' ),
+			reconectar_versao_asset( 'assets/js/checkout.js' ),
+			true
+		);
+		wp_localize_script(
+			'reconectar-checkout',
+			'reconectarCheckout',
+			array(
+				'maisDados' => __( 'Endereço e mais dados', 'reconectar' ),
+			)
+		);
+	}
 }
 add_action( 'wp_enqueue_scripts', 'reconectar_enqueue_assets', 40 );
 

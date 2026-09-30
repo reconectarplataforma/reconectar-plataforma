@@ -538,6 +538,31 @@ else
   echo "Página 'Categorias' já existe."
 fi
 
+echo "== Página de Transparência =="
+# Âncora do painel de transparência, e ela precisa existir **aqui** — antes do
+# menu e do rodapé, que consultam a página e a omitem em silêncio quando não a
+# acham. Enquanto este bloco não existiu, a página era criada à mão na máquina de
+# desenvolvimento e não atravessava o deploy por nenhum caminho: em produção o
+# painel respondia 404, e com ele sumiam o atalho de enquete do cabeçalho e o
+# item "Votar" da barra inferior, que conferem
+# `Reconectar_Painel_Transparencia::url()` antes de imprimir. É a mesma forma da
+# armadilha do `custom_logo` — configuração local que o servidor nunca vê.
+#
+# O shortcode no conteúdo não é enfeite: `url()` acha a página pelo slug, mas
+# `enfileirar_assets()` só carrega `transparencia.css` se encontrar
+# `[reconectar_painel_transparencia]` no `post_content`. Página sem ele responde
+# 200 e sai sem estilo nenhum.
+if ! wp post list --post_type=page --name=transparencia --field=ID | grep -q .; then
+  wp post create \
+    --post_type=page \
+    --post_title="Transparência" \
+    --post_name=transparencia \
+    --post_status=publish \
+    --post_content="[reconectar_painel_transparencia]"
+else
+  echo "Página 'Transparência' já existe."
+fi
+
 echo "== Fórum inicial (bbPress) =="
 if ! wp post list --post_type=forum --field=ID | grep -q .; then
   wp post create \
@@ -561,6 +586,39 @@ else
   echo "Título da listagem já foi definido."
 fi
 
+# Devolve o ID de uma página do WooCommerce pela **opção** que o aponta, nunca
+# pelo slug. O slug é gravado no idioma ativo no instante em que o plugin cria a
+# página — no ativar, antes de o pacote de idioma estar de pé —, então ele varia
+# por instalação: a máquina de desenvolvimento nasceu em inglês e tem `shop` e
+# `my-account`; a de produção nasceu em pt-BR e tem `loja` e `minha-conta`.
+#
+# O sintoma de buscar por slug é o pior que este script sabe produzir: o
+# `wp post list --name=shop` não falha, devolve vazio, a guarda `[ -n … ]` engole
+# o vazio, e o menu de produção fica com "Loja" e "Minha Conta" a menos sem uma
+# linha de erro no log do deploy. O bloco do carrinho e do checkout lá acima já
+# resolvia pela opção; faltava aplicar o mesmo aqui.
+#
+# A chave da conta é `woocommerce_myaccount_page_id` — sem hífen e sem
+# sublinhado, ao contrário do slug. E a conferência de `post_status` repete o
+# `--post_status=publish` que as buscas antigas faziam: sem ela, uma página na
+# lixeira entregaria link válido para o 404 de quem não está logado.
+reconectar_id_de_pagina_do_woo() {
+  local id status
+  id="$(wp option get "woocommerce_$1_page_id" 2>/dev/null || true)"
+
+  case "$id" in
+    '' | *[!0-9]* ) return 0 ;;
+  esac
+
+  [ "$id" -ge 1 ] || return 0
+
+  status="$(wp post get "$id" --field=post_status 2>/dev/null || true)"
+
+  if [ "$status" = "publish" ]; then
+    printf '%s' "$id"
+  fi
+}
+
 echo "== Menu principal (navegação) =="
 if wp menu list --fields=locations --format=csv | grep -q "primary"; then
   echo "Já existe um menu atribuído ao local 'primary', pulando."
@@ -576,7 +634,7 @@ else
   # `PHP_URL_PATH` do item, então continua reconhecendo o do fórum.
   wp menu item add-custom "menu-principal" "Início" "/" --position=1
 
-  loja_id=$(wp post list --post_type=page --name=shop --post_status=publish --field=ID)
+  loja_id="$(reconectar_id_de_pagina_do_woo shop)"
   [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Loja" --position=2
 
   # A listagem de lojas é o destino do breadcrumb do Dokan e do "Ver todos" dos
@@ -601,7 +659,7 @@ else
   transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=6
 
-  conta_id=$(wp post list --post_type=page --name=my-account --post_status=publish --field=ID)
+  conta_id="$(reconectar_id_de_pagina_do_woo myaccount)"
   [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=7
 
   wp menu location assign menu-principal primary
@@ -618,6 +676,51 @@ if wp menu list --fields=slug --format=csv | grep -q "^menu-principal$" \
   # o item que a ocupa, deixando a ordem dos dois a cargo do banco.
   wp menu item add-custom "menu-principal" "Fórum" "/forums/"
   echo "Item 'Fórum' acrescentado ao menu principal."
+fi
+
+# Acrescenta ao menu já criado um item `add-post` que falta. Irmão do reparo do
+# fórum acima, e pela mesma razão: uma instalação provisionada antes desta entrega
+# cai no "pulando" e ficaria para sempre sem os itens.
+#
+# A idempotência é pelo **`object_id`**, não pelo rótulo nem pela URL. O rótulo é
+# editável no painel, e a URL do item `add-post` é o permalink — que muda se
+# alguém renomear o slug da página. O ID do post é o único dado que sobrevive às
+# duas coisas, e é justamente o slug que divergiu entre os ambientes.
+#
+# Sem `--position`, pela razão já escrita acima: o menu tem ordem definida, e
+# repetir uma posição ocupada deixa o empate a cargo do banco. O item entra no fim
+# da lista — reordenar é um arrasto no painel, e este script não desfaz escolha do
+# administrador.
+#
+# A lista é colhida numa variável antes de ir ao `grep`, e não canalizada direto:
+# sob `pipefail`, o `grep -q` fecha o cano ao achar a primeira linha e o `wp` do
+# outro lado pode morrer de SIGPIPE, fazendo o pipeline reportar falha justamente
+# no caso em que o item EXISTE — a condição se inverteria e o script criaria uma
+# duplicata por execução. É a mesma armadilha já registrada no bloco do rodapé.
+reconectar_reparar_item_de_menu() {
+  local pagina_id="$1" rotulo="$2" existentes
+
+  [ -n "$pagina_id" ] || return 0
+
+  existentes="$(wp menu item list menu-principal --fields=object_id --format=csv 2>/dev/null || true)"
+
+  if printf '%s\n' "$existentes" | grep -qx "$pagina_id"; then
+    return 0
+  fi
+
+  wp menu item add-post "menu-principal" "$pagina_id" --title="$rotulo"
+  echo "Item '$rotulo' acrescentado ao menu principal."
+}
+
+reconectar_menus_existentes="$(wp menu list --fields=slug --format=csv 2>/dev/null || true)"
+
+if printf '%s\n' "$reconectar_menus_existentes" | grep -qx "menu-principal"; then
+  reconectar_reparar_item_de_menu "$(reconectar_id_de_pagina_do_woo shop)" "Loja"
+
+  transparencia_reparo_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
+  reconectar_reparar_item_de_menu "$transparencia_reparo_id" "Transparência"
+
+  reconectar_reparar_item_de_menu "$(reconectar_id_de_pagina_do_woo myaccount)" "Minha Conta"
 fi
 
 echo "== Rodapé (widgets das três colunas) =="
@@ -652,11 +755,35 @@ reconectar_url_da_pagina() {
   fi
 }
 
+# Irmã da de cima para as páginas do WooCommerce, que não podem ser procuradas
+# pelo slug: ele sai no idioma ativo quando o plugin cria a página, e diverge
+# entre a máquina de desenvolvimento e a de produção. Veja
+# `reconectar_id_de_pagina_do_woo()`, lá em cima.
+reconectar_url_da_pagina_do_woo() {
+  local id url
+  id="$(reconectar_id_de_pagina_do_woo "$1")"
+
+  if [ -n "$id" ]; then
+    url=$(wp post url "$id")
+    printf '%s' "${url#"$reconectar_base_do_site"}"
+  fi
+}
+
 # Monta um <li> de link, ou nada quando a página não existe. Omitir o item é
 # deliberado: um rodapé com um link a menos é melhor que um link para o 404.
 reconectar_item_de_rodape() {
   local url
   url=$(reconectar_url_da_pagina "$1")
+
+  if [ -n "$url" ]; then
+    printf '<li><a href="%s">%s</a></li>' "$url" "$2"
+  fi
+}
+
+# O mesmo <li>, para página do WooCommerce resolvida pela opção de ID.
+reconectar_item_de_rodape_do_woo() {
+  local url
+  url=$(reconectar_url_da_pagina_do_woo "$1")
 
   if [ -n "$url" ]; then
     printf '<li><a href="%s">%s</a></li>' "$url" "$2"
@@ -679,7 +806,7 @@ fi
 if [ -n "$(wp widget list reconectar-rodape-2 --format=ids)" ]; then
   echo "Coluna 2 do rodapé já tem conteúdo."
 else
-  navegacao="$(reconectar_item_de_rodape shop 'Loja')"
+  navegacao="$(reconectar_item_de_rodape_do_woo shop 'Loja')"
   navegacao+="$(reconectar_item_de_rodape store-listing 'Lojas parceiras')"
   navegacao+="$(reconectar_item_de_rodape comunidade 'Comunidade')"
   navegacao+="$(reconectar_item_de_rodape transparencia 'Transparência')"
@@ -698,7 +825,7 @@ if [ -n "$(wp widget list reconectar-rodape-3 --format=ids)" ]; then
 else
   loja="$(reconectar_item_de_rodape vendor-onboarding 'Quero vender')"
   loja+="$(reconectar_item_de_rodape dashboard 'Painel da loja')"
-  loja+="$(reconectar_item_de_rodape my-account 'Minha conta')"
+  loja+="$(reconectar_item_de_rodape_do_woo myaccount 'Minha conta')"
   loja+="$(reconectar_item_de_rodape my-orders 'Meus pedidos')"
 
   if [ -n "$loja" ]; then
@@ -709,6 +836,21 @@ else
     echo "Nenhuma página de conta encontrada, coluna 3 fica vazia."
   fi
 fi
+
+echo "== Links que faltam no rodapé =="
+# Irmão do reparo do menu, lá em cima, e pela mesma razão: as colunas acima só são
+# escritas quando estão vazias, então uma instalação provisionada antes de uma
+# página existir nunca recebe o link dela. Foi assim que a Transparência ficou de
+# fora do rodapé de produção, junto com "Loja" e "Minha conta" — estas duas porque
+# eram procuradas pelo slug em inglês, que não existe na instalação nascida em
+# pt-BR.
+#
+# O reparo vai em PHP e não aqui porque o conteúdo do widget é HTML dentro de um
+# array serializado: `wp widget list --format=json` é a única leitura disponível
+# (não existe `wp widget get`), e ela devolve o texto com escapes Unicode. Montar
+# a substituição em bash a partir disso seria frágil de um jeito que só apareceria
+# em produção.
+wp eval-file /var/www/scripts/reparar-rodape.php
 
 echo "== URLs gravadas no banco =="
 # Os blocos de menu e de rodapé acima só escrevem quando encontram o lugar vazio,

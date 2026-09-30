@@ -33,6 +33,12 @@
      clareamento. */
   --rc-texto-sobre-destaque: #27272a;
 
+  /* Verde de desconto, e não a --reconectar-cor-primaria: a primária mede
+     2,30:1 sobre branco e reprovaria o critério 1.4.3 da WCAG 2.1 num texto
+     que informa valor — a mesma armadilha já registrada para o nome da
+     categoria nos cards da home. Este mede ~4,9:1. */
+  --rc-cor-desconto: #0E7A5F;
+
   --rc-raio: 8px;
   --rc-sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
   --rc-espaco: 16px;
@@ -94,11 +100,22 @@
    lados, alinhados em qualquer largura.
 
    O preço é a medida de texto na tela muito larga. Sem teto, um parágrafo de
-   descrição de produto atravessa os 2560px de um monitor ultrawide. O teto
-   passa a ser de quem tem texto corrido — `--rc-largura` em `.rc-forum`,
-   `.rc-forum-topico` e `.rc-login` —, e não do contêiner que carrega junto
-   grade de produtos, tabela de pedidos e o painel do Dokan, onde ele só
-   desperdiçava faixa.
+   descrição de produto atravessa os 2560px de um monitor ultrawide. O teto passa
+   a ser de quem tem texto corrido, e não do contêiner que carrega junto grade de
+   produtos, tabela de pedidos e o painel do Dokan, onde ele só desperdiçava
+   faixa.
+
+   **Teto de contêiner é a ferramenta errada para isso, e o fórum provou.**
+   `.rc-forum` e `.rc-forum-topico` carregavam `--rc-largura`, e o efeito era a
+   página inteira nascer 85px à direita do logotipo — medido a 1449px de viewport:
+   cabeçalho e `#primary` em x=40, o fórum em x=125. Um teto de 1200px numa tela
+   de 1449 não protege medida de texto nenhuma; só desalinha a página.
+
+   Quem protege medida é o elemento que **tem** o texto: `max-width: 70ch` no
+   parágrafo, como `.rc-loja__descricao` já fazia, e como o corpo da pergunta e o
+   da resposta passaram a fazer. `.rc-login` é o último consumidor de
+   `--rc-largura` e fica: é grade de duas colunas com arte à esquerda, em que
+   alargar esticaria a imagem, não a leitura.
 
    As três regras do tema pai estão dentro de `@media`, o que não lhes dá
    especificidade extra — esta vence por vir depois na cascata, já que o
@@ -543,7 +560,6 @@
 }
 
 .rc-conta,
-.rc-enquete-aviso,
 .rc-carrinho__link {
   align-items: center;
   color: var(--rc-texto);
@@ -560,48 +576,9 @@
 }
 
 .rc-conta__rotulo,
-.rc-enquete-aviso__rotulo,
 .rc-carrinho__texto {
   font-size: var(--rc-fonte-sm);
   font-weight: 600;
-}
-
-/* `relative` para ancorar o selo, e `line-height: 0` porque o `<svg>` é inline e
-   arrastaria o espaço de descida da linha junto — o mesmo par já resolvido no
-   ícone da barra inferior. */
-.rc-enquete-aviso__icone {
-  display: block;
-  line-height: 0;
-  position: relative;
-}
-
-/* O selo numérico dos dois atalhos de enquete — cabeçalho e barra inferior.
-   Declarado num lugar só porque é a mesma informação: dois blocos divergiriam no
-   dia em que um deles for ajustado.
-
-   A cor é a institucional, não a secundária. O laranja `#CF6442` é a escolha
-   óbvia para notificação e mede **3,78:1** sobre o branco: passa como elemento
-   gráfico (critério 1.4.11) e **reprova** como texto (1.4.3) — e aqui há um
-   dígito dentro. O roxo com texto branco mede 9,6:1.
-
-   `--rc-fonte-2xs` é o piso da escala, 12px. Abaixo dele não se desce, e é por
-   isso que o selo tem `min-width` em vez de tamanho menor: o que encolhe é a
-   bolinha, nunca o número. */
-.rc-enquete-aviso__selo,
-.rc-barra-inferior__selo {
-  background: var(--reconectar-cor-institucional);
-  border: 2px solid var(--rc-superficie);
-  border-radius: 999px;
-  color: #fff;
-  font-size: var(--rc-fonte-2xs);
-  font-weight: 700;
-  line-height: 1;
-  min-width: 18px;
-  padding: 2px 4px;
-  position: absolute;
-  right: -8px;
-  text-align: center;
-  top: -8px;
 }
 
 .rc-carrinho__total {
@@ -742,15 +719,6 @@
      Os 68px que ele devolve à linha são o que permite marca e ações lado a lado
      abaixo de 560px, onde antes as ações ocupavam uma linha própria. */
   .rc-conta {
-    display: none;
-  }
-
-  /* Pelo mesmo motivo, e literalmente ao lado: o item "Votar" da barra inferior
-     tem este exato destino. Aqui a redundância seria tripla, porque o cartão
-     flutuante do plugin também anuncia a mesma enquete — e é por isso que ele
-     sai da tela abaixo de 768px (`enquete.css`). No celular resta um anúncio só,
-     no lugar que o polegar alcança. */
-  .rc-enquete-aviso {
     display: none;
   }
 
@@ -2471,10 +2439,16 @@
 
    Nenhum `font-size` literal aqui: só degraus de `--rc-fonte-*`. */
 
-.rc-forum {
-  max-width: var(--rc-largura);
-  margin: 0 auto;
-}
+/* Sem régua própria: quem a faz é o `.col-full`, como em toda outra página.
+   O teto de `--rc-largura` que morava aqui punha o fórum 85px mais para dentro
+   que o logotipo e que a grade de produtos — medido a 1449px de viewport, o
+   cabeçalho e o `#primary` do catálogo em x=40, a listagem do fórum em x=125.
+
+   O argumento que justificava o teto é o da medida de texto, e esta tela não
+   tem texto corrido: é grade de três colunas com cards, da mesma natureza de
+   `ul.products`. Onde o argumento vale de fato — o corpo da pergunta, o da
+   resposta e os campos de escrita — o teto passou para o elemento de texto, no
+   molde que `.rc-loja__descricao` já usava. */
 
 .rc-forum-wrapper {
   /* O bbPress traz folha própria com margens generosas em volta de
@@ -3045,10 +3019,14 @@
 
 /* Pergunta e respostas ---------------------------------------------------- */
 
-.rc-forum-topico {
-  max-width: var(--rc-largura);
-  margin: 0 auto;
-}
+/* Sem régua própria, como na listagem: as duas telas do fórum precisam nascer na
+   mesma vertical do logotipo, e não 85px mais para dentro.
+
+   Aqui, porém, o conteúdo **é** coluna única de texto corrido, e é por isso que o
+   teto não desapareceu — mudou de dono. Medido a 1449px de viewport, sem teto
+   nenhum: o corpo da pergunta ia a 1275px e o campo de resposta a 1331px, cerca
+   de 160 caracteres por linha. Quem limita agora é o próprio parágrafo, no molde
+   de `.rc-loja__descricao`. */
 
 .rc-forum-pergunta,
 .rc-forum-resposta {
@@ -3076,6 +3054,10 @@
 .rc-forum-resposta__texto {
   margin-top: 12px;
   font-size: var(--rc-fonte-base);
+  /* O teto de medida que saiu de `.rc-forum-topico`. Medido, `70ch` resolve para
+     688px — a mesma medida de `.rc-loja__descricao`, que é o precedente do
+     projeto para isto. */
+  max-width: 70ch;
 }
 
 .rc-forum-topico__titulo-respostas {
@@ -3291,14 +3273,30 @@
    por regras que casem com `#bbp_topic_tags`, o resultado é lista vazia. Os
    450px medidos são a largura intrínseca de 40 caracteres, e em 375px o campo
    ultrapassava a viewport em 108px. Não é estouro de página, porque um ancestral
-   corta: é campo cortado, em que se digita sem ver o fim do que se escreveu. */
+   corta: é campo cortado, em que se digita sem ver o fim do que se escreveu.
+
+   O `textarea` entra pelo motivo oposto, e ele só apareceu quando o tópico
+   passou a ocupar a régua do site: sem teto, o campo de resposta media 1331px, e
+   quem escreve não consegue reler o parágrafo que acabou de digitar. `min()`
+   guarda as duas pontas — no celular vence o `100%`, no desktop o `70ch`.
+
+   `ch` é a largura do glifo zero **na fonte do elemento**, não uma medida
+   absoluta, e aqui isso é a favor: o bbPress declara `font-size: 12px` no
+   `textarea.bbp-the-content`, então os mesmos `70ch` resolvem para 506px no campo
+   e 688px no parágrafo já publicado — setenta caracteres nos dois, que é a medida
+   que se queria limitar. Quem trocar `ch` por um valor em px perde essa
+   propriedade sem que nada acuse. */
 #bbpress-forums .rc-forum__form-pergunta input[type="text"],
 #bbpress-forums .rc-forum__form-resposta input[type="text"],
+#bbpress-forums .rc-forum__form-pergunta textarea,
+#bbpress-forums .rc-forum__form-resposta textarea,
 .rc-forum__form-pergunta input[type="text"],
-.rc-forum__form-resposta input[type="text"] {
+.rc-forum__form-resposta input[type="text"],
+.rc-forum__form-pergunta textarea,
+.rc-forum__form-resposta textarea {
   box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
+  max-width: min(100%, 70ch);
 }
 
 /* ==========================================================================
@@ -3329,6 +3327,30 @@
   position: absolute;
   width: 1px;
   word-wrap: normal;
+}
+
+/* ==========================================================================
+   Link de edição no conteúdo
+   ========================================================================== */
+
+/* `reconectar_remover_link_de_edicao_no_conteudo()` esvazia a âncora e o
+   invólucro fica: `edit_post_link()` concatena o `$before` e o `$after` **fora**
+   do filtro — `echo $before . apply_filters( 'edit_post_link', … ) . $after` —,
+   então nenhum filtro alcança o `<div class="edit-link">`.
+
+   Div vazio não tem altura, mas margem não depende de conteúdo para empurrar.
+   Varrido o CSSOM, há exatamente uma regra que alcança o elemento em todo o
+   projeto: `woocommerce.css` declara `.single-product div.product .edit-link
+   { font-size: 0.875em; margin-top: 1em }` — cerca de 14px sobrando no fim da
+   página de produto, por um elemento que já não diz nada.
+
+   A alternativa era filtrar `get_edit_post_link`, que faz `edit_post_link()`
+   desistir antes de imprimir o `$before` e dispensaria esta regra. Ela foi
+   descartada porque aquele filtro também alimenta `wp_admin_bar_edit_menu()`: o
+   item "Editar" da barra superior sairia junto, e ele é justamente o atalho para
+   o painel que se quis preservar. */
+.edit-link:empty {
+  display: none;
 }
 
 /* ==========================================================================
@@ -4299,6 +4321,670 @@
 .col2-set > .col-1,
 .col2-set > .col-2 {
   width: auto;
+}
+
+/* ==========================================================================
+   Checkout
+   ========================================================================== */
+
+/*
+ * Devolve ao `#page` a condição de não-scroll-container, para que o resumo possa
+ * grudar no topo.
+ *
+ * O Storefront declara `.site { overflow-x: hidden }`, e `hidden` num eixo faz o
+ * outro computar `auto`: o `#page` passa a ser **scroll container**. Um
+ * `position: sticky` adere ao scrollport do ancestral rolável mais próximo — que
+ * ali é o `#page`, cujo `scrollHeight` é igual ao `clientHeight`. Ele nunca rola,
+ * então o sticky nunca ativa.
+ *
+ * O sintoma é o pior do repositório: a regra está escrita, o computed style
+ * confirma `position: sticky`, e o card simplesmente acompanha a página. Medido a
+ * 1136px, do topo até 1600px de rolagem: `530 → 130 → -370 → -1070`, linear.
+ *
+ * `clip` mantém exatamente o recorte horizontal que a regra do tema pai existe
+ * para fazer, e **não** cria scroll container. Com ele: `530 → 130 → 16 → 16`.
+ * Escopado ao checkout porque é aqui que há sticky; e em navegador sem suporte a
+ * `clip` a declaração é descartada, volta a valer o `hidden` do pai, e o resumo
+ * apenas rola junto — degradação sem tela quebrada.
+ *
+ * Mexer no `<body>` não era o caminho, embora ele tenha o mesmo `hidden/auto`: o
+ * scrollport que conta é o do ancestral **mais próximo**. Medido, `clip` só no
+ * `#page` já basta.
+ */
+.rc-checkout .site {
+  overflow-x: clip;
+}
+
+/*
+ * Grade de duas colunas no `form.checkout`: dados e pedido empilhados à
+ * esquerda, resumo colado ao topo à direita.
+ *
+ * A grade vai nos **filhos diretos** do formulário, e não em `display: contents`
+ * nos netos, porque a regra de `.col2-set` logo acima já resolve o
+ * empilhamento: com `width: auto`, `.col-1` e `.col-2` voltam a ser blocos em
+ * fluxo normal e se empilham sozinhos. `display: contents` custaria os papéis
+ * ARIA dos contêineres que ele dissolve — preço alto para repor o que já
+ * funciona.
+ *
+ * Escopado por `.rc-checkout` no `<body>`: carrinho, "Minha conta", endereços e
+ * recibo do pedido montam o mesmo `.col2-set` e têm layout próprio.
+ */
+.rc-checkout form.checkout {
+  column-gap: var(--rc-espaco);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  /*
+   * Zero de propósito, e o espaçamento vertical fica por conta do
+   * `margin-bottom` de cada card. O resumo ocupa `grid-row: 1 / span 20`, o que
+   * cria vinte linhas implícitas: com `row-gap` diferente de zero, os dezenove
+   * gaps das linhas vazias somariam altura à página inteira.
+   */
+  row-gap: 0;
+}
+
+/*
+ * Tudo na coluna 1 por padrão, inclusive o que o WooCommerce insere por AJAX
+ * (`.woocommerce-NoticeGroup`) e o que um plugin acrescentar amanhã. Só o resumo
+ * é movido, logo abaixo — assim nenhum filho inesperado cai na coluna estreita.
+ */
+.rc-checkout form.checkout > * {
+  grid-column: 1;
+  min-width: 0;
+}
+
+/*
+ * O `woocommerce.css` do Storefront monta este checkout em duas colunas
+ * flutuantes, e as duas declaram largura:
+ *
+ *   .col2-set                       { width: 52.9412%; float: left; margin-right: 5.88235% }
+ *   #order_review_heading, #order_review { width: 41.1765%; float: right }
+ *
+ * Em grid item o `float` é ignorado, mas a largura **não**: medido a 1136px, os
+ * cards saíam com 380px e 295px dentro de uma coluna de 717px, e o formulário
+ * parecia ter três colunas onde há duas.
+ *
+ * O seletor precisa dos IDs porque a regra do `#order_review` tem
+ * especificidade (1,0,0) — nenhuma lista de classes a alcançaria.
+ */
+.rc-checkout form.checkout > #customer_details,
+.rc-checkout form.checkout > #order_review {
+  margin-right: 0;
+  width: auto;
+}
+
+/*
+ * `span 20` e não `1 / -1`: o `-1` resolve para o fim das linhas **explícitas**,
+ * e aqui todas são implícitas (o posicionamento é automático), então `-1` viraria
+ * a própria linha 1 e o card teria a altura de uma linha só.
+ *
+ * `sticky` foi a escolha do usuário sobre o `fixed` que ele pediu: `fixed` tira o
+ * card do fluxo, a coluna da esquerda passa por baixo dele, e um resumo mais alto
+ * que a janela deixaria o botão de finalizar inalcançável.
+ *
+ * O `form.checkout >` não é decorativo: `.rc-checkout form.checkout > *`, acima,
+ * vale **(0,2,1)** — `form` é o tipo e `.checkout` é uma segunda classe, fácil de
+ * não contar —, então `.rc-checkout .rc-checkout__resumo`, com (0,2,0), perdia o
+ * `grid-column` para o `1` do coringa. Medido: `grid-area: 1 / 1 / span 20`, com
+ * o resumo ocupando a coluna larga e a estreita vazia.
+ */
+.rc-checkout form.checkout > .rc-checkout__resumo {
+  align-self: start;
+  grid-column: 2;
+  grid-row: 1 / span 20;
+  position: sticky;
+  top: var(--rc-espaco);
+}
+
+/* --- Cards -------------------------------------------------------------- */
+
+.rc-checkout .woocommerce-billing-fields,
+.rc-checkout .woocommerce-additional-fields,
+.rc-checkout .rc-checkout__pedido,
+.rc-checkout .rc-checkout__resumo {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  /* Declarado no componente porque `#payment` é vestido pelo WooCommerce, que
+     não herda o reset do tema em toda instalação. */
+  box-shadow: var(--rc-sombra);
+  box-sizing: border-box;
+  margin-bottom: var(--rc-espaco);
+  padding: var(--rc-espaco);
+}
+
+/*
+ * Em regra separada, nunca na lista acima: um seletor inválido dentro de lista
+ * separada por vírgula invalida a **regra inteira**, e `:has()` não existe em
+ * navegador antigo. Aqui a degradação é uma seção sem card; na lista, seria o
+ * checkout inteiro sem card nenhum.
+ *
+ * E a condição existe porque `form-shipping.php` imprime a `<div>`
+ * incondicionalmente: sem endereço de entrega a seção sai vazia, e um card
+ * incondicional desenharia uma caixa com nada dentro. Medido neste ambiente:
+ * `zonas: 0`.
+ */
+.rc-checkout .woocommerce-shipping-fields:has( > .shipping_address ) {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  box-shadow: var(--rc-sombra);
+  box-sizing: border-box;
+  margin-bottom: var(--rc-espaco);
+  padding: var(--rc-espaco);
+}
+
+/*
+ * Os títulos de fábrica saem porque há substituto autoral no DOM, escrito pelos
+ * ganchos de `inc/marketplace/checkout.php` — não é a armadilha do
+ * `woocommerce_show_page_title`, onde o `<h1>` desaparecia sem que nada o
+ * substituísse e quem navega por cabeçalhos ficava sem saber onde está.
+ *
+ * O `<h3 id="ship-to-different-address">` fica de fora de propósito: ele é o
+ * **label do checkbox** de entregar em outro endereço. Esconder junto tiraria o
+ * controle da tela.
+ */
+.rc-checkout .woocommerce-billing-fields > h3,
+.rc-checkout .woocommerce-additional-fields > h3,
+.rc-checkout #order_review_heading {
+  display: none;
+}
+
+.rc-checkout .rc-checkout__titulo {
+  font-size: var(--rc-fonte-lg);
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 var(--rc-espaco);
+}
+
+/* --- Colapse de endereço e complementos --------------------------------- */
+
+.rc-checkout .rc-checkout__mais {
+  border-top: 1px solid var(--rc-borda);
+  margin-top: var(--rc-espaco);
+  padding-top: var(--rc-espaco);
+}
+
+/*
+ * `display: flex` num `<summary>` apaga o triângulo nativo no Chrome, e
+ * `list-style: none` faz o mesmo no Firefox e no Safari — daí o chevron próprio,
+ * desenhado em borda. Sem glifo de fonte: a Poppins do projeto não traz um, e
+ * cair no fallback do sistema dá um símbolo diferente por plataforma.
+ */
+.rc-checkout .rc-checkout__mais-gatilho,
+.rc-checkout .rc-checkout__loja-resumo {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.rc-checkout .rc-checkout__mais-gatilho::-webkit-details-marker,
+.rc-checkout .rc-checkout__loja-resumo::-webkit-details-marker {
+  display: none;
+}
+
+.rc-checkout .rc-checkout__mais-gatilho::after,
+.rc-checkout .rc-checkout__loja-resumo::after {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  flex: none;
+  height: 0.5rem;
+  margin-left: auto;
+  /* -45deg aponta para baixo; a rotação para -135deg no `[open]` aponta para
+     cima, e a transição é só do ângulo para não animar layout. */
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  width: 0.5rem;
+}
+
+.rc-checkout .rc-checkout__mais[open] > .rc-checkout__mais-gatilho::after,
+.rc-checkout .rc-checkout__loja[open] > .rc-checkout__loja-resumo::after {
+  transform: rotate(-135deg);
+}
+
+.rc-checkout .rc-checkout__mais-gatilho:focus-visible,
+.rc-checkout .rc-checkout__loja-resumo:focus-visible {
+  outline: 2px solid var(--reconectar-cor-primaria, #31beb1);
+  outline-offset: 2px;
+}
+
+.rc-checkout .rc-checkout__mais-gatilho {
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+}
+
+.rc-checkout .rc-checkout__mais-corpo {
+  padding-top: var(--rc-espaco);
+}
+
+/* --- Pedido, agrupado por loja ------------------------------------------ */
+
+.rc-checkout .rc-checkout__loja {
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  margin-bottom: 0.5rem;
+}
+
+.rc-checkout .rc-checkout__loja:last-child {
+  margin-bottom: 0;
+}
+
+.rc-checkout .rc-checkout__loja-resumo {
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0.75rem;
+}
+
+.rc-checkout .rc-checkout__loja-nome {
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+}
+
+.rc-checkout .rc-checkout__loja-meta {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+}
+
+.rc-checkout .rc-checkout__loja-total {
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.rc-checkout .rc-checkout__itens {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+}
+
+/* `center` e não `baseline` desde que a miniatura entrou na linha: a imagem não
+   tem linha de base, e o navegador alinharia a borda inferior dela com o texto,
+   jogando nome e valor para o pé de um bloco de 48px. */
+.rc-checkout .rc-checkout__item {
+  align-items: center;
+  border-top: 1px solid var(--rc-borda);
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.rc-checkout .rc-checkout__item-imagem {
+  flex: none;
+  line-height: 0;
+}
+
+/*
+ * `max-width` ao lado de `width`, e não no lugar dele: o `woocommerce.css`
+ * dimensiona miniatura por `max-width`, e uma regra autoral que declare só
+ * `width` ganha a cascata sem mudar nada na tela — o teto veio de outra
+ * propriedade, que ninguém disputou.
+ */
+.rc-checkout .rc-checkout__item-foto {
+  border-radius: var(--rc-raio);
+  height: auto;
+  max-width: 48px;
+  object-fit: cover;
+  width: 48px;
+}
+
+/*
+ * `flex: 1 1 0` e não `auto`: em linha flex quem decide a quebra é a **base**, e
+ * um item com base automática entra na conta com a largura do próprio conteúdo —
+ * o nome longo de um produto empurraria o valor para outra linha antes de
+ * encolher. Aqui não há `wrap`, mas a mesma base é o que faz as reticências
+ * funcionarem.
+ */
+.rc-checkout .rc-checkout__item-nome {
+  flex: 1 1 0;
+  font-size: var(--rc-fonte-sm);
+  min-width: 0;
+}
+
+.rc-checkout .rc-checkout__item-qtd {
+  color: var(--rc-texto);
+  flex: none;
+  font-size: var(--rc-fonte-xs);
+}
+
+.rc-checkout .rc-checkout__item-valor {
+  flex: none;
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+}
+
+.rc-checkout .rc-checkout__vazio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  margin: 0;
+}
+
+/* --- Forma de pagamento, dentro do colapse de cada loja ------------------ */
+
+/*
+ * `<fieldset>` zerado: o padrão do navegador é margem lateral, padding e uma
+ * borda de 2px em `groove` que não combina com nenhum card do projeto.
+ */
+.rc-checkout .rc-checkout__meios {
+  border: 0;
+  border-top: 1px solid var(--rc-borda);
+  margin: 0 0.75rem 0.75rem;
+  padding: 0.75rem 0 0;
+}
+
+/* `<legend>` com `float: left` e não `display: block`: um legend no fluxo
+   normal continua interrompendo a borda do fieldset em vários navegadores, e o
+   recorte aparece mesmo com a borda zerada. */
+.rc-checkout .rc-checkout__meios-titulo {
+  float: left;
+  font-size: var(--rc-fonte-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+/*
+ * Grade de três colunas — rádio, ícone, texto —, com as duas primeiras cruzando
+ * as duas linhas. O nome vai em cima e a linha de apoio embaixo, alinhados pela
+ * mesma coluna, como no exemplo de referência.
+ */
+.rc-checkout .rc-checkout__meio {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--rc-raio);
+  column-gap: 0.5rem;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  margin-bottom: 0.25rem;
+  padding: 0.5rem;
+}
+
+.rc-checkout .rc-checkout__meio:last-child {
+  margin-bottom: 0;
+}
+
+.rc-checkout .rc-checkout__meio-radio,
+.rc-checkout .rc-checkout__meio-icone {
+  grid-row: 1 / span 2;
+}
+
+.rc-checkout .rc-checkout__meio-radio {
+  margin: 0;
+}
+
+.rc-checkout .rc-checkout__meio-icone {
+  line-height: 0;
+}
+
+/*
+ * O ícone é redundante ao nome que vem ao lado — sai com `aria-hidden` no
+ * markup —, então é gráfico decorativo e não entra no critério 1.4.11. É por
+ * isso que ele pode usar a primária, que como **texto** reprovaria.
+ */
+.rc-checkout .rc-meio-icone {
+  color: var(--reconectar-cor-primaria, #31BEB1);
+  display: block;
+  height: 32px;
+  max-width: 32px;
+  width: 32px;
+}
+
+.rc-checkout .rc-meio-icone--transferencia {
+  color: var(--reconectar-cor-institucional, #663191);
+}
+
+.rc-checkout .rc-checkout__meio-nome {
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-checkout .rc-checkout__meio-apoio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+/*
+ * Duas fontes para o mesmo realce, de propósito. A classe vem do servidor e é o
+ * que sobrevive à troca de fragmento; o `:has()` acompanha o clique antes de o
+ * AJAX voltar. Em regra separada porque `:has()` inválido invalidaria a regra
+ * inteira, e aí o estado escolhido não apareceria nem pela classe.
+ */
+.rc-checkout .rc-checkout__meio.is-escolhido {
+  background: var(--rc-fundo);
+  border-color: var(--rc-borda);
+}
+
+.rc-checkout .rc-checkout__meio:has( .rc-checkout__meio-radio:checked ) {
+  background: var(--rc-fundo);
+  border-color: var(--rc-borda);
+}
+
+/* Itálico e não cor de alerta, pelo mesmo motivo do "a combinar com a loja": é
+   informação sobre o estado da loja, não erro de quem compra. */
+.rc-checkout .rc-checkout__sem-meio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  font-style: italic;
+  margin: 0 0.75rem 0.75rem;
+}
+
+/* --- Resumo da compra --------------------------------------------------- */
+
+.rc-checkout .rc-checkout__totais {
+  margin: 0;
+}
+
+.rc-checkout .rc-checkout__linha {
+  display: flex;
+  gap: var(--rc-espaco);
+  justify-content: space-between;
+  padding: 0.375rem 0;
+}
+
+/* `margin: 0` no `<dd>` porque o padrão do navegador é um recuo de 40px à
+   esquerda, que jogaria o valor para longe da borda direita do card. */
+.rc-checkout .rc-checkout__linha-rotulo,
+.rc-checkout .rc-checkout__linha-valor {
+  font-size: var(--rc-fonte-sm);
+  margin: 0;
+}
+
+.rc-checkout .rc-checkout__linha-rotulo {
+  color: var(--rc-texto);
+}
+
+.rc-checkout .rc-checkout__linha-valor {
+  text-align: right;
+}
+
+.rc-checkout .rc-checkout__linha--total {
+  border-top: 1px solid var(--rc-borda);
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.rc-checkout .rc-checkout__linha--total .rc-checkout__linha-rotulo,
+.rc-checkout .rc-checkout__linha--total .rc-checkout__linha-valor {
+  color: inherit;
+  font-size: var(--rc-fonte-md);
+  font-weight: 600;
+}
+
+/*
+ * Verde no valor, pelo modificador do **contêiner**: quem carrega o `--desconto`
+ * é a `<div class="rc-checkout__linha">`, não o `<dd>` — é `%1$s` do `printf` de
+ * `reconectar_checkout_linha_de_total()`. Uma regra escrita em
+ * `.rc-checkout__linha-valor--desconto` não casaria com nada, o sintoma mais
+ * caro deste repositório: código no lugar certo que não faz nada.
+ *
+ * E é `--rc-cor-desconto`, nunca a primária: aqui a cor está sobre **texto que
+ * informa valor**, e #31BEB1 mede 2,30:1 sobre branco — critério 1.4.3 da WCAG
+ * 2.1 reprovado, a mesma armadilha já registrada para `.rc-card-categoria`.
+ */
+.rc-checkout .rc-checkout__linha--desconto .rc-checkout__linha-valor {
+  color: var(--rc-cor-desconto);
+}
+
+/*
+ * O meio escolhido, sob o valor de "Você pagará". Peso e corpo declarados
+ * porque o `<span>` mora **dentro** do `<dd>` da linha de total, que é 600 em
+ * `--rc-fonte-md`: sem isto o nome do gateway sairia do tamanho do próprio
+ * total, disputando a leitura com ele.
+ */
+.rc-checkout .rc-checkout__linha-meio {
+  color: var(--rc-texto);
+  display: block;
+  font-size: var(--rc-fonte-xs);
+  font-weight: 400;
+  margin-top: 0.125rem;
+}
+
+/* Itálico e não cor de alerta: "a combinar com a loja" é informação honesta
+   sobre o estado da loja, não erro do comprador. */
+.rc-checkout .rc-checkout__linha-valor--aviso {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  font-style: italic;
+}
+
+.rc-checkout .rc-checkout__fretes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rc-checkout .rc-checkout__frete {
+  align-items: baseline;
+  display: flex;
+  gap: 0.375rem;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/*
+ * A economia fica **fora** do `<dl>`, e por isso precisa da margem própria: ela
+ * não é uma linha de total: é a leitura das linhas acima, e somá-la ao subtotal
+ * como se fosse parcela produziria um resumo que não fecha.
+ */
+.rc-checkout .rc-checkout__economia {
+  color: var(--rc-cor-desconto);
+  font-size: var(--rc-fonte-sm);
+  margin: 0.5rem 0 0;
+}
+
+/* O valor vem de `wc_price()`, que embrulha o número num `<span>` próprio —
+   herdar não basta quando o Storefront veste aquela classe. */
+.rc-checkout .rc-checkout__economia .woocommerce-Price-amount {
+  color: inherit;
+  font-weight: 600;
+}
+
+.rc-checkout .rc-checkout__finalizar {
+  margin-top: var(--rc-espaco);
+  width: 100%;
+}
+
+/*
+ * Abaixo do botão porque é o ato dele que o texto qualifica ("ao finalizar você
+ * concorda…"). Corpo menor e cor de apoio: é nota de rodapé do card, e competir
+ * em peso com o botão atrapalharia justamente quem já decidiu comprar.
+ */
+.rc-checkout .rc-checkout__privacidade {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-compacta);
+  margin-top: 0.75rem;
+}
+
+.rc-checkout .rc-checkout__privacidade p {
+  margin: 0;
+}
+
+/* --- Pagamento ---------------------------------------------------------- */
+
+/*
+ * O `#payment` deixou de ser card quando a escolha migrou para o colapse de cada
+ * loja: o que resta dele no DOM é infraestrutura — o nonce, o `_wp_http_referer`
+ * e a lista global de gateways, que é quem leva um `payment_method` válido no
+ * POST. Sem borda, sem fundo e sem espaçamento, ele não desenha nada.
+ *
+ * O elemento **não** é escondido inteiro, e isso é deliberado: é dentro dele que
+ * o WooCommerce imprime "não há métodos de pagamento disponíveis", pelo filtro
+ * `woocommerce_no_available_payment_methods_message` que
+ * `explicar_ausencia_de_meios()` reescreve. Escondê-lo deixaria a tela sem
+ * explicação nenhuma justamente no caso em que ela é indispensável.
+ */
+.rc-checkout #payment {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rc-checkout .wc_payment_methods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * Some o **item de gateway**, nunca a `<ul>` inteira: a mensagem de "nenhum
+ * método disponível" é um `<li class="woocommerce-info">` irmão, dentro da mesma
+ * lista, e esconder o contêiner apagaria a única explicação da tela no caso em
+ * que loja alguma recebe.
+ *
+ * E é `display: none`, não `visibility` nem a técnica de leitor de tela: um
+ * rádio `:checked` fora da tela continua sendo enviado — é essa submissão que
+ * leva um `payment_method` válido no POST, e é justamente o que se quer
+ * preservar. A escolha que o comprador enxerga é a dos rádios por loja.
+ */
+.rc-checkout .wc_payment_methods > li.wc_payment_method {
+  display: none;
+}
+
+.rc-checkout .woocommerce-terms-and-conditions-wrapper,
+.rc-checkout .place-order {
+  font-size: var(--rc-fonte-sm);
+}
+
+/* --- Celular ------------------------------------------------------------ */
+
+/*
+ * 767px e não 768: é em 767px que a `.rc-barra-inferior` aparece, com
+ * `--rc-barra-altura` e `--rc-barra-refugio` declarados naquele mesmo bloco. Um
+ * media query de 768px deixaria uma faixa de 1px com a barra na tela e sem o
+ * recuo que reserva o espaço dela.
+ */
+@media (max-width: 767px) {
+  .rc-checkout form.checkout {
+    grid-template-columns: minmax(0, 1fr);
+    /* A barra fixa cobre o rodapé da página, e o resumo é o último card: sem o
+       recuo, o botão de finalizar nasce embaixo dela. */
+    padding-bottom: calc( var(--rc-barra-altura) + var(--rc-barra-refugio) + var(--rc-espaco) );
+  }
+
+  /*
+   * Escolha do usuário: no celular o resumo fica no fluxo, como último card, em
+   * vez de disputar a base da tela com a barra inferior. `grid-row: auto` desfaz
+   * o `span 20`, que numa coluna só empurraria todo o resto para baixo dele.
+   *
+   * O seletor repete o `form.checkout >` da regra de desktop porque media query
+   * **não** acrescenta especificidade: com um seletor mais fraco aqui, o
+   * `grid-row: 1 / span 20` de lá continuaria valendo no celular.
+   */
+  .rc-checkout form.checkout > .rc-checkout__resumo {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+  }
 }
 
 /* ==========================================================================
