@@ -100,11 +100,22 @@
    lados, alinhados em qualquer largura.
 
    O preço é a medida de texto na tela muito larga. Sem teto, um parágrafo de
-   descrição de produto atravessa os 2560px de um monitor ultrawide. O teto
-   passa a ser de quem tem texto corrido — `--rc-largura` em `.rc-forum`,
-   `.rc-forum-topico` e `.rc-login` —, e não do contêiner que carrega junto
-   grade de produtos, tabela de pedidos e o painel do Dokan, onde ele só
-   desperdiçava faixa.
+   descrição de produto atravessa os 2560px de um monitor ultrawide. O teto passa
+   a ser de quem tem texto corrido, e não do contêiner que carrega junto grade de
+   produtos, tabela de pedidos e o painel do Dokan, onde ele só desperdiçava
+   faixa.
+
+   **Teto de contêiner é a ferramenta errada para isso, e o fórum provou.**
+   `.rc-forum` e `.rc-forum-topico` carregavam `--rc-largura`, e o efeito era a
+   página inteira nascer 85px à direita do logotipo — medido a 1449px de viewport:
+   cabeçalho e `#primary` em x=40, o fórum em x=125. Um teto de 1200px numa tela
+   de 1449 não protege medida de texto nenhuma; só desalinha a página.
+
+   Quem protege medida é o elemento que **tem** o texto: `max-width: 70ch` no
+   parágrafo, como `.rc-loja__descricao` já fazia, e como o corpo da pergunta e o
+   da resposta passaram a fazer. `.rc-login` é o último consumidor de
+   `--rc-largura` e fica: é grade de duas colunas com arte à esquerda, em que
+   alargar esticaria a imagem, não a leitura.
 
    As três regras do tema pai estão dentro de `@media`, o que não lhes dá
    especificidade extra — esta vence por vir depois na cascata, já que o
@@ -2428,10 +2439,16 @@
 
    Nenhum `font-size` literal aqui: só degraus de `--rc-fonte-*`. */
 
-.rc-forum {
-  max-width: var(--rc-largura);
-  margin: 0 auto;
-}
+/* Sem régua própria: quem a faz é o `.col-full`, como em toda outra página.
+   O teto de `--rc-largura` que morava aqui punha o fórum 85px mais para dentro
+   que o logotipo e que a grade de produtos — medido a 1449px de viewport, o
+   cabeçalho e o `#primary` do catálogo em x=40, a listagem do fórum em x=125.
+
+   O argumento que justificava o teto é o da medida de texto, e esta tela não
+   tem texto corrido: é grade de três colunas com cards, da mesma natureza de
+   `ul.products`. Onde o argumento vale de fato — o corpo da pergunta, o da
+   resposta e os campos de escrita — o teto passou para o elemento de texto, no
+   molde que `.rc-loja__descricao` já usava. */
 
 .rc-forum-wrapper {
   /* O bbPress traz folha própria com margens generosas em volta de
@@ -3002,10 +3019,14 @@
 
 /* Pergunta e respostas ---------------------------------------------------- */
 
-.rc-forum-topico {
-  max-width: var(--rc-largura);
-  margin: 0 auto;
-}
+/* Sem régua própria, como na listagem: as duas telas do fórum precisam nascer na
+   mesma vertical do logotipo, e não 85px mais para dentro.
+
+   Aqui, porém, o conteúdo **é** coluna única de texto corrido, e é por isso que o
+   teto não desapareceu — mudou de dono. Medido a 1449px de viewport, sem teto
+   nenhum: o corpo da pergunta ia a 1275px e o campo de resposta a 1331px, cerca
+   de 160 caracteres por linha. Quem limita agora é o próprio parágrafo, no molde
+   de `.rc-loja__descricao`. */
 
 .rc-forum-pergunta,
 .rc-forum-resposta {
@@ -3033,6 +3054,10 @@
 .rc-forum-resposta__texto {
   margin-top: 12px;
   font-size: var(--rc-fonte-base);
+  /* O teto de medida que saiu de `.rc-forum-topico`. Medido, `70ch` resolve para
+     688px — a mesma medida de `.rc-loja__descricao`, que é o precedente do
+     projeto para isto. */
+  max-width: 70ch;
 }
 
 .rc-forum-topico__titulo-respostas {
@@ -3248,14 +3273,30 @@
    por regras que casem com `#bbp_topic_tags`, o resultado é lista vazia. Os
    450px medidos são a largura intrínseca de 40 caracteres, e em 375px o campo
    ultrapassava a viewport em 108px. Não é estouro de página, porque um ancestral
-   corta: é campo cortado, em que se digita sem ver o fim do que se escreveu. */
+   corta: é campo cortado, em que se digita sem ver o fim do que se escreveu.
+
+   O `textarea` entra pelo motivo oposto, e ele só apareceu quando o tópico
+   passou a ocupar a régua do site: sem teto, o campo de resposta media 1331px, e
+   quem escreve não consegue reler o parágrafo que acabou de digitar. `min()`
+   guarda as duas pontas — no celular vence o `100%`, no desktop o `70ch`.
+
+   `ch` é a largura do glifo zero **na fonte do elemento**, não uma medida
+   absoluta, e aqui isso é a favor: o bbPress declara `font-size: 12px` no
+   `textarea.bbp-the-content`, então os mesmos `70ch` resolvem para 506px no campo
+   e 688px no parágrafo já publicado — setenta caracteres nos dois, que é a medida
+   que se queria limitar. Quem trocar `ch` por um valor em px perde essa
+   propriedade sem que nada acuse. */
 #bbpress-forums .rc-forum__form-pergunta input[type="text"],
 #bbpress-forums .rc-forum__form-resposta input[type="text"],
+#bbpress-forums .rc-forum__form-pergunta textarea,
+#bbpress-forums .rc-forum__form-resposta textarea,
 .rc-forum__form-pergunta input[type="text"],
-.rc-forum__form-resposta input[type="text"] {
+.rc-forum__form-resposta input[type="text"],
+.rc-forum__form-pergunta textarea,
+.rc-forum__form-resposta textarea {
   box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
+  max-width: min(100%, 70ch);
 }
 
 /* ==========================================================================
