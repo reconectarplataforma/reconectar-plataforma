@@ -130,8 +130,14 @@ function reconectar_forum_selo_de_papel( $autor_id ) {
 /**
  * Imprime os três contadores de uma pergunta.
  *
- * Cada número leva o próprio rótulo por extenso no `aria-label`: "12" sozinho
- * não diz nada a quem navega por leitor de tela, e o ícone ao lado é decorativo.
+ * Cada número leva o próprio rótulo, **visível** e por extenso, embaixo dele:
+ * três círculos com "0", "0" e "3" não dizem qual é voto, qual é resposta e qual
+ * é visualização. Ícone com `title` foi descartado — o tooltip não existe no
+ * toque, e o celular é o uso principal da plataforma — e o texto na tela é o que
+ * o leitor de tela lê, sem camada sr-only duplicando a informação.
+ *
+ * O rótulo concorda com o número ("1 voto", "2 votos"): é o mesmo `_n()` que a
+ * frase acessível usava, só sem o número dentro.
  *
  * @param WP_Post $topico Pergunta.
  */
@@ -145,8 +151,7 @@ function reconectar_forum_contadores( $topico ) {
 		array(
 			'valor'  => $votos,
 			'classe' => 'rc-forum-contador--votos',
-			/* translators: %s: quantidade de votos. */
-			'texto'  => _n( '%s voto', '%s votos', abs( $votos ), 'reconectar' ),
+			'rotulo' => _n( 'voto', 'votos', abs( $votos ), 'reconectar' ),
 		),
 		array(
 			/*
@@ -159,29 +164,20 @@ function reconectar_forum_contadores( $topico ) {
 			'classe' => $resolvida
 				? 'rc-forum-contador--respostas rc-forum-contador--resolvida'
 				: 'rc-forum-contador--respostas',
-			/* translators: %s: quantidade de respostas. */
-			'texto'  => _n( '%s resposta', '%s respostas', $respostas, 'reconectar' ),
+			'rotulo' => _n( 'resposta', 'respostas', $respostas, 'reconectar' ),
 		),
 		array(
 			'valor'  => $vistas,
 			'classe' => 'rc-forum-contador--vistas',
-			/* translators: %s: quantidade de visualizações. */
-			'texto'  => _n( '%s visualização', '%s visualizações', $vistas, 'reconectar' ),
+			'rotulo' => _n( 'visualização', 'visualizações', $vistas, 'reconectar' ),
 		),
 	);
 	?>
 	<ul class="rc-forum-card__contadores">
 		<?php foreach ( $itens as $item ) : ?>
 			<li class="rc-forum-contador <?php echo esc_attr( $item['classe'] ); ?>">
-				<span class="rc-forum-contador__valor" aria-hidden="true"><?php echo esc_html( number_format_i18n( $item['valor'] ) ); ?></span>
-				<span class="screen-reader-text">
-					<?php
-					printf(
-						esc_html( $item['texto'] ),
-						esc_html( number_format_i18n( $item['valor'] ) )
-					);
-					?>
-				</span>
+				<span class="rc-forum-contador__valor"><?php echo esc_html( number_format_i18n( $item['valor'] ) ); ?></span>
+				<span class="rc-forum-contador__rotulo"><?php echo esc_html( $item['rotulo'] ); ?></span>
 			</li>
 		<?php endforeach; ?>
 		<?php if ( $resolvida ) : ?>
