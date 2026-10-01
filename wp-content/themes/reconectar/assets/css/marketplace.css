@@ -2821,24 +2821,34 @@
   list-style: none;
 }
 
+/* Rótulo visível sob o número: o círculo de 52px não comportava "visualizações"
+   (13 letras em 12px passam de 80px), então o contador virou ladrilho. A largura
+   mínima é a do rótulo mais longo, para os três ficarem do mesmo tamanho. */
 .rc-forum-contador {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
+  gap: 2px;
+  min-width: 5.875rem;
+  padding: 8px 6px;
+  border-radius: 14px;
   border: 1px solid var(--rc-borda);
   background: var(--rc-superficie);
   color: var(--rc-texto);
+  text-align: center;
 }
 
 .rc-forum-contador__valor {
-  font-size: var(--rc-fonte-base);
+  font-size: var(--rc-fonte-md);
   font-weight: 700;
   line-height: var(--rc-entrelinha-justa);
   color: var(--rc-texto-sobre-destaque);
+}
+
+.rc-forum-contador__rotulo {
+  font-size: var(--rc-fonte-2xs);
+  line-height: var(--rc-entrelinha-justa);
 }
 
 .rc-forum-contador--votos {
@@ -3724,7 +3734,32 @@
   }
 
   .rc-forum-card__contadores {
+    flex-wrap: wrap;
     justify-content: flex-start;
+    max-width: 100%;
+    gap: 4px 12px;
+  }
+
+  /*
+   * Três ladrilhos de 94px mais o selo somam 337px, e o cartão tem 294px úteis a
+   * 360px: o `nowrap` empurrava o cartão inteiro 27px para fora da tela, e o
+   * `overflow-x: hidden` do Storefront escondia o estouro (`scrollX` e a sobra do
+   * `documentElement` seguiam em zero). No estreito o contador vira "0 votos" em
+   * linha, sem caixa — a legenda continua visível, e o que não couber quebra.
+   * O `:not` mantém o selo ✓ de fora: ele é pílula, não ladrilho.
+   */
+  .rc-forum-contador:not(.rc-forum-contador--selo) {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .rc-forum-contador__rotulo {
+    font-size: var(--rc-fonte-xs);
   }
 
   .rc-forum__form-filtro {
