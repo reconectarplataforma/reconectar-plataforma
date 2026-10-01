@@ -168,9 +168,14 @@ class Reconectar_Incubadora {
 	 * slug inexistente ainda confirma ao visitante que a rota existe. Feed e
 	 * embed caem no mesmo teste: são a mesma consulta com outra saída.
 	 *
+	 * Pública porque a camada de leitura e o tema também a consultam — classe do
+	 * `<body>`, layout de largura total, cabeçalho de página. Um segundo teste
+	 * escrito à parte divergiria deste no primeiro caso novo, e a tela passaria a
+	 * se vestir de Incubadora onde o portão não a protege, ou o contrário.
+	 *
 	 * @return bool
 	 */
-	private static function requisicao_e_da_incubadora() {
+	public static function requisicao_e_da_incubadora() {
 		if ( is_singular( self::POST_TYPE ) || is_page( self::SLUG ) ) {
 			return true;
 		}

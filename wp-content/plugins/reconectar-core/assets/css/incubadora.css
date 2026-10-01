@@ -1,0 +1,413 @@
+/**
+ * Tela de leitura da Incubadora: árvore lateral, trilha e página.
+ *
+ * As duas exigências de todo CSS de plugin deste repositório valem aqui:
+ *
+ * 1. **`box-sizing` declarado no próprio componente.** O reset do tema não
+ *    alcança o plugin.
+ * 2. **Token sempre com fallback literal.** A Incubadora é plugin e não pode
+ *    exigir tema nenhum — a mesma razão dos `--rc-pe-*` do painel de empresas.
+ *
+ * Nenhum `font-size` literal: a escala de nove degraus mora no `:root` do tema,
+ * e aqui ela é consumida com o valor do degrau como recuo.
+ *
+ * Cor de link e de item ativo é a institucional (#663191, ~9:1 sobre branco),
+ * nunca a primária: #31BEB1 mede 2,30:1 e reprova o critério 1.4.3 da WCAG 2.1
+ * em texto — a armadilha do nome da categoria nos cards da home.
+ */
+
+/*
+ * O `overflow-x: hidden` do Storefront faz do `.site` um scroll container, e
+ * `position: sticky` adere ao scrollport do ancestral rolável mais próximo —
+ * que nunca rola. A árvore subiria com a página sem nada acusar no DevTools.
+ * `clip` recorta igual e não cria scroll container. Escopado à Incubadora pelo
+ * mesmo motivo do `.rc-checkout .site`: o `hidden` é o que segura o transbordo
+ * horizontal do celular no resto do site.
+ */
+.rc-tela-incubadora .site {
+	overflow-x: clip;
+}
+
+.rc-incubadora,
+.rc-incubadora *,
+.rc-incubadora *::before,
+.rc-incubadora *::after {
+	box-sizing: border-box;
+}
+
+.rc-incubadora {
+	--rc-incubadora-link: var(--reconectar-cor-institucional, #663191);
+	--rc-incubadora-borda: var(--rc-borda, #e4e4e7);
+	--rc-incubadora-fundo: var(--rc-fundo, #f7f7f8);
+	--rc-incubadora-apoio: var(--rc-texto, #717171);
+
+	display: grid;
+	gap: var(--rc-espaco, 16px);
+	grid-template-columns: minmax(0, 1fr);
+	margin: 0 0 calc(2 * var(--rc-espaco, 16px));
+}
+
+/* --- Pular a árvore ------------------------------------------------------ */
+
+/*
+ * Técnica absoluta, e não a variante no fluxo: num bloco de texto a variante
+ * no fluxo gera line box da altura do strut. O ancestral posicionado é o
+ * próprio `.rc-incubadora`, para o link não subir até o viewport — o defeito
+ * que fez a barra inferior sumir no carrossel.
+ */
+.rc-incubadora {
+	position: relative;
+}
+
+.rc-incubadora__pular {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.rc-incubadora__pular:focus {
+	z-index: 10;
+	top: 0;
+	left: 0;
+	width: auto;
+	height: auto;
+	padding: 8px 12px;
+	clip-path: none;
+	background: var(--rc-superficie, #ffffff);
+	border: 2px solid var(--rc-incubadora-link);
+	border-radius: var(--rc-raio, 8px);
+	color: var(--rc-incubadora-link);
+}
+
+/* --- Árvore lateral ------------------------------------------------------ */
+
+.rc-incubadora__gaveta {
+	background: var(--rc-superficie, #ffffff);
+	border: 1px solid var(--rc-incubadora-borda);
+	border-radius: var(--rc-raio, 8px);
+}
+
+.rc-incubadora__gatilho {
+	cursor: pointer;
+	font-size: var(--rc-fonte-base, 1rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	padding: 12px var(--rc-espaco, 16px);
+}
+
+.rc-incubadora__arvore {
+	padding: 0 8px 12px;
+}
+
+.rc-incubadora__espaco {
+	font-size: var(--rc-fonte-xs, 0.8125rem);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 12px 8px 8px;
+	text-transform: uppercase;
+}
+
+.rc-incubadora__espaco a {
+	color: var(--rc-incubadora-apoio);
+	text-decoration: none;
+}
+
+.rc-incubadora__arvore-vazia {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	margin: 0 8px;
+}
+
+.rc-incubadora__ramo {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/*
+ * O chevron fica à esquerda do título, numa reserva de 24px do `<li>`. No DOM
+ * ele vem **depois** do link (ver `arvore.php`), e é levado à primeira linha por
+ * `position: absolute` contra o `<li>`; a tabulação segue lendo título,
+ * expandir, filhas. Não é `order`: não há dois blocos trocados de lugar, só um
+ * ícone ao lado do texto que ele expande.
+ */
+.rc-incubadora__no {
+	margin: 0;
+	padding: 0 0 0 24px;
+	position: relative;
+}
+
+.rc-incubadora__no-link {
+	align-items: baseline;
+	border-radius: 6px;
+	color: var(--rc-texto-sobre-destaque, #27272a);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	gap: 4px 8px;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	padding: 6px 8px;
+	text-decoration: none;
+}
+
+.rc-incubadora__no-link:hover {
+	background: var(--rc-incubadora-fundo);
+	color: var(--rc-incubadora-link);
+}
+
+.rc-incubadora__no-link[aria-current="page"] {
+	background: var(--rc-incubadora-fundo);
+	box-shadow: inset 3px 0 0 var(--rc-incubadora-link);
+	color: var(--rc-incubadora-link);
+	font-weight: 600;
+}
+
+.rc-incubadora__no-titulo {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__no-gatilho {
+	align-items: center;
+	border-radius: 6px;
+	cursor: pointer;
+	display: flex;
+	height: 32px;
+	justify-content: center;
+	left: 0;
+	list-style: none;
+	position: absolute;
+	top: 0;
+	width: 24px;
+}
+
+.rc-incubadora__no-gatilho::-webkit-details-marker {
+	display: none;
+}
+
+/* Chevron desenhado em borda: sem ícone, sem fonte, sem requisição. */
+.rc-incubadora__no-gatilho::before {
+	border-bottom: 2px solid currentColor;
+	border-right: 2px solid currentColor;
+	content: "";
+	height: 7px;
+	transform: rotate(-45deg);
+	transition: transform 0.15s ease;
+	width: 7px;
+}
+
+.rc-incubadora__no-gaveta[open] > .rc-incubadora__no-gatilho::before {
+	transform: rotate(45deg);
+}
+
+.rc-incubadora__no-gatilho:hover {
+	background: var(--rc-incubadora-fundo);
+}
+
+.rc-incubadora__no-gatilho:focus-visible,
+.rc-incubadora__no-link:focus-visible,
+.rc-incubadora__gatilho:focus-visible {
+	outline: 2px solid var(--rc-incubadora-link);
+	outline-offset: 2px;
+}
+
+/*
+ * Os filhos voltam à margem do `<li>`, que reservou 24px para o chevron: sem
+ * isto o recuo do segundo nível somaria os 24px ao padding do `<ul>`.
+ */
+.rc-incubadora__no-gaveta {
+	margin-left: -24px;
+}
+
+.rc-incubadora__no-gaveta > .rc-incubadora__ramo {
+	padding-left: calc(24px + 8px);
+}
+
+/* --- Selos --------------------------------------------------------------- */
+
+.rc-incubadora__selo {
+	background: var(--reconectar-cor-destaque, #F1BF3D);
+	border-radius: 999px;
+	color: var(--rc-texto-sobre-destaque, #27272a);
+	display: inline-block;
+	font-size: var(--rc-fonte-2xs, 0.75rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	padding: 2px 8px;
+}
+
+.rc-incubadora__selo--destaque {
+	margin: 0 0 12px;
+}
+
+/* --- Coluna principal ---------------------------------------------------- */
+
+.rc-incubadora__principal {
+	min-width: 0;
+}
+
+.rc-incubadora__principal:focus {
+	outline: none;
+}
+
+.rc-incubadora__trilha ol {
+	color: var(--rc-incubadora-apoio);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	gap: 4px;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	list-style: none;
+	margin: 0 0 12px;
+	padding: 0;
+}
+
+.rc-incubadora__trilha li {
+	margin: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__trilha li + li::before {
+	content: "/";
+	margin-right: 4px;
+}
+
+.rc-incubadora__trilha a {
+	color: var(--rc-incubadora-link);
+}
+
+.rc-incubadora__titulo {
+	font-size: var(--rc-fonte-2xl, 1.75rem);
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 0 0 8px;
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__autoria {
+	color: var(--rc-incubadora-apoio);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	gap: 4px 8px;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 var(--rc-espaco, 16px);
+}
+
+/*
+ * A tabela é de metadados, duas colunas de rótulo e valor; no celular ela
+ * cabe, então segue tabela — sem a armadilha do `shop_table_responsive`.
+ * O `max-width` vai junto do `width` porque o Storefront dimensiona `table`.
+ */
+.rc-incubadora__metadados {
+	border-collapse: collapse;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 calc(1.5 * var(--rc-espaco, 16px));
+	max-width: 100%;
+	width: 100%;
+}
+
+.rc-incubadora__metadados th,
+.rc-incubadora__metadados td {
+	background: transparent;
+	border-bottom: 1px solid var(--rc-incubadora-borda);
+	padding: 8px 12px 8px 0;
+	text-align: left;
+	vertical-align: top;
+}
+
+.rc-incubadora__metadados th {
+	color: var(--rc-incubadora-apoio);
+	font-weight: 600;
+	white-space: nowrap;
+	width: 1%;
+}
+
+.rc-incubadora__conteudo {
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__conteudo img {
+	height: auto;
+	max-width: 100%;
+}
+
+.rc-incubadora__conteudo a {
+	color: var(--rc-incubadora-link);
+}
+
+.rc-incubadora__conteudo table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+	/* Scroll container horizontal: ver a armadilha do carrossel. */
+	position: relative;
+}
+
+.rc-incubadora__vazio,
+.rc-incubadora__estado-vazio {
+	color: var(--rc-incubadora-apoio);
+}
+
+.rc-incubadora__estado-vazio {
+	background: var(--rc-incubadora-fundo);
+	border: 1px dashed var(--rc-incubadora-borda);
+	border-radius: var(--rc-raio, 8px);
+	padding: var(--rc-espaco, 16px);
+}
+
+.rc-incubadora__estado-vazio p:last-child {
+	margin-bottom: 0;
+}
+
+/* --- Desktop ------------------------------------------------------------- */
+
+/*
+ * A partir de 992px a gaveta deixa de colapsar: o gatilho some e o conteúdo é
+ * forçado visível com o `<details>` fechado. São dois mecanismos, pelos motivos
+ * do `.rc-menu` do cabeçalho: navegador antigo esconde o filho por `display`,
+ * navegador atual esconde por `content-visibility` no `::details-content` do
+ * pai, e nenhum `display` no filho vence o segundo.
+ */
+@media (min-width: 992px) {
+	.rc-incubadora {
+		align-items: start;
+		gap: calc(2 * var(--rc-espaco, 16px));
+		grid-template-columns: 280px minmax(0, 1fr);
+	}
+
+	.rc-incubadora__lateral {
+		max-height: calc(100vh - 2 * var(--rc-espaco, 16px));
+		overflow-y: auto;
+		/* Scroll container: segura os `.screen-reader-text` absolutos. */
+		position: sticky;
+		top: var(--rc-espaco, 16px);
+	}
+
+	.rc-incubadora__gatilho {
+		display: none;
+	}
+
+	.rc-incubadora__arvore {
+		display: block;
+	}
+
+	.rc-incubadora__gaveta::details-content {
+		content-visibility: visible;
+	}
+
+	.rc-incubadora__titulo {
+		font-size: var(--rc-fonte-3xl, 2.25rem);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rc-incubadora__no-gatilho::before {
+		transition: none;
+	}
+}

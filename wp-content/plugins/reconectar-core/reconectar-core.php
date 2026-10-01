@@ -60,6 +60,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-forum.php';
 // a capacidade de escrita; e no plugin, não no tema, pela mesma razão das
 // campanhas: trocar de tema não pode apagar o conhecimento já escrito.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-leitura.php';
 
 // O avatar local também é plugin, e não tema, porque o que ele resolve é
 // proteção de dados: o Gravatar entrega a um terceiro o hash do e-mail de quem
@@ -114,5 +115,6 @@ function reconectar_core_init() {
 	// Também depois de `Reconectar_Permissoes`: o post type aponta suas
 	// primitivas para `CAP_GERIR_INCUBADORA`.
 	Reconectar_Incubadora::init();
+	Reconectar_Incubadora_Leitura::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );

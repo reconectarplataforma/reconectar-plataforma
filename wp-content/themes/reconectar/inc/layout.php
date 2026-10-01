@@ -69,7 +69,18 @@ function reconectar_ajustar_classes_de_layout( $classes ) {
 		|| is_singular( array( 'forum', 'topic', 'reply' ) )
 		|| is_tax( 'topic-tag' );
 
-	if ( ! is_front_page() && ! $painel_de_empresas && ! $pagina_de_loja && ! $listagem_de_lojas && ! $e_do_forum ) {
+	// A Incubadora é o sexto caso: ela imprime a própria coluna lateral — a
+	// árvore de páginas — e não chama `get_sidebar()`. A pergunta é feita ao
+	// plugin, que é quem sabe o que é da Incubadora. Dois `if` e não um `||`
+	// com `class_exists()`: com a classe ainda não carregada, o primeiro termo
+	// curto-circuitaria o segundo, e a tela sairia ora larga, ora estreita.
+	$e_da_incubadora = false;
+
+	if ( class_exists( 'Reconectar_Incubadora' ) ) {
+		$e_da_incubadora = Reconectar_Incubadora::requisicao_e_da_incubadora();
+	}
+
+	if ( ! is_front_page() && ! $painel_de_empresas && ! $pagina_de_loja && ! $listagem_de_lojas && ! $e_do_forum && ! $e_da_incubadora ) {
 		return $classes;
 	}
 
@@ -183,6 +194,40 @@ function reconectar_remover_titulo_da_listagem_do_forum() {
 	remove_action( 'storefront_page', 'storefront_page_header', 10 );
 }
 add_action( 'wp', 'reconectar_remover_titulo_da_listagem_do_forum' );
+
+/**
+ * Tira o título e a trilha do tema pai nas telas da Incubadora.
+ *
+ * A âncora `/incubadora/` é uma página comum, e o Storefront imprimiria o
+ * `<h1 class="entry-title">Incubadora</h1>` dela por cima do `<h1>` que a
+ * Incubadora imprime para a página aberta — dois cabeçalhos de primeiro nível,
+ * o mesmo defeito das funções irmãs acima. Sai o do tema pai: o da Incubadora é
+ * o que nomeia a página que se está lendo.
+ *
+ * A página isolada não passa por `storefront_page`, porque o template é do
+ * plugin; a remoção cobre só a âncora, mas a pergunta ao plugin já responde às
+ * duas, e não há por que separá-las aqui.
+ *
+ * A trilha do WooCommerce sai pelo motivo da pergunta do fórum: a Incubadora
+ * imprime a dela, que segue a árvore e omite a mãe em rascunho para quem não a
+ * enxerga. A do WooCommerce sobe por `post_parent` sem olhar a situação, e
+ * imprimiria o título de um rascunho na tela de um comprador.
+ *
+ * @return void
+ */
+function reconectar_remover_titulo_da_incubadora() {
+	if ( ! class_exists( 'Reconectar_Incubadora' ) ) {
+		return;
+	}
+
+	if ( ! Reconectar_Incubadora::requisicao_e_da_incubadora() ) {
+		return;
+	}
+
+	remove_action( 'storefront_page', 'storefront_page_header', 10 );
+	remove_action( 'storefront_before_content', 'woocommerce_breadcrumb', 10 );
+}
+add_action( 'wp', 'reconectar_remover_titulo_da_incubadora' );
 
 /**
  * Marca as páginas cujo título deve sair da tela, mas não do documento.
