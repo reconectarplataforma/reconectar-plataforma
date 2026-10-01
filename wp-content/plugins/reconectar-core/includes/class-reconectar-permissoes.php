@@ -159,6 +159,17 @@ class Reconectar_Permissoes {
 	const CAP_GERIR_ENQUETES = 'reconectar_gerir_enquetes';
 
 	/**
+	 * Criar, editar, mover e excluir páginas da Incubadora.
+	 *
+	 * Mesma forma de `CAP_GERIR_ENQUETES`: o post type aponta para ela todas as
+	 * primitivas e deixa as meta caps no padrão. Uma só capacidade, sem distinção
+	 * entre "minhas" e "dos outros", porque a Incubadora é uma wiki
+	 * colaborativa — quem a detém edita qualquer página, e `post_author` fica
+	 * como crédito, não como posse. Loja e Usuário Comum só leem.
+	 */
+	const CAP_GERIR_INCUBADORA = 'reconectar_gerir_incubadora';
+
+	/**
 	 * Todas as capacidades ligadas à administração de empresas.
 	 *
 	 * @var string[]
@@ -257,6 +268,7 @@ class Reconectar_Permissoes {
 		'edit_theme_options',
 		self::CAP_GERIR_CAMPANHAS,
 		self::CAP_GERIR_ENQUETES,
+		self::CAP_GERIR_INCUBADORA,
 	);
 
 	/**
@@ -345,7 +357,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 6;
+	const VERSAO_CAPACIDADES = 7;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -442,12 +454,14 @@ class Reconectar_Permissoes {
 				// Ele já entra no `/wp-admin` por `manage_options`, mas as duas
 				// abaixo não são decoração: `CAP_ADMIN_WP` mantém a trava com uma
 				// resposta coerente caso alguém um dia retire `manage_options` de
-				// um administrador a dedo, e as duas de CPT são primitivas — sem
-				// elas os menus Campanhas e Enquetes somem para quem instalou a
-				// plataforma, exatamente como aconteceria com as empresas.
+				// um administrador a dedo, e as três de CPT são primitivas — sem
+				// elas os menus Campanhas e Enquetes e a edição da Incubadora
+				// somem para quem instalou a plataforma, exatamente como
+				// aconteceria com as empresas.
 				$objeto->add_cap( self::CAP_ADMIN_WP );
 				$objeto->add_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->add_cap( self::CAP_GERIR_ENQUETES );
+				$objeto->add_cap( self::CAP_GERIR_INCUBADORA );
 
 				continue;
 			}
@@ -459,12 +473,13 @@ class Reconectar_Permissoes {
 			}
 
 			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
-			// a lista completa. Para qualquer outro, estas três não fazem sentido
-			// nenhum — e uma concessão feita por engano sai aqui.
+			// a lista completa. Para qualquer outro, estas quatro não fazem
+			// sentido nenhum — e uma concessão feita por engano sai aqui.
 			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
 				$objeto->remove_cap( self::CAP_ADMIN_WP );
 				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->remove_cap( self::CAP_GERIR_ENQUETES );
+				$objeto->remove_cap( self::CAP_GERIR_INCUBADORA );
 			}
 
 			foreach ( self::CAPS_DE_DESENVOLVIMENTO as $capacidade ) {
@@ -847,6 +862,7 @@ class Reconectar_Permissoes {
 			Reconectar_Empresa::POST_TYPE,
 			Reconectar_Campanha::POST_TYPE,
 			Reconectar_Proposta_Votacao::POST_TYPE,
+			Reconectar_Incubadora::POST_TYPE,
 			'post',
 			'page',
 			'forum',

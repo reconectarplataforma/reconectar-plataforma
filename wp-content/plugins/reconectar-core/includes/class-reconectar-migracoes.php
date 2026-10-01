@@ -39,8 +39,9 @@ class Reconectar_Migracoes {
 	 * 3 — apaga as metas de contagem favor/contra das enquetes.
 	 * 4 — reescreve as regras de permalink pela aba de comprovantes do painel.
 	 * 5 — reescreve as regras outra vez, pela remoção daquela aba.
+	 * 6 — reescreve as regras pelo post type da Incubadora (`incubadora_pagina`).
 	 */
-	const VERSAO = 5;
+	const VERSAO = 6;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -99,7 +100,9 @@ class Reconectar_Migracoes {
 	 *
 	 * O passo se repete por isso: a versão 4 acompanhou a criação da aba de
 	 * comprovantes, a 5 acompanha a remoção dela em favor de uma coluna na lista
-	 * de pedidos.
+	 * de pedidos, e a 6 acompanha o post type da Incubadora — que traz regra de
+	 * reescrita própria, `/incubadora/<pai>/<filho>/`, e responderia 404 numa
+	 * instalação já de pé pelo mesmo motivo.
 	 *
 	 * `flush_rewrite_rules()` é caro e por isso mora aqui, no mecanismo que roda
 	 * uma vez por instalação, e não num gancho de carga de página.
