@@ -307,6 +307,36 @@ catálogo é parte da demonstração da regra. Os votos são atribuídos a eleit
 que não são o autor do conteúdo — ninguém vota em si mesmo, no catálogo como no
 endpoint.
 
+**7 páginas da Incubadora**, a wiki interna, todas assinadas pelo Moderador
+(`demo-moderador`):
+
+| Página | Mãe | Status |
+|---|---|---|
+| Comece por aqui | — | publicada |
+| Guia do vendedor | — | publicada |
+| Cadastrar um produto | Guia do vendedor | publicada |
+| Receber por PIX | Guia do vendedor | publicada, com vídeo |
+| Governança | — | publicada |
+| Como funcionam as enquetes | Governança | publicada |
+| Atas e decisões | Governança | **rascunho** |
+
+O rascunho é de propósito: é ele que mostra a regra de leitura. O Moderador o
+vê na árvore com o selo "Rascunho"; a loja e o cliente não o veem e recebem 404
+no endereço dele. Uma demonstração só com páginas publicadas não teria como
+exibir essa diferença.
+
+O texto das páginas descreve **só o que a plataforma faz de fato** — uma
+página de ajuda que promete um recurso inexistente ensina errado quem a lê. E
+ele passa pelo mesmo sanitizador do editor: o que a allowlist recusaria sai na
+saída da carga como aviso, não em silêncio.
+
+O vídeo de "Receber por PIX" é declarado em `dados-demo.php`, na chave `video`
+do bloco `incubadora`, e foi escolhido pela equipe do projeto. Ele não se
+inventa: um ID plausível de YouTube abriria o vídeo de um terceiro qualquer
+dentro da plataforma. Com a chave vazia, a página sai sem vídeo e a carga
+avisa. Na leitura, o vídeo é uma capa estática; o player do
+`youtube-nocookie.com` só carrega no clique.
+
 **Lojas, clientes, Administradores e Moderador entram com a mesma senha**,
 `reconectar-demo`, definida
 em `demo.php` e substituível pela variável de ambiente
@@ -330,8 +360,8 @@ reais.
 
 ## Sobre a remoção
 
-A remoção apaga pedidos, produtos, campanhas, empresas, usuários, arquivos de
-mídia, termos de categoria e avaliações — permanentemente, sem passar pela
+A remoção apaga pedidos, produtos, campanhas, empresas, páginas da Incubadora,
+usuários, arquivos de mídia, termos de categoria e avaliações — permanentemente, sem passar pela
 lixeira. Ela é
 restrita ao que carrega a meta `_reconectar_demo`, mas ainda assim é
 irreversível, e por isso pede confirmação.
@@ -362,6 +392,18 @@ em cascata o que estiver dentro de um fórum, e uma pergunta feita por alguém d
 verdade durante a apresentação sairia junto sem nunca ter recebido a marcação.
 Preservar um agrupador vazio de dado fictício custa uma linha no seletor;
 apagar a pergunta de outra pessoa não tem desfazer.
+
+As páginas da Incubadora saem **antes dos usuários**, por um motivo próprio: o
+post type declara `delete_with_user => false`, e apagar o Moderador deixaria as
+páginas no ar, assinadas por uma conta que não existe mais. A busca alcança
+também a **lixeira** — é para lá que o botão Excluir da Incubadora manda a
+página, e `post_status => any` não a inclui. Sem isso, uma página excluída pela
+interface sobreviveria à remoção, e a carga seguinte criaria uma segunda com a
+mesma chave. Uma página real criada **sob** uma da demonstração não sai junto:
+`wp_delete_post()` sobe as filhas para a avó.
+
+Quando não há terminal — num job, num `ssh` sem `-t` —, a confirmação não tem
+como ser respondida, e `./scripts/seed-demo.sh remover` exige `-y`.
 
 As tags do fórum saem pelo mesmo caminho das categorias de produto — a consulta
 ao `termmeta` —, mas a taxonomia é lida do banco e não assumida:

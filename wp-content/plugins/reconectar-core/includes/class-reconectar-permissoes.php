@@ -159,6 +159,17 @@ class Reconectar_Permissoes {
 	const CAP_GERIR_ENQUETES = 'reconectar_gerir_enquetes';
 
 	/**
+	 * Criar, editar, mover e excluir páginas da Incubadora.
+	 *
+	 * Mesma forma de `CAP_GERIR_ENQUETES`: o post type aponta para ela todas as
+	 * primitivas e deixa as meta caps no padrão. Uma só capacidade, sem distinção
+	 * entre "minhas" e "dos outros", porque a Incubadora é uma wiki
+	 * colaborativa — quem a detém edita qualquer página, e `post_author` fica
+	 * como crédito, não como posse. Loja e Usuário Comum só leem.
+	 */
+	const CAP_GERIR_INCUBADORA = 'reconectar_gerir_incubadora';
+
+	/**
 	 * Todas as capacidades ligadas à administração de empresas.
 	 *
 	 * @var string[]
@@ -257,6 +268,7 @@ class Reconectar_Permissoes {
 		'edit_theme_options',
 		self::CAP_GERIR_CAMPANHAS,
 		self::CAP_GERIR_ENQUETES,
+		self::CAP_GERIR_INCUBADORA,
 	);
 
 	/**
@@ -345,7 +357,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 6;
+	const VERSAO_CAPACIDADES = 7;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -367,6 +379,8 @@ class Reconectar_Permissoes {
 		// Prioridade 11: revisa o que `bbp_map_meta_caps` decide em 10.
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restaurar_gestao_de_foruns' ), 11, 3 );
 		add_action( 'set_user_role', array( __CLASS__, 'sincronizar_papel_no_forum' ), 10, 2 );
+		// Prioridade 20: depois de `bbp_user_register`, em 10 — ver o método.
+		add_action( 'user_register', array( __CLASS__, 'sincronizar_papel_no_forum_ao_cadastrar' ), 20 );
 		add_action( 'template_redirect', array( __CLASS__, 'bloquear_comunidade' ) );
 		// Prioridade 1, e não a padrão: o WooCommerce registra em `admin_init` o
 		// seu próprio bloqueio (`WC_Admin::prevent_admin_access()`), que manda para
@@ -442,12 +456,14 @@ class Reconectar_Permissoes {
 				// Ele já entra no `/wp-admin` por `manage_options`, mas as duas
 				// abaixo não são decoração: `CAP_ADMIN_WP` mantém a trava com uma
 				// resposta coerente caso alguém um dia retire `manage_options` de
-				// um administrador a dedo, e as duas de CPT são primitivas — sem
-				// elas os menus Campanhas e Enquetes somem para quem instalou a
-				// plataforma, exatamente como aconteceria com as empresas.
+				// um administrador a dedo, e as três de CPT são primitivas — sem
+				// elas os menus Campanhas e Enquetes e a edição da Incubadora
+				// somem para quem instalou a plataforma, exatamente como
+				// aconteceria com as empresas.
 				$objeto->add_cap( self::CAP_ADMIN_WP );
 				$objeto->add_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->add_cap( self::CAP_GERIR_ENQUETES );
+				$objeto->add_cap( self::CAP_GERIR_INCUBADORA );
 
 				continue;
 			}
@@ -459,12 +475,13 @@ class Reconectar_Permissoes {
 			}
 
 			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
-			// a lista completa. Para qualquer outro, estas três não fazem sentido
-			// nenhum — e uma concessão feita por engano sai aqui.
+			// a lista completa. Para qualquer outro, estas quatro não fazem
+			// sentido nenhum — e uma concessão feita por engano sai aqui.
 			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
 				$objeto->remove_cap( self::CAP_ADMIN_WP );
 				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->remove_cap( self::CAP_GERIR_ENQUETES );
+				$objeto->remove_cap( self::CAP_GERIR_INCUBADORA );
 			}
 
 			foreach ( self::CAPS_DE_DESENVOLVIMENTO as $capacidade ) {
@@ -847,6 +864,7 @@ class Reconectar_Permissoes {
 			Reconectar_Empresa::POST_TYPE,
 			Reconectar_Campanha::POST_TYPE,
 			Reconectar_Proposta_Votacao::POST_TYPE,
+			Reconectar_Incubadora::POST_TYPE,
 			'post',
 			'page',
 			'forum',
@@ -1174,6 +1192,34 @@ class Reconectar_Permissoes {
 	 */
 	public static function sincronizar_papel_no_forum( $usuario_id, $papel ) {
 		if ( ! in_array( $papel, array( self::PAPEL_MODERADOR, self::PAPEL_ADMIN_EMPRESAS ), true ) ) {
+			return;
+		}
+
+		self::aplicar_moderacao_no_forum( $usuario_id );
+	}
+
+	/**
+	 * Repete a sincronização depois que o bbPress dá o papel padrão ao cadastro.
+	 *
+	 * `wp_insert_user()` grava o papel com `set_role()` — o que dispara
+	 * `set_user_role` e `sincronizar_papel_no_forum()` — e só **depois** dispara
+	 * `user_register`. Ali o bbPress (`bbp_user_add_role_on_register()`, pelo
+	 * `bbp_user_register` em prioridade 10) chama `bbp_set_user_role()` com o
+	 * papel padrão e grava `bbp_participant` por cima do `bbp_moderator` que
+	 * acabara de ser dado.
+	 *
+	 * O sintoma não é erro: Moderador e Administrador nascem sem moderar o fórum
+	 * (`edit.php?post_type=topic` em 403), e só quem já existia quando a
+	 * migração rodou fica certo. Foi a carga de demonstração, ao recriar os
+	 * usuários, que revelou — mas vale para todo cadastro desses dois papéis.
+	 *
+	 * @param int $usuario_id Usuário recém-cadastrado.
+	 * @return void
+	 */
+	public static function sincronizar_papel_no_forum_ao_cadastrar( $usuario_id ) {
+		$usuario = get_userdata( $usuario_id );
+
+		if ( ! $usuario || ! array_intersect( array( self::PAPEL_MODERADOR, self::PAPEL_ADMIN_EMPRESAS ), (array) $usuario->roles ) ) {
 			return;
 		}
 

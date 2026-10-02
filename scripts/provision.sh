@@ -563,6 +563,29 @@ else
   echo "Página 'Transparência' já existe."
 fi
 
+echo "== Página da Incubadora =="
+# Âncora da wiki da Incubadora, criada aqui pela mesma razão da Transparência:
+# o menu, logo abaixo, a consulta e a omite em silêncio quando não a acha, e uma
+# página feita à mão no painel não atravessa o deploy.
+#
+# O shortcode no conteúdo é o que faz a tela existir: sem ele a página responde
+# 200, não carrega `incubadora.css` e não desenha a árvore. A âncora é `page`,
+# e não o post type `incubadora_pagina`, porque a regra de reescrita do post type
+# exige um segmento depois de `/incubadora/` — a URL sozinha cai em `pagename`.
+#
+# Só `publish`: `get_page_by_path()` acharia um rascunho com o mesmo slug, e o
+# plugin descarta a âncora que não esteja publicada.
+if ! wp post list --post_type=page --name=incubadora --post_status=publish --field=ID | grep -q .; then
+  wp post create \
+    --post_type=page \
+    --post_title="Incubadora" \
+    --post_name=incubadora \
+    --post_status=publish \
+    --post_content="[reconectar_incubadora]"
+else
+  echo "Página 'Incubadora' já existe."
+fi
+
 echo "== Fórum inicial (bbPress) =="
 if ! wp post list --post_type=forum --field=ID | grep -q .; then
   wp post create \
@@ -659,8 +682,14 @@ else
   transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=6
 
+  # O visitante não vê este item: a Incubadora é só para quem entrou, e
+  # `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` o tira pelo ID
+  # da página — um link que só leva ao login seria defeito de interface.
+  incubadora_id=$(wp post list --post_type=page --name=incubadora --post_status=publish --field=ID)
+  [ -n "$incubadora_id" ] && wp menu item add-post "menu-principal" "$incubadora_id" --title="Incubadora" --position=7
+
   conta_id="$(reconectar_id_de_pagina_do_woo myaccount)"
-  [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=7
+  [ -n "$conta_id" ] && wp menu item add-post "menu-principal" "$conta_id" --title="Minha Conta" --position=8
 
   wp menu location assign menu-principal primary
 fi
@@ -719,6 +748,9 @@ if printf '%s\n' "$reconectar_menus_existentes" | grep -qx "menu-principal"; the
 
   transparencia_reparo_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   reconectar_reparar_item_de_menu "$transparencia_reparo_id" "Transparência"
+
+  incubadora_reparo_id=$(wp post list --post_type=page --name=incubadora --post_status=publish --field=ID)
+  reconectar_reparar_item_de_menu "$incubadora_reparo_id" "Incubadora"
 
   reconectar_reparar_item_de_menu "$(reconectar_id_de_pagina_do_woo myaccount)" "Minha Conta"
 fi

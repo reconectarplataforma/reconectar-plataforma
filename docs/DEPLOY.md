@@ -233,4 +233,11 @@ Na sua máquina, `chmod 400 dev.pem`.
 - **Rollback automático.** Voltar é reverter na `main` e disparar o
   `implantar.yml` à mão. Sem release versionada e sem symlink de versão.
 - **Ambiente de homologação separado.** Um servidor só, uma branch só.
+- **Backup de `uploads/`.** Imagens e PDFs enviados à Incubadora ficam em
+  `wp-content/uploads/reconectar-incubadora/`, que não está no Git nem no
+  `rsync` do deploy: existem só no servidor que os recebeu. O banco guarda a
+  referência, não o arquivo — restaurar só o dump deixa as páginas com imagem
+  quebrada. O backup dessa pasta é da infraestrutura. Arquivo enviado e nunca
+  salvo numa página vira órfão; `Reconectar_Incubadora_Arquivos::limpar_orfaos()`
+  os lista, e só apaga quando chamado com `false`.
 - **Rotação da chave.** O `dev.pem` é uma chave de longa duração num secret.

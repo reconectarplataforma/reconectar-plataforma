@@ -493,7 +493,242 @@ else
   echo "  --    nenhuma categoria de fórum; criação de pergunta não verificada"
 fi
 
-rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_ADMIN"
+# Os endpoints de escrita da Incubadora só respondem a POST e devolvem JSON, por
+# isso não cabem em `conferir`. Cada caso confere o status **e** o `codigo` do
+# corpo: os três perfis barrados recebem 401 ou 403, e um 403 sozinho não diria
+# qual trava respondeu. É o `codigo` que prova a ordem dos portões — loja e
+# cliente param em `capacidade`, antes do nonce que nunca recebem; o moderador
+# passa pela capacidade e para em `nonce`. Se a ordem se invertesse, os dois
+# primeiros passariam a responder `nonce`, e um teste só de status seguiria
+# verde.
+#
+# O GET existe porque `admin-post.php` dispara a ação também por GET, lendo
+# `action` de `$_REQUEST`: sem a trava de método, um link ou uma imagem numa
+# página gravaria em nome de quem a abrisse.
+#
+# O caminho feliz não cabe aqui — o nonce que o WP-CLI gera não vale no
+# servidor — e vai por WP-CLI no fim do script.
+conferir_escrita() {
+  local jar="$1" metodo="$2" acao="$3" esperado="$4" codigo_json="$5" descricao="$6"
+  local argumentos=( -s -w '\n%{http_code}' )
+  [ -n "$jar" ] && argumentos+=( -b "$jar" )
+
+  local resposta
+  if [ "$metodo" = "GET" ]; then
+    resposta="$(curl "${argumentos[@]}" "$BASE/wp-admin/admin-post.php?action=reconectar_incubadora_$acao")"
+  else
+    resposta="$(curl "${argumentos[@]}" \
+      --data-urlencode "action=reconectar_incubadora_$acao" \
+      --data-urlencode "pagina=1" \
+      --data-urlencode "titulo=Forjado" \
+      --data-urlencode "_wpnonce=invalido" \
+      "$BASE/wp-admin/admin-post.php")"
+  fi
+
+  local codigo corpo
+  codigo="$(printf '%s' "$resposta" | tail -1)"
+  corpo="$(printf '%s' "$resposta" | sed '$d')"
+
+  total=$((total + 1))
+  if [ "$codigo" = "$esperado" ] && [[ "$corpo" == *"\"codigo\":\"$codigo_json\""* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "$acao" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: esperado %s %s, veio %s %.80s\n' "$acao" "$descricao" "$esperado" "$codigo_json" "$codigo" "$corpo"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Escrita da Incubadora por HTTP"
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  for acao in salvar criar mover excluir enviar restaurar; do
+    conferir_escrita ""               POST "$acao" 401 login      "visitante é mandado entrar"
+    conferir_escrita "$JAR_CLIENTE"   POST "$acao" 403 capacidade "cliente barrado pela capacidade"
+    conferir_escrita "$JAR_VENDEDOR"  POST "$acao" 403 capacidade "loja barrada pela capacidade"
+    conferir_escrita "$JAR_MODERADOR" POST "$acao" 403 nonce      "moderador sem nonce barrado"
+    conferir_escrita "$JAR_MODERADOR" GET  "$acao" 405 metodo     "GET não grava"
+  done
+else
+  echo "  --    sessões de cliente, loja ou moderador ausentes; escrita não verificada"
+fi
+
+# O editor é uma camada por cima da leitura, e a camada inteira — script, nonce,
+# rota — só pode chegar a quem escreve. O nonce no HTML do cliente não abriria
+# a escrita sozinho, porque a capacidade é conferida antes dele; mas é a
+# segunda trava, e esta linha é o que avisa no dia em que ela ficar sozinha.
+# A agulha é o nome do objeto de dados, que só sai junto do script.
+echo "Editor da Incubadora (só para quem escreve)"
+caminho_incubadora="$(wp_eval '
+  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+  echo $p ? wp_parse_url( get_permalink( $p[0] ), PHP_URL_PATH ) : "";')"
+if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraEditor" "presente" "moderador recebe o editor"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "cliente só lê"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "loja só lê"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" 'data-rc-incubadora="editar"' "ausente" "cliente sem o botão Editar"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "tinymce.min.js" "ausente" "o TinyMCE só carrega no clique"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraArvore" "presente" "moderador recebe a árvore interativa"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraArvore" "ausente"  "cliente sem a árvore interativa"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="mover"' "ausente" "loja sem o botão Mover"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
+fi
+
+# O histórico mora no mesmo endereço da página, sob `?historico=1` e
+# `?versao=<ID>`. Para quem não edita, os dois parâmetros não existem: a
+# resposta é a página atual, com 200, e não um 403 — que confirmaria a quem
+# só lê que há uma versão com aquele ID. A agulha é a faixa da versão antiga
+# e o título da lista, que só saem nos dois modos.
+#
+# A versão vem da última revisão da página; sem nenhuma, `wp_save_post_revision()`
+# grava a primeira, para que a contagem de casos não dependa do estado do banco.
+echo "Histórico da Incubadora (só para quem edita)"
+versao_incubadora="$(wp_eval '
+  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+  if ( $p ) { $r = wp_get_post_revisions( $p[0], array( "posts_per_page" => 1 ) ); echo $r ? key( $r ) : (int) wp_save_post_revision( $p[0] ); }')"
+if [ -n "$caminho_incubadora" ] && [ -n "$versao_incubadora" ] && [ "$versao_incubadora" != "0" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" '?historico=1"' "presente" "moderador recebe o link Histórico"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" '?historico=1"' "ausente"  "cliente sem o link Histórico"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "presente" "moderador vê a lista de versões"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "cliente recebe a página, não a lista"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "loja recebe a página, não a lista"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "presente" "moderador vê a versão"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "cliente recebe a página atual"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "loja recebe a página atual"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "incubadora-historico.js" "ausente" "cliente sem o script de restaurar"
+  conferir "$JAR_CLIENTE"   "$caminho_incubadora?versao=999999999" "200" "versão inexistente não vaza ao cliente"
+  conferir "$JAR_MODERADOR" "$caminho_incubadora?versao=999999999" "404" "versão inexistente é 404 a quem edita"
+  conferir ""               "$caminho_incubadora?historico=1"      "302 wp-login.php" "visitante é mandado entrar"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; histórico não verificado"
+fi
+
+# A busca lê o mesmo conjunto que a árvore, e o vazamento que importa é o do
+# rascunho: o título e o trecho sairiam na lista para quem não pode abrir a
+# página. O par criado aqui é um rascunho e uma filha **publicada** sob ele —
+# a filha é o caso que um `post_status = publish` sozinho deixaria passar,
+# porque ela está publicada e é 404 ao cliente.
+#
+# A palavra é aleatória para que nenhuma página real case com ela; o par sai
+# no fim, com ou sem falha.
+echo "Busca na Incubadora"
+palavra_busca="rcbusca$(date +%s)"
+par_busca="$(wp_eval '
+  $mae = wp_insert_post( array( "post_type" => "incubadora_pagina", "post_status" => "draft", "post_title" => "Verificação da busca", "post_content" => "<p>'"$palavra_busca"' no rascunho</p>" ) );
+  $filha = $mae ? wp_insert_post( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "post_parent" => $mae, "post_title" => "Verificação da busca, filha", "post_content" => "<p>'"$palavra_busca"' na filha</p>" ) ) : 0;
+  echo $mae && $filha ? "$mae $filha" : "";')"
+if [ -n "$par_busca" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir ""               "/incubadora/?q=$palavra_busca" "302 wp-login.php" "visitante é mandado entrar"
+  conferir "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "200" "a âncora com busca não redireciona"
+  conferir_corpo "$JAR_MODERADOR" "/incubadora/?q=$palavra_busca" "2 páginas encontradas" "presente" "moderador acha o rascunho e a filha"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "cliente não acha nenhuma das duas"
+  conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "loja não acha nenhuma das duas"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Verificação da busca" "ausente" "nem o título vaza ao cliente"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=ab" "Escreva ao menos 3 caracteres" "presente" "busca curta pede mais texto"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E" "<script>alert(1)" "ausente" "texto buscado não volta como marcação"
+else
+  echo "  --    sessões ausentes, ou o par de teste não foi criado; busca não verificada"
+fi
+[ -n "$par_busca" ] && wp_eval 'foreach ( explode( " ", "'"$par_busca"'" ) as $id ) { wp_delete_post( (int) $id, true ); }' >/dev/null
+
+# Arquivos da Incubadora. A pasta fica dentro de `uploads/`, que o Apache
+# serve sem passar pelo WordPress: o acesso direto tem de bater no `.htaccess`
+# (403), e a única entrada é a rota autoral, que exige login. Os cabeçalhos
+# contam tanto quanto o status — sem `nosniff` e sem a CSP com `sandbox`, um
+# arquivo que passasse pela conferência de tipo ainda poderia ser
+# interpretado como página no domínio da plataforma.
+#
+# O arquivo de teste é gravado por WP-CLI, como o moderador, porque o nonce
+# do CLI não vale no navegador; a recusa por tamanho vai por HTTP, porque é
+# exatamente o caso em que o PHP descarta o corpo antes de o WordPress ver.
+conferir_cabecalho() {
+  local jar="$1" caminho="$2" agulha="$3" descricao="$4"
+  local cabecalhos
+
+  cabecalhos="$(curl -s -D - -o /dev/null -b "$jar" "$BASE$caminho" | tr -d '\r')"
+
+  total=$((total + 1))
+  if printf '%s' "$cabecalhos" | grep -qi -- "$agulha"; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "arquivo" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: cabeçalho "%s" ausente\n' "arquivo" "$descricao" "$agulha"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Arquivos da Incubadora"
+arquivo_teste=""
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ] && docker compose version >/dev/null 2>&1; then
+  arquivo_teste="$( ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user=demo-moderador eval '
+    $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1 ) );
+    if ( ! $p ) { return; }
+    $t = wp_tempnam( "rc-acessos.png" );
+    $i = imagecreatetruecolor( 8, 8 );
+    imagepng( $i, $t );
+    $r = Reconectar_Incubadora_Arquivos::guardar( $p[0], $t, "acessos.png" );
+    wp_delete_file( $t );
+    echo is_wp_error( $r ) ? "" : $r["arquivo"];' 2>/dev/null ) | tail -1 | tr -d '\r' )"
+fi
+
+if [ -n "$arquivo_teste" ]; then
+  rota_arquivo="/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=$arquivo_teste"
+  conferir ""               "/wp-content/uploads/reconectar-incubadora/$arquivo_teste" "403" "acesso direto à pasta barrado"
+  conferir ""               "$rota_arquivo" "401" "visitante não baixa"
+  conferir "$JAR_CLIENTE"   "$rota_arquivo" "200" "cliente logado baixa"
+  conferir "$JAR_VENDEDOR"  "$rota_arquivo" "200" "loja logada baixa"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-type: image/png" "tipo vem do arquivo"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^x-content-type-options: nosniff" "navegador não adivinha o tipo"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-security-policy: .*sandbox" "arquivo aberto em sandbox"
+  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=00000000000000000000000000000000.png" "404" "nome válido inexistente"
+  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=..%2F..%2F..%2Fwp-config.php" "404" "caminho fora da pasta recusado"
+
+  total=$((total + 1))
+  codigo_post="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR_CLIENTE" -X POST "$BASE$rota_arquivo")"
+  if [ "$codigo_post" = "405" ]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "arquivo" "POST não entrega"
+  else
+    printf '  FALHA %-24s POST não entrega: esperado 405, veio %s\n' "arquivo" "$codigo_post"
+    falhas=$((falhas + 1))
+  fi
+
+  ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
+    $n = "'"$arquivo_teste"'";
+    wp_delete_file( Reconectar_Incubadora_Arquivos::diretorio() . "/" . $n );
+    $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "any", "numberposts" => -1, "fields" => "ids" ) );
+    foreach ( $p as $id ) {
+      foreach ( get_post_meta( $id, Reconectar_Incubadora_Arquivos::META ) as $r ) {
+        if ( isset( $r["arquivo"] ) && $n === $r["arquivo"] ) { delete_post_meta( $id, Reconectar_Incubadora_Arquivos::META, $r ); }
+      }
+    }' >/dev/null 2>&1 )
+else
+  echo "  --    nenhuma página publicada, sessões ausentes ou Docker indisponível; entrega não verificada"
+fi
+
+# Acima de `post_max_size` o PHP descarta `$_POST` e `$_FILES` inteiros — o
+# nonce some junto, e sem a conferência de tamanho antes dele a pessoa leria
+# "link expirado" por ter enviado um arquivo grande. A ação vai na URL, que é
+# o único lugar de onde ela sobrevive.
+if [ -f "$JAR_MODERADOR" ]; then
+  corpo_grande="$(mktemp)"
+  head -c 9437184 /dev/zero > "$corpo_grande"
+  resposta_grande="$(curl -s -w '\n%{http_code}' -b "$JAR_MODERADOR" \
+    -F "action=reconectar_incubadora_enviar" -F "pagina=1" -F "arquivo=@$corpo_grande;filename=grande.png" \
+    "$BASE/wp-admin/admin-post.php?action=reconectar_incubadora_enviar")"
+  rm -f "$corpo_grande"
+
+  total=$((total + 1))
+  if [ "$(printf '%s' "$resposta_grande" | tail -1)" = "413" ] && [[ "$resposta_grande" == *'"codigo":"tamanho"'* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "enviar" "corpo acima do teto explica o tamanho"
+  else
+    printf '  FALHA %-24s corpo acima do teto: esperado 413 tamanho, veio %.80s\n' "enviar" "$resposta_grande"
+    falhas=$((falhas + 1))
+  fi
+fi
+
+rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_MODERADOR" "$JAR_ADMIN"
 
 # O isolamento entre vendedores não tem URL fixa: depende de qual produto
 # pertence a quem. Vai por WP-CLI, e nas duas direções — uma trava que negasse
@@ -769,6 +1004,43 @@ FIM
   fi
 else
   echo "  --    Docker Compose ausente; escrita no fórum não verificada"
+fi
+
+# O bloco HTTP mede as recusas; o caminho feliz só se exercita por WP-CLI,
+# porque o nonce que o CLI gera não vale no servidor. `verificar-incubadora.php`
+# chama as operações direto: com o moderador, cria uma árvore de teste, salva,
+# provoca conflito, publica, sobe até o teto de níveis, move e exclui — e apaga tudo
+# no fim; com cliente e loja, confere que a segunda camada recusa sozinha,
+# que é o que vale se a trava do handler regredir.
+#
+# `--user=<login>` e não `wp_set_current_user()`: o papel do bbPress só se
+# aplica no `init`, e o `eval` chega depois dele.
+echo "Escrita da Incubadora por WP-CLI"
+if docker compose version >/dev/null 2>&1; then
+  saida=""
+  for usuario in demo-moderador demo-cliente-marina demo-sabor-da-terra; do
+    parcial="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user="$usuario" eval-file /var/www/scripts/verificar-incubadora.php 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
+    if [ -z "$parcial" ]; then
+      parcial="FALHA $usuario-sem-resposta"
+    fi
+    saida="$saida$(printf '%s' "$parcial" | sed "s/^\([^ ]*\) /\1 $usuario: /")
+"
+  done
+
+  while IFS=" " read -r estado rotulo; do
+    [ -z "$estado" ] && continue
+    total=$((total + 1))
+    if [ "$estado" = "ok" ]; then
+      [ "$verboso" = "sim" ] && echo "  ok    $rotulo"
+    else
+      echo "  FALHA $rotulo"
+      falhas=$((falhas + 1))
+    fi
+  done <<FIM
+$saida
+FIM
+else
+  echo "  --    Docker Compose ausente; escrita da Incubadora não verificada"
 fi
 
 echo

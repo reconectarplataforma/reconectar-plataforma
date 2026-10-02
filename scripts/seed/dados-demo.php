@@ -999,6 +999,118 @@ return array(
 	),
 
 	/*
+	 * Páginas da Incubadora, a wiki interna da plataforma.
+	 *
+	 * `pai` é a `chave` de outra página deste mesmo bloco, e por isso a ordem
+	 * importa: a mãe vem antes da filha, ou a filha nasce na raiz. `ordem` vira
+	 * `menu_order`, que é o que a árvore lateral usa para ordenar irmãs.
+	 *
+	 * Uma das páginas é `draft` de propósito. É ela que mostra a regra de
+	 * leitura: o Moderador a vê na árvore com o selo de rascunho, e a loja e o
+	 * cliente recebem 404 no endereço dela. Uma demonstração só com páginas
+	 * publicadas não teria como exibir essa diferença.
+	 *
+	 * O `conteudo` passa pelo mesmo sanitizador que o editor usa, então o que
+	 * está aqui tem de ser o que a allowlist aceita — e o que ela recusaria sai
+	 * na saída da carga como aviso, não em silêncio. O texto descreve só o que a
+	 * plataforma faz de fato; uma página de ajuda que promete um recurso
+	 * inexistente ensina errado quem a lê.
+	 *
+	 * `{{video}}` marca onde entra o vídeo de `video`. A URL é escolhida pela
+	 * equipe do projeto, nunca inventada aqui: um ID plausível de YouTube abriria
+	 * um vídeo qualquer de terceiro dentro da plataforma. Vazia, a página sai sem
+	 * vídeo e a carga avisa.
+	 */
+	'incubadora' => array(
+		'autor'   => 'demo-moderador',
+		'video'   => 'https://www.youtube.com/watch?v=5JxN3ELqo9I',
+		'paginas' => array(
+			array(
+				'chave'    => 'incubadora-comece-por-aqui',
+				'titulo'   => 'Comece por aqui',
+				'status'   => 'publish',
+				'ordem'    => 0,
+				'dias'     => 30,
+				'conteudo' => '<p>A Incubadora reúne o que a equipe da Reconectar explica mais de uma vez: como vender, como receber e como a plataforma toma decisões. As páginas são escritas e revisadas pela moderação, e toda alteração fica no histórico.</p>'
+					. '<h2>Onde fica cada coisa</h2>'
+					. '<table><thead><tr><th scope="col">O que você procura</th><th scope="col">Onde encontrar</th></tr></thead><tbody>'
+					. '<tr><td>Painel da sua loja</td><td><code>/dashboard/</code></td></tr>'
+					. '<tr><td>Chave PIX e conta bancária</td><td><code>/dashboard/settings/payment/</code></td></tr>'
+					. '<tr><td>Perguntas e respostas entre lojas</td><td>Menu <strong>Comunidade</strong></td></tr>'
+					. '<tr><td>Enquetes e resultados</td><td><code>/transparencia/</code></td></tr>'
+					. '</tbody></table>'
+					. '<h2>Como ler estas páginas</h2>'
+					. '<ul><li>A árvore à esquerda mostra a página em que você está e as que estão ao lado dela.</li><li>A busca procura no título e no texto, sem diferença de acento.</li><li>O botão <strong>Compartilhar</strong> copia um endereço que continua valendo mesmo se a página mudar de lugar.</li></ul>',
+			),
+			array(
+				'chave'    => 'incubadora-guia-do-vendedor',
+				'titulo'   => 'Guia do vendedor',
+				'status'   => 'publish',
+				'ordem'    => 10,
+				'dias'     => 28,
+				'conteudo' => '<p>O caminho de uma loja, do cadastro do primeiro produto até o dinheiro na conta. Cada etapa tem a sua página logo abaixo desta.</p>'
+					. '<ol><li>Cadastrar os produtos.</li><li>Informar como recebe: PIX, conta bancária ou os dois.</li><li>Conferir o pagamento de cada pedido e mudar o status.</li></ol>'
+					. '<blockquote><p>A plataforma não recebe dinheiro em nome da loja. O comprador paga direto para quem vende, com os dados que a própria loja cadastrou.</p></blockquote>',
+			),
+			array(
+				'chave'    => 'incubadora-cadastrar-produto',
+				'pai'      => 'incubadora-guia-do-vendedor',
+				'titulo'   => 'Cadastrar um produto',
+				'status'   => 'publish',
+				'ordem'    => 0,
+				'dias'     => 27,
+				'conteudo' => '<p>No painel da loja, abra <strong>Produtos</strong> e use <strong>Adicionar novo produto</strong>.</p>'
+					. '<h2>O que não pode faltar</h2>'
+					. '<ul><li><strong>Nome</strong> que diga o que é, com a medida quando ela importa: “Farinha de mandioca 1 kg”.</li><li><strong>Preço</strong> da unidade que o cliente coloca no carrinho.</li><li><strong>Estoque</strong> real. Produto com estoque zerado sai da vitrine sozinho.</li><li><strong>Foto</strong> do próprio produto, com boa luz.</li></ul>'
+					. '<h2>Venda por peso</h2>'
+					. '<p>Ainda não existe preço por quilo com quantidade livre. O que funciona hoje é cadastrar a embalagem como produto — pacote de 500 g, por exemplo — e deixar o peso no nome.</p>',
+			),
+			array(
+				'chave'    => 'incubadora-receber-por-pix',
+				'pai'      => 'incubadora-guia-do-vendedor',
+				'titulo'   => 'Receber por PIX',
+				'status'   => 'publish',
+				'ordem'    => 10,
+				'dias'     => 25,
+				'conteudo' => '<p>Em <strong>Configurações → Pagamento</strong>, no painel da loja, preencha o tipo de chave, a chave, o nome de quem recebe e a cidade. Os quatro são usados para montar o código copia-e-cola que o comprador recebe.</p>'
+					. '{{video}}'
+					. '<h2>Depois da compra</h2>'
+					. '<ol><li>O comprador paga e envia o comprovante pela página do pedido.</li><li>O pedido aparece em <strong>Pagamento em conferência</strong> no seu painel.</li><li>Confira no extrato do banco e confirme. Só então o pedido segue para preparação.</li></ol>'
+					. '<p>Num carrinho com várias lojas, cada loja recebe a sua parte e confirma só o que é dela.</p>',
+			),
+			array(
+				'chave'    => 'incubadora-governanca',
+				'titulo'   => 'Governança',
+				'status'   => 'publish',
+				'ordem'    => 20,
+				'dias'     => 21,
+				'conteudo' => '<p>Como a comunidade da Reconectar participa das decisões sobre a plataforma.</p>'
+					. '<p>As regras de participação ainda estão sendo definidas com as lojas. Enquanto isso, as páginas desta seção descrevem o que já funciona.</p>',
+			),
+			array(
+				'chave'    => 'incubadora-enquetes',
+				'pai'      => 'incubadora-governanca',
+				'titulo'   => 'Como funcionam as enquetes',
+				'status'   => 'publish',
+				'ordem'    => 0,
+				'dias'     => 20,
+				'conteudo' => '<p>A moderação publica uma enquete com as alternativas e o prazo de votação. Enquanto ela está aberta, um cartão aparece em todas as telas do site.</p>'
+					. '<ul><li>Cada conta vota uma vez.</li><li>O resultado só fica público depois do encerramento, para que ninguém escolha olhando a maioria.</li><li>As enquetes encerradas ficam na página <strong>Transparência</strong>, com o resultado completo.</li></ul>',
+			),
+			array(
+				'chave'    => 'incubadora-atas',
+				'pai'      => 'incubadora-governanca',
+				'titulo'   => 'Atas e decisões',
+				'status'   => 'draft',
+				'ordem'    => 10,
+				'dias'     => 3,
+				'conteudo' => '<p>Rascunho. Esta página vai reunir as atas das reuniões com as lojas, uma seção por encontro.</p>'
+					. '<h2>Modelo de seção</h2>'
+					. '<ul><li>Data e participantes.</li><li>O que foi decidido.</li><li>O que ficou para o próximo encontro.</li></ul>',
+			),
+		),
+	),
+	/*
 	 * Fórum de perguntas e respostas.
 	 *
 	 * As `categorias` viram fóruns do bbPress; as `perguntas`, tópicos; e cada

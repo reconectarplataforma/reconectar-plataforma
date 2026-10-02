@@ -37,6 +37,10 @@ aconteceu neste repositório, e vários custaram horas.
 | `…/includes/class-reconectar-painel-empresas.php` | painel gerencial, rota própria fora do `/wp-admin` |
 | `…/includes/painel-empresas/` | os templates das telas do painel |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
+| `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca |
+| `…/includes/incubadora/` | os templates da Incubadora |
+| `…/assets/vendor/tinymce/8.9.2/` | o editor da Incubadora, vendorizado; origem e licença no `LEIAME.md` |
+| `scripts/verificar-incubadora.php` | operações da Incubadora por WP-CLI, chamado pelo `verificar-acessos.sh` |
 | `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
 | `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
@@ -75,9 +79,10 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-127 casos de permissão por HTTP, nos cinco perfis. Sai com status 1 se algum
-falhar. **Rode depois de mexer em qualquer coisa de RBAC** — as travas não têm
-teste automatizado além deste.
+274 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
+Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
+RBAC** — as travas não têm teste automatizado além deste.
 
 ```bash
 ./scripts/permissoes-dev.sh
@@ -1329,6 +1334,112 @@ sincronizar para `/wp-content/` e `/scripts/` na **raiz do servidor** — com
 `--rsync-path="sudo rsync"`, portanto como root e com `--delete`. Quem barra é
 o passo "Conferir que os secrets e variables existem", em
 `.github/actions/preparar-ssh/action.yml`.
+
+### Post type novo: o nome cabe em 20 caracteres, e o `query_var` fica ligado
+
+`wp_posts.post_type` é `varchar(20)`, com o mesmo `sql_mode` não estrito da
+armadilha do `post_status`: `reconectar_incubadora` (21) seria truncado no
+`INSERT`, em silêncio. Daí `incubadora_pagina`, com 18.
+
+Num post type hierárquico com `query_var => false`, a regra de reescrita passa a
+usar `pagename` — e `WP::parse_request()` confere `pagename` por
+`get_page_by_path()` **só no tipo `page`**. Medido: `/incubadora/<slug>/` caía na
+regra de anexo e respondia 404, com a regra do CPT bem ali em `wp rewrite list`.
+O `query_var` é o próprio `POST_TYPE`.
+
+E o `capabilities` do CPT declara só as **primitivas**. Mapear ali as meta caps
+(`edit_post`, `read_post`, `delete_post`) derruba o redirecionamento do
+`/wp-admin` que o resto do RBAC monta em cima delas.
+
+### Acima de `post_max_size` o PHP esvazia `$_POST` inteiro — inclusive o `action`
+
+Corpo maior que `post_max_size` chega com `$_POST` e `$_FILES` **vazios**. Não é
+só o arquivo que some: somem o nonce e o `action`. Com o `action` no corpo, o
+`admin-post.php` nem acha o handler; com ele lá e o nonce perdido, a resposta é
+"o formulário expirou", o usuário recarrega e perde o que não tinha salvo.
+
+O envio da Incubadora põe o `action` na **URL** e confere `CONTENT_LENGTH`
+contra `post_max_size` **antes** do nonce, respondendo 413 com o limite legível.
+Veja `Reconectar_Incubadora_Acoes::exigir_requisicao()`.
+
+E o limite que vale é o do PHP, não o da classe. O container tem
+`upload_max_filesize=2M`: os 5 MB de imagem e 10 MB de PDF de
+`Reconectar_Incubadora_Arquivos` são um teto, aplicado como `min()` com
+`wp_max_upload_size()`. Elevar é decisão de infraestrutura.
+
+### Rascunho novo tem `post_modified_gmt` zerado
+
+`0000-00-00 00:00:00` até a primeira gravação. `get_post_modified_time( 'U',
+true )` devolve `false`, que vira 0 na conta, e a tela dizia **"Editado há 57
+anos"** — um número absurdo o bastante para ninguém confiar no resto. Use
+`get_post_timestamp( $post, 'modified' )`, que cai na data local quando a GMT
+está zerada.
+
+### `wp_get_post_revision()` recebe o argumento por referência
+
+Uma expressão ali — `wp_get_post_revision( (int) $id )` — é **erro fatal**, não
+aviso. Converta numa variável antes.
+
+### `post_status => 'any'` não alcança a lixeira
+
+Nem o `auto-draft`: `any` exclui todo status registrado com
+`exclude_from_search`, e `trash` é um deles. Uma remoção que busque por `any`
+deixa para trás o que já foi excluído — e a Incubadora manda para a lixeira. A
+lista explícita está em `reconectar_demo_paginas_da_incubadora()`.
+
+### O bbPress regrava `bbp_participant` em `user_register`, depois do papel
+
+`wp_insert_user()` grava o papel com `set_role()` — que dispara `set_user_role` e
+a sincronização do fórum — e só **depois** dispara `user_register`. Ali
+`bbp_user_register` (prioridade 10) chama `bbp_set_user_role()` com o papel
+padrão e põe `bbp_participant` por cima do `bbp_moderator` recém-dado.
+
+O sintoma é um Moderador ou Administrador **novo** sem moderar o fórum
+(`edit.php?post_type=topic` em 403), enquanto os antigos funcionam. Foi a carga
+de demonstração, ao recriar os usuários, que revelou.
+`sincronizar_papel_no_forum_ao_cadastrar()` repete a sincronização em
+`user_register` prioridade 20.
+
+### TinyMCE `inline`: o navegador carrega o que o servidor ainda vai recusar
+
+Três defeitos do mesmo fato — no modo `inline` o conteúdo é DOM vivo:
+
+- **`<iframe>` colado é carregado na hora.** O sanitizador do servidor o tira
+  ao salvar, mas o navegador já chamou o host dele. O filtro fica no cliente
+  também, em `editor.parser.addNodeFilter( 'iframe' )`, com a mesma allowlist.
+- **`editor.remove()` devolve o conteúdo serializado ao elemento.** Os iframes
+  renascem por um instante, o bastante para chamar o provedor. Esvazie o
+  elemento **antes** do `remove()`.
+- **O player do vídeo é vivo na edição.** Abrir uma página em edição contata o
+  provedor; na leitura, a capa estática não. Está documentado, não é defeito.
+
+E duas da configuração. Uma imagem inserida com `alt=""` abre a janela do
+TinyMCE com **"decorativa" já marcada** e o campo de descrição desabilitado —
+medido —, e a decisão chega tomada para quem envia; por isso a imagem enviada
+entra **sem** `alt`, e quem garante o `alt=""` ao salvar é o sanitizador. E a
+base `emojiimages` do plugin `emoticons` busca as imagens numa CDN — a
+configurada é `emojis`, que é texto.
+
+O TinyMCE é carregado só no clique em Editar. Para conferir, a agulha é
+`tinymce.min.js`: o caminho `vendor/tinymce` aparece nos dados localizados da
+página mesmo sem o editor carregado.
+
+### Sanitizar o que o Moderador escreve é reconstruir, não filtrar
+
+Moderador e Administrador **não** têm `unfiltered_html`, e a Incubadora aceita
+vídeo, tabela e imagem. `Reconectar_Incubadora_Conteudo` remonta o HTML por
+`DOMDocument` a partir de uma lista fechada e passa por `wp_kses` depois, como
+segunda camada. A gravação roda entre `kses_remove_filters()` e `kses_init()`,
+em `try/finally`: sem isso o núcleo passaria o conteúdo pela allowlist genérica
+de post, que não é a da Incubadora e só poderia divergir dela; e sem o
+`finally` uma exceção deixaria o `kses` desligado para o resto da requisição.
+
+A leitura **sanitiza de novo** e tem render próprio, sem `the_content`: conteúdo
+gravado direto no banco — por restauração de dump, por migração — não passou
+pela gravação. `<img>` só da rota autoral de arquivos: imagem externa é
+rastreador, e a LGPD conta. A bateria de 70 casos de XSS vive fora do
+repositório; ao mexer no sanitizador, cada caso precisa de segunda passada
+idêntica, ou ele não é idempotente.
 
 ## Convenções
 

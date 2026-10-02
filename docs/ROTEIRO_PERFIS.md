@@ -169,6 +169,18 @@ pelo painel.
 > Digite a URL da comunidade à mão. É esse o teste que importa: a trava está no
 > backend, não na ausência do link.
 
+### 1.6 A Incubadora — Ana lê, e só lê
+
+Ainda logada como Ana, abra http://localhost:8090/incubadora/. A âncora leva à
+primeira página da árvore, "Comece por aqui", com as páginas publicadas na
+lateral. Não há botão **Editar**, **Nova subpágina**, **Mover…** nem
+**Histórico**: quem não tem `reconectar_gerir_incubadora` recebe só a leitura,
+e o script do editor nem chega ao navegador.
+
+Saia da conta e abra o mesmo endereço: `302` para o login. A Incubadora é
+interna — o item some do menu do visitante, a página sai com `noindex`, e
+nenhuma URL dela responde sem login.
+
 ---
 
 # Roteiro 2 — Vendedor
@@ -721,6 +733,61 @@ Em **Aparência → Menus** (`nav-menus.php`, `200`) o perfil cria e reordena me
 O princípio em uma frase: **o Moderador entra no painel para cuidar do que se
 lê, nunca do que se vende nem do que se instala.**
 
+### 4.6 A Incubadora — escrever sem entrar no `/wp-admin`
+
+A Incubadora é a wiki interna da plataforma, e tudo nela acontece no próprio
+site. Abra http://localhost:8090/incubadora/.
+
+**A árvore.** Na lateral, as sete páginas da demonstração, com "Atas e
+decisões" marcada **Rascunho** sob Governança. Ela existe para mostrar a regra
+de leitura: copie o endereço dela, entre como Ana (Roteiro 1) e abra — **404**.
+O cliente e a loja não veem o rascunho na árvore, nem na busca, nem pelo
+endereço.
+
+**Editar.** Em "Receber por PIX", clique em **Editar**. O editor abre sobre a
+própria página, sem tela de prévia: o que se vê enquanto se edita é o que será
+publicado. Mude uma frase e clique em **Atualizar**; a linha "Editado há…" sobe
+para agora. **Fechar** com alteração pendente pede confirmação. `Ctrl+S` também
+salva.
+
+**Vídeo.** O botão **Inserir vídeo** aceita link do YouTube ou do Vimeo. Na
+leitura, o vídeo é uma capa estática com botão de play: nada é pedido ao
+provedor antes do clique, e o player sai de `youtube-nocookie.com`. Dentro do
+editor o player é vivo — é a única situação em que abrir a página já contata o
+provedor.
+
+**O que o editor recusa.** Cole um `<iframe>` de outro site, um `<script>` ou
+uma imagem de outro domínio: ao salvar, o trecho sai e o aviso "Parte do
+conteúdo foi ajustada ao salvar" diz o quê. A recusa é do servidor, não do
+editor — o Moderador não tem `unfiltered_html`, e o conteúdo é reconstruído a
+partir de uma lista fechada de elementos.
+
+**Imagem e PDF.** Arraste ou cole uma imagem no editor, ou use **Anexar imagem
+ou PDF**. O PDF entra como link. O arquivo vai para uma pasta fora da biblioteca de mídia, com nome aleatório,
+servida só para quem está logado; a imagem perde os metadados (EXIF) e é
+reduzida a 2000 px. SVG é recusado, e o limite efetivo é o do servidor — **2 MB**
+no container de desenvolvimento.
+
+**Organizar.** **Nova subpágina** cria uma filha da página aberta, como
+rascunho. Arraste uma página na árvore para antes, para dentro ou para depois
+de outra; pelo teclado, **Mover…** abre um diálogo com a mãe e a posição. As
+subpáginas vão junto, e o link copiado por **Copiar link** continua valendo
+depois da mudança.
+
+**Histórico.** Em **Histórico** estão as versões gravadas, com autor e data.
+Abra uma antiga e use **Restaurar esta versão**: o estado de agora vira uma
+versão nova antes de ser substituído, então restaurar nunca perde nada.
+
+**Conflito.** Abra a mesma página em duas abas, edite e salve na primeira, e
+depois salve na segunda. A segunda recebe o aviso de que a página mudou e a
+opção **Salvar por cima da versão nova** — nada é sobrescrito sem que alguém
+escolha.
+
+**Buscar.** A busca da lateral não distingue acento nem maiúscula: "pix" acha
+"PIX". O Moderador acha o rascunho; Ana, com a mesma palavra, não acha.
+
+O Administrador e o Super Administrador fazem o mesmo. A loja lê, como Ana.
+
 ---
 
 # Roteiro 5 — Super Administrador
@@ -981,10 +1048,11 @@ As travas de acesso têm verificação automática:
 Faz login de verdade nos cinco perfis, bate em cada URL restrita e compara o
 código HTTP com o esperado — incluindo o isolamento entre lojas e entre
 empresas, nas duas direções, a escrita no fórum, a administração do fórum pelos
-dois perfis novos e as telas que continuam fora do alcance deles. São **127
-casos**; o script sai com status 1 se algum falhar. Rode antes de apresentar.
+dois perfis novos, as telas que continuam fora do alcance deles e as travas da
+Incubadora — leitura, escrita, histórico, busca e arquivos. São **274 casos**;
+o script sai com status 1 se algum falhar. Rode antes de apresentar.
 
-Isso cobre os itens 3, 4, 7, 8, 9, 12, 15, 16, 17, 20, 23, 24 e 25 da tabela
+Isso cobre os itens 3, 4, 7, 8, 9, 12, 15, 16, 17, 20, 23, 24, 25, 33 e 34 da tabela
 abaixo. O restante é visual e precisa de olho humano:
 
 | # | O que demonstrar | Evidência |
@@ -1021,6 +1089,10 @@ abaixo. O restante é visual e precisa de olho humano:
 | 30 | Loja sem meio cadastrado não vende, e o motivo aparece | seção 7.3 |
 | 31 | Uma instrução de pagamento por loja, com o valor do sub-pedido | seção 7.5 |
 | 32 | BR Code reconhecido por um app de banco real | seção 7.6 |
+| 33 | Incubadora só para quem está logado, sem edição para cliente e loja | seção 1.6 |
+| 34 | Rascunho da Incubadora invisível a quem só lê | 404 em "Atas e decisões", seção 4.6 |
+| 35 | Editar, mover e restaurar sem o `/wp-admin` | seção 4.6 |
+| 36 | Vídeo sem contato com o provedor antes do clique | seção 4.6 |
 
 ## Recomeçar
 
