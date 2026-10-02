@@ -1,8 +1,8 @@
 <?php
 /**
- * Escrita da Incubadora: salvar, criar e excluir páginas.
+ * Escrita da Incubadora: salvar, criar, mover e excluir páginas.
  *
- * Os três pontos de entrada passam por `admin-post.php` e respondem JSON. A
+ * Os quatro pontos de entrada passam por `admin-post.php` e respondem JSON. A
  * rota é a mesma do voto do fórum e do comprovante, e já está excetuada em
  * `Reconectar_Permissoes::bloquear_area_administrativa()` — um endpoint em
  * qualquer outro lugar do `/wp-admin` devolveria 302 para a área do usuário, e
@@ -10,7 +10,7 @@
  *
  * Cada ação é dividida em duas metades. O handler (`processar_*`) cuida do
  * transporte: método, sessão, capacidade e nonce, nessa ordem. A operação
- * (`salvar`, `criar`, `excluir`) cuida do domínio — a página existe, é deste
+ * (`salvar`, `criar`, `mover`, `excluir`) cuida do domínio — a página existe, é deste
  * post type, o usuário pode mexer **nela** — e devolve array ou `WP_Error`. A
  * divisão existe para a verificação: `wp_send_json()` encerra o processo, e
  * um teste por WP-CLI que chamasse o handler morreria junto. Pela operação, o
@@ -44,6 +44,7 @@ class Reconectar_Incubadora_Acoes {
 	const ACOES = array(
 		'salvar'  => 'processar_salvar',
 		'criar'   => 'processar_criar',
+		'mover'   => 'processar_mover',
 		'excluir' => 'processar_excluir',
 	);
 
@@ -67,7 +68,7 @@ class Reconectar_Incubadora_Acoes {
 	/**
 	 * Nome completo de uma ação, que é também a ação do nonce dela.
 	 *
-	 * @param string $acao `salvar`, `criar` ou `excluir`.
+	 * @param string $acao `salvar`, `criar`, `mover` ou `excluir`.
 	 * @return string
 	 */
 	public static function acao( $acao ) {
@@ -117,6 +118,50 @@ class Reconectar_Incubadora_Acoes {
 				'mae'    => isset( $_POST['mae'] ) ? absint( $_POST['mae'] ) : 0,
 			)
 		);
+		// phpcs:enable
+
+		self::responder( $resultado );
+	}
+
+	/**
+	 * Handler de `mover`.
+	 *
+	 * A resposta leva, além do resultado, a árvore e a trilha já refeitas. Mover
+	 * muda o endereço da página e de toda a subárvore dela: remendar no
+	 * navegador os `href` de cada descendente, o chevron da mãe que ganhou a
+	 * primeira filha e o da que perdeu a última seria reimplementar
+	 * `arvore.php` em JavaScript — e as duas versões divergiriam no primeiro
+	 * ajuste. `atual` e `abertos` só servem a esse desenho; não entram na
+	 * operação.
+	 *
+	 * @return void
+	 */
+	public static function processar_mover() {
+		self::exigir_requisicao( 'mover' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- conferido em `exigir_requisicao()`.
+		$resultado = self::mover(
+			array(
+				'pagina' => isset( $_POST['pagina'] ) ? absint( $_POST['pagina'] ) : 0,
+				'pai'    => isset( $_POST['pai'] ) ? absint( $_POST['pai'] ) : 0,
+				'ordem'  => isset( $_POST['ordem'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['ordem'] ) ) : array(),
+			)
+		);
+
+		if ( ! is_wp_error( $resultado ) ) {
+			$abertos   = isset( $_POST['abertos'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['abertos'] ) ) : array();
+			$abertos[] = $resultado['pai'];
+
+			$atual     = isset( $_POST['atual'] ) ? absint( $_POST['atual'] ) : 0;
+
+			// O endereço da página aberta muda se ela — ou uma ancestral dela —
+			// foi a movida; a tela corrige a barra de endereço com ele.
+			$resultado = array_merge(
+				$resultado,
+				Reconectar_Incubadora_Leitura::fragmentos( $atual, $abertos ),
+				array( 'url_atual' => $atual ? self::caminho( get_permalink( $atual ) ) : '' )
+			);
+		}
 		// phpcs:enable
 
 		self::responder( $resultado );
@@ -354,6 +399,155 @@ class Reconectar_Incubadora_Acoes {
 	}
 
 	/**
+	 * Põe uma página sob outra mãe, ou na raiz, numa posição entre as irmãs.
+	 *
+	 * `ordem` é a lista **inteira** das filhas do destino, já com a página no
+	 * lugar escolhido — e não um índice. Com índice, o servidor teria de supor
+	 * que a lista que a pessoa via é a do banco; se alguém criou ou moveu uma
+	 * irmã nesse meio-tempo, "terceira posição" cairia ao lado de outra página.
+	 * Com a lista inteira, a divergência se detecta: o conjunto recebido tem de
+	 * ser exatamente o das filhas atuais mais a página, ou a resposta é 409 e a
+	 * tela se recarrega antes de tentar de novo.
+	 *
+	 * Grava por `$wpdb`, numa transação, e não por `wp_update_post()`. Mover não
+	 * é editar: pelo núcleo, cada irmã renumerada ganharia uma revisão — e o
+	 * teto de 30 do histórico se gastaria em reordenação —, um
+	 * `post_modified` novo, que faria o editor aberto de outra pessoa acusar
+	 * conflito sem ninguém ter mexido no texto, e uma passada do kses no
+	 * conteúdo. A transação é o que impede uma reordenação pela metade, com
+	 * duas irmãs na mesma posição, se uma das gravações falhar.
+	 *
+	 * Só as situações que a árvore de quem escreve mostra — publicado e
+	 * rascunho — entram na conferência e na numeração. Uma página `pending` ou
+	 * `private`, criada por fora, não está na tela; exigi-la na lista faria toda
+	 * tentativa responder 409.
+	 *
+	 * @param array $dados {
+	 *     @type int   $pagina ID da página movida.
+	 *     @type int   $pai    ID da nova mãe, ou 0 para a raiz.
+	 *     @type int[] $ordem  IDs das filhas do destino, na ordem final.
+	 * }
+	 * @return array|WP_Error
+	 */
+	public static function mover( $dados ) {
+		global $wpdb;
+
+		$dados = wp_parse_args(
+			$dados,
+			array(
+				'pagina' => 0,
+				'pai'    => 0,
+				'ordem'  => array(),
+			)
+		);
+
+		$pagina = self::pagina_editavel( (int) $dados['pagina'], 'edit_post' );
+
+		if ( is_wp_error( $pagina ) ) {
+			return $pagina;
+		}
+
+		$pagina_id = (int) $pagina->ID;
+		$pai_id    = (int) $dados['pai'];
+
+		if ( $pai_id ) {
+			if ( is_wp_error( self::pagina_editavel( $pai_id, 'edit_post' ) ) ) {
+				return self::erro( 'pai_invalido', __( 'A página de destino não existe mais ou não pode ser editada.', 'reconectar-core' ), 422 );
+			}
+
+			// Sem esta guarda, a página passaria a ser filha de uma descendente
+			// dela: o ramo inteiro formaria um ciclo, sem caminho até a raiz, e
+			// sumiria da árvore — publicado, mas inalcançável.
+			if ( self::descende_de( $pai_id, $pagina_id ) ) {
+				return self::erro( 'pai_invalido', __( 'Uma página não pode ir para dentro dela mesma nem de uma das subpáginas dela.', 'reconectar-core' ), 422 );
+			}
+		}
+
+		// O teto vale para o ramo inteiro, não só para a página: a subpágina mais
+		// funda dela desce junto. A conta é a mesma de `criar()` — nenhuma página
+		// com mais de `PROFUNDIDADE_MAXIMA` ancestrais.
+		$ancestrais = $pai_id ? count( get_post_ancestors( $pai_id ) ) + 1 : 0;
+
+		if ( $ancestrais + self::altura( $pagina_id ) > Reconectar_Incubadora::PROFUNDIDADE_MAXIMA ) {
+			return self::erro(
+				'profundidade',
+				sprintf(
+					/* translators: %d: número máximo de níveis. */
+					__( 'A Incubadora admite até %d níveis de subpágina, e as subpáginas desta página passariam do limite. Escolha um destino num nível acima.', 'reconectar-core' ),
+					Reconectar_Incubadora::PROFUNDIDADE_MAXIMA
+				),
+				422
+			);
+		}
+
+		$ordem    = array_values( array_map( 'intval', (array) $dados['ordem'] ) );
+		$esperado = array_values( array_diff( self::filhas( $pai_id ), array( $pagina_id ) ) );
+		$esperado[] = $pagina_id;
+
+		$recebido = $ordem;
+		sort( $recebido );
+		sort( $esperado );
+
+		// `array_unique` à parte: `[5, 5, 7]` contra `[5, 7]` falharia já na
+		// contagem, mas `[5, 5]` contra `[5, 7]` só se pega comparando os dois.
+		if ( $recebido !== $esperado || count( array_unique( $ordem ) ) !== count( $ordem ) ) {
+			return self::erro( 'conflito', __( 'A árvore de páginas mudou desde que você a abriu — outra pessoa criou ou moveu uma página. Recarregue para ver a árvore atual e tente de novo.', 'reconectar-core' ), 409 );
+		}
+
+		$muda_de_mae = (int) $pagina->post_parent !== $pai_id;
+		$slug        = $pagina->post_name;
+
+		// O caminho é feito dos slugs, e duas irmãs com o mesmo slug teriam o
+		// mesmo endereço: a segunda ficaria inalcançável. O slug só muda quando
+		// colide, porque cada troca quebra os links copiados para a página.
+		if ( $muda_de_mae && '' !== $slug ) {
+			$slug = wp_unique_post_slug( $slug, $pagina_id, 'publish', Reconectar_Incubadora::POST_TYPE, $pai_id );
+		}
+
+		$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		$gravou = true;
+
+		foreach ( $ordem as $posicao => $id ) {
+			$campos = array( 'menu_order' => $posicao );
+
+			if ( $id === $pagina_id ) {
+				$campos['post_parent'] = $pai_id;
+				$campos['post_name']   = $slug;
+			}
+
+			// `update()` devolve 0 quando a linha já tinha esses valores; só
+			// `false` é falha.
+			if ( false === $wpdb->update( $wpdb->posts, $campos, array( 'ID' => $id ) ) ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$gravou = false;
+				break;
+			}
+		}
+
+		$wpdb->query( $gravou ? 'COMMIT' : 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		// Depois do `ROLLBACK` também: o cache não sabe da transação, e nada
+		// garante que ele não tenha sido aquecido no meio dela.
+		foreach ( $ordem as $id ) {
+			clean_post_cache( $id );
+		}
+
+		if ( ! $gravou ) {
+			return self::erro( 'servidor', __( 'Não foi possível mover a página. Nada foi alterado; tente de novo.', 'reconectar-core' ), 500 );
+		}
+
+		$pagina = get_post( $pagina_id );
+
+		return array(
+			'codigo'  => 'movida',
+			'id'      => $pagina_id,
+			'pai'     => $pai_id,
+			'posicao' => (int) array_search( $pagina_id, $ordem, true ),
+			'url'     => self::caminho( get_permalink( $pagina ) ),
+		);
+	}
+
+	/**
 	 * Manda uma página para a lixeira.
 	 *
 	 * Recusa página com filhas: levar uma página com subpáginas à lixeira
@@ -418,7 +612,7 @@ class Reconectar_Incubadora_Acoes {
 	 * capacidade foi consultada. Nesta ordem, um POST forjado por `curl`
 	 * recebe `capacidade`, e é essa a trava que a verificação mede.
 	 *
-	 * @param string $acao `salvar`, `criar` ou `excluir`.
+	 * @param string $acao `salvar`, `criar`, `mover` ou `excluir`.
 	 * @return void
 	 */
 	private static function exigir_requisicao( $acao ) {
@@ -592,6 +786,115 @@ class Reconectar_Incubadora_Acoes {
 		);
 
 		return null === $maior ? 0 : (int) $maior + 1;
+	}
+
+	/**
+	 * IDs das filhas de uma mãe que a árvore de quem escreve mostra, na ordem dela.
+	 *
+	 * A mesma ordenação de `Reconectar_Incubadora_Leitura::mapa_visivel()`:
+	 * `menu_order` e, no empate, o título.
+	 *
+	 * @param int $mae_id ID da mãe, ou 0 para a raiz.
+	 * @return int[]
+	 */
+	private static function filhas( $mae_id ) {
+		global $wpdb;
+
+		$ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_parent = %d AND post_status IN ( 'publish', 'draft' ) ORDER BY menu_order ASC, post_title ASC",
+				Reconectar_Incubadora::POST_TYPE,
+				$mae_id
+			)
+		);
+
+		return array_map( 'intval', $ids );
+	}
+
+	/**
+	 * Diz se uma página é a outra ou está abaixo dela.
+	 *
+	 * Sobe por `post_parent` a partir do candidato, com um conjunto de
+	 * visitados: um ciclo já gravado no banco — por importação, por edição
+	 * direta — faria um laço sem ele.
+	 *
+	 * @param int $candidato_id ID da página que se quer saber se é descendente.
+	 * @param int $ancestral_id ID da possível ancestral.
+	 * @return bool
+	 */
+	private static function descende_de( $candidato_id, $ancestral_id ) {
+		$id        = (int) $candidato_id;
+		$visitados = array();
+
+		while ( $id && ! isset( $visitados[ $id ] ) ) {
+			if ( $id === (int) $ancestral_id ) {
+				return true;
+			}
+
+			$visitados[ $id ] = true;
+			$id               = (int) wp_get_post_parent_id( $id );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Quantos níveis de subpágina há abaixo de uma página — 0 se ela não tem filhas.
+	 *
+	 * Conta todas as situações fora da lixeira, e não só as que a árvore mostra:
+	 * uma neta `pending` também desce junto quando a avó muda de lugar, e
+	 * passar do teto com ela quebraria a recursão da árvore do mesmo jeito.
+	 *
+	 * Uma consulta só, com o mapa de filhas montado em PHP: descer por consulta
+	 * a cada nível custaria uma ida ao banco por página do ramo.
+	 *
+	 * @param int $pagina_id ID da página.
+	 * @return int
+	 */
+	private static function altura( $pagina_id ) {
+		global $wpdb;
+
+		$linhas = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT ID, post_parent FROM {$wpdb->posts} WHERE post_type = %s AND post_status NOT IN ( 'trash', 'auto-draft', 'inherit' )",
+				Reconectar_Incubadora::POST_TYPE
+			)
+		);
+
+		$filhas = array();
+
+		foreach ( $linhas as $linha ) {
+			$filhas[ (int) $linha->post_parent ][] = (int) $linha->ID;
+		}
+
+		$altura    = 0;
+		$nivel     = array( (int) $pagina_id );
+		$visitados = array( (int) $pagina_id => true );
+
+		// Em largura, nível a nível: a altura é o número de níveis não vazios
+		// abaixo da página. O teto do laço é defesa contra ciclo, como em
+		// `descende_de()`.
+		while ( $altura <= Reconectar_Incubadora::PROFUNDIDADE_MAXIMA + 1 ) {
+			$proximo = array();
+
+			foreach ( $nivel as $id ) {
+				foreach ( isset( $filhas[ $id ] ) ? $filhas[ $id ] : array() as $filha ) {
+					if ( ! isset( $visitados[ $filha ] ) ) {
+						$visitados[ $filha ] = true;
+						$proximo[]           = $filha;
+					}
+				}
+			}
+
+			if ( ! $proximo ) {
+				break;
+			}
+
+			++$altura;
+			$nivel = $proximo;
+		}
+
+		return $altura;
 	}
 
 	/**

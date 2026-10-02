@@ -698,3 +698,115 @@
 		transition: none;
 	}
 }
+
+/* --- Árvore interativa: criar e mover ------------------------------------ */
+
+.rc-incubadora__nova.rc-incubadora__nova {
+	margin: 0 8px 12px;
+	width: calc(100% - 16px);
+}
+
+.rc-incubadora__arvore-dica {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-2xs, 0.75rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 12px 8px 0;
+}
+
+/*
+ * Zonas de soltar. Linha acima ou abaixo para "antes" e "depois", contorno
+ * para "dentro" — as mesmas três leituras de um gerenciador de arquivos. Por
+ * `box-shadow` e não por borda: borda mexeria na altura do link, e o ponteiro
+ * mudaria de zona sozinho, em laço, a cada repintura.
+ */
+.rc-incubadora__no--antes > .rc-incubadora__no-link {
+	box-shadow: inset 0 3px 0 var(--rc-incubadora-link);
+}
+
+.rc-incubadora__no--depois > .rc-incubadora__no-link {
+	box-shadow: inset 0 -3px 0 var(--rc-incubadora-link);
+}
+
+.rc-incubadora__no--dentro > .rc-incubadora__no-link {
+	background: var(--rc-incubadora-fundo);
+	box-shadow: inset 0 0 0 2px var(--rc-incubadora-link);
+}
+
+.rc-incubadora__no--arrastada > .rc-incubadora__no-link {
+	opacity: 0.5;
+}
+
+/* --- Diálogo -------------------------------------------------------------- */
+
+.rc-incubadora__dialogo {
+	border: 1px solid var(--rc-incubadora-borda);
+	border-radius: var(--rc-raio, 8px);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+	color: #1f1f1f;
+	max-width: min(32rem, calc(100vw - 32px));
+	padding: var(--rc-espaco, 16px) calc(1.5 * var(--rc-espaco, 16px));
+	width: 100%;
+}
+
+.rc-incubadora__dialogo::backdrop {
+	background: rgba(0, 0, 0, 0.45);
+}
+
+.rc-incubadora__dialogo-titulo {
+	font-size: var(--rc-fonte-lg, 1.25rem);
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 0 0 12px;
+}
+
+.rc-incubadora__dialogo-ajuda {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	margin: 0 0 12px;
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__dialogo-campo {
+	display: grid;
+	gap: 4px;
+	margin: 0 0 12px;
+}
+
+.rc-incubadora__dialogo-campo label {
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	font-weight: 600;
+}
+
+/*
+ * Classe dobrada contra o `input[type="text"]` (0,1,1) do Storefront, e
+ * `font-family` explícita contra o `select` dele, que tira a Poppins.
+ * `max-width` ao lado de `width`: um `<option>` comprido não estica o select
+ * para fora do diálogo.
+ */
+.rc-incubadora__dialogo-entrada.rc-incubadora__dialogo-entrada {
+	background: #fff;
+	border: 1px solid #8a8a93;
+	border-radius: 6px;
+	color: #1f1f1f;
+	font-family: inherit;
+	font-size: var(--rc-fonte-base, 1rem);
+	max-width: 100%;
+	min-width: 0;
+	padding: 8px 10px;
+	width: 100%;
+}
+
+.rc-incubadora__dialogo-entrada:focus-visible {
+	outline: 3px solid var(--reconectar-cor-destaque, #F1BF3D);
+	outline-offset: 1px;
+}
+
+.rc-incubadora__dialogo-botoes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 16px 0 0;
+}
+
+.rc-incubadora__dialogo .rc-incubadora__alerta {
+	margin: 0;
+}

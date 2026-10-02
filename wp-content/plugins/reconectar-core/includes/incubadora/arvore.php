@@ -14,6 +14,10 @@
  * problema do `<details open>` no celular: a árvore inteira já está dentro da
  * gaveta fechada da moldura.
  *
+ * `data-rc-id` no `<li>` é o que o arrastar e o "Mover…" leem para montar a
+ * ordem das irmãs: a árvore inteira está no DOM, fechada ou não, e é ela a
+ * cópia que a pessoa vê da estrutura — o servidor confere se ainda é a atual.
+ *
  * @package reconectar-core
  *
  * @var int   $mae
@@ -34,7 +38,7 @@ defined( 'ABSPATH' ) || exit;
 		$rc_e_atual    = $rc_id === (int) $contexto['atual'];
 		$rc_aberto     = $rc_e_atual || in_array( $rc_id, $abertos, true );
 		?>
-		<li class="rc-incubadora__no<?php echo $rc_tem_filhas ? ' rc-incubadora__no--com-filhas' : ''; ?>">
+		<li class="rc-incubadora__no<?php echo $rc_tem_filhas ? ' rc-incubadora__no--com-filhas' : ''; ?>" data-rc-id="<?php echo esc_attr( $rc_id ); ?>">
 			<a class="rc-incubadora__no-link" href="<?php echo esc_url( get_permalink( $rc_no ) ); ?>"<?php echo $rc_e_atual ? ' aria-current="page"' : ''; ?>>
 				<span class="rc-incubadora__no-titulo"><?php echo esc_html( $rc_titulo ); ?></span>
 				<?php if ( 'draft' === $rc_no->post_status ) : ?>

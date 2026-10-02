@@ -56,7 +56,8 @@
 		vazio: '',
 		editor: null,
 		salvando: false,
-		carregando: null
+		carregando: null,
+		focarTitulo: false
 	};
 
 	var campoTitulo = null;
@@ -695,8 +696,17 @@
 			estado.editor = editores[ 0 ];
 			estado.editor.getBody().setAttribute( 'aria-label', t.corpoRotulo );
 			estado.editor.setDirty( false );
-			estado.editor.focus();
 			anunciar( t.editando );
+
+			// Página recém-criada: o título provisório é o primeiro a trocar.
+			if ( estado.focarTitulo && campoTitulo ) {
+				estado.focarTitulo = false;
+				campoTitulo.focus();
+				campoTitulo.select();
+				return;
+			}
+
+			estado.editor.focus();
 		} ).catch( function () {
 			desmontarInterface();
 			corpo.innerHTML = estado.leitura;
@@ -942,4 +952,18 @@
 
 	botaoEditar.hidden = false;
 	botaoEditar.addEventListener( 'click', editar );
+
+	/*
+	 * `?editar=1` é como a árvore entrega a página que acabou de criar: abre já
+	 * no editor. O parâmetro sai do endereço antes de abrir, para que recarregar
+	 * ou copiar o link não reabra a edição.
+	 */
+	var endereco = new URL( window.location.href );
+
+	if ( '1' === endereco.searchParams.get( 'editar' ) ) {
+		endereco.searchParams.delete( 'editar' );
+		window.history.replaceState( window.history.state, '', endereco.pathname + endereco.search + endereco.hash );
+		estado.focarTitulo = true;
+		editar();
+	}
 }() );

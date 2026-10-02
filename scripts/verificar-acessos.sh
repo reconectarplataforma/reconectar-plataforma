@@ -542,7 +542,7 @@ conferir_escrita() {
 
 echo "Escrita da Incubadora por HTTP"
 if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
-  for acao in salvar criar excluir; do
+  for acao in salvar criar mover excluir; do
     conferir_escrita ""               POST "$acao" 401 login      "visitante é mandado entrar"
     conferir_escrita "$JAR_CLIENTE"   POST "$acao" 403 capacidade "cliente barrado pela capacidade"
     conferir_escrita "$JAR_VENDEDOR"  POST "$acao" 403 capacidade "loja barrada pela capacidade"
@@ -568,6 +568,9 @@ if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "loja só lê"
   conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" 'data-rc-incubadora="editar"' "ausente" "cliente sem o botão Editar"
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "tinymce.min.js" "ausente" "o TinyMCE só carrega no clique"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraArvore" "presente" "moderador recebe a árvore interativa"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraArvore" "ausente"  "cliente sem a árvore interativa"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="mover"' "ausente" "loja sem o botão Mover"
 else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
 fi
@@ -853,7 +856,7 @@ fi
 # O bloco HTTP mede as recusas; o caminho feliz só se exercita por WP-CLI,
 # porque o nonce que o CLI gera não vale no servidor. `verificar-incubadora.php`
 # chama as operações direto: com o moderador, cria uma árvore de teste, salva,
-# provoca conflito, publica, sobe até o teto de níveis e exclui — e apaga tudo
+# provoca conflito, publica, sobe até o teto de níveis, move e exclui — e apaga tudo
 # no fim; com cliente e loja, confere que a segunda camada recusa sozinha,
 # que é o que vale se a trava do handler regredir.
 #

@@ -14,6 +14,10 @@
  * páginas, quem navega por teclado atravessaria cinquenta links a cada página
  * aberta antes de chegar ao texto.
  *
+ * "Nova página" fica no topo da árvore, e não ao pé: com cinquenta páginas, o
+ * pé está fora da tela. Nasce `hidden` pelo motivo dos botões da página —
+ * sem script ele não faria nada.
+ *
  * @package reconectar-core
  *
  * @var array $contexto
@@ -40,28 +44,20 @@ $rc_url_raiz = $contexto['url_raiz'];
 					<?php endif; ?>
 				</p>
 
-				<?php if ( empty( $contexto['filhos'][0] ) ) : ?>
-					<p class="rc-incubadora__arvore-vazia"><?php esc_html_e( 'Nenhuma página ainda.', 'reconectar-core' ); ?></p>
-				<?php else : ?>
-					<?php Reconectar_Incubadora_Leitura::imprimir_ramo( 0, $contexto ); ?>
+				<?php if ( Reconectar_Incubadora_Leitura::ve_rascunho() ) : ?>
+					<button type="button" class="rc-incubadora__botao rc-incubadora__nova" data-rc-incubadora="criar" data-rc-mae="0" hidden><?php esc_html_e( 'Nova página', 'reconectar-core' ); ?></button>
 				<?php endif; ?>
+
+				<div class="rc-incubadora__arvore-corpo">
+					<?php echo Reconectar_Incubadora_Leitura::html_do_template( 'arvore-corpo.php', $contexto ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado no template. ?>
+				</div>
 			</nav>
 		</details>
 	</aside>
 
 	<div class="rc-incubadora__principal" id="rc-incubadora-conteudo" tabindex="-1">
 		<?php if ( $rc_pagina instanceof WP_Post ) : ?>
-			<nav class="rc-incubadora__trilha" aria-label="<?php esc_attr_e( 'Trilha da Incubadora', 'reconectar-core' ); ?>">
-				<ol>
-					<?php if ( $rc_url_raiz ) : ?>
-						<li><a href="<?php echo esc_url( $rc_url_raiz ); ?>"><?php esc_html_e( 'Incubadora', 'reconectar-core' ); ?></a></li>
-					<?php endif; ?>
-					<?php foreach ( $contexto['caminho'] as $rc_ancestral ) : ?>
-						<li><a href="<?php echo esc_url( get_permalink( $rc_ancestral ) ); ?>"><?php echo esc_html( get_the_title( $rc_ancestral ) ); ?></a></li>
-					<?php endforeach; ?>
-					<li><span aria-current="page"><?php echo esc_html( get_the_title( $rc_pagina ) ); ?></span></li>
-				</ol>
-			</nav>
+			<?php echo Reconectar_Incubadora_Leitura::html_do_template( 'trilha.php', $contexto ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado no template. ?>
 
 			<?php include __DIR__ . '/leitura.php'; ?>
 		<?php else : ?>

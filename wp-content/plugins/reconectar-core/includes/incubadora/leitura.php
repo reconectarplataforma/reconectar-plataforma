@@ -12,6 +12,9 @@
  * `incubadora.js` refaz o relativo a cada meio minuto, corrigido pela hora do
  * servidor em `data-rc-agora` — o relógio de quem lê pode estar errado.
  *
+ * "Nova subpágina" e "Mover…" saem para quem pode escrever, e quem os liga é
+ * o script da árvore, carregado só para essas pessoas.
+ *
  * Os botões nascem `hidden` e o JS os revela: sem script, "Editar" não faria
  * nada e "Copiar link" não copiaria. As duas regiões de aviso existem desde o
  * carregamento, vazias, porque leitor de tela só anuncia mudança em região
@@ -50,6 +53,8 @@ $rc_link       = add_query_arg(
 		<div class="rc-incubadora__acoes">
 			<?php if ( Reconectar_Incubadora_Editor::deve_carregar() ) : ?>
 				<button type="button" class="rc-incubadora__botao rc-incubadora__botao--primario" data-rc-incubadora="editar" hidden><?php esc_html_e( 'Editar', 'reconectar-core' ); ?></button>
+				<button type="button" class="rc-incubadora__botao" data-rc-incubadora="criar" data-rc-mae="<?php echo esc_attr( $rc_pagina->ID ); ?>" hidden><?php esc_html_e( 'Nova subpágina', 'reconectar-core' ); ?></button>
+				<button type="button" class="rc-incubadora__botao" data-rc-incubadora="mover" data-rc-pagina="<?php echo esc_attr( $rc_pagina->ID ); ?>" aria-haspopup="dialog" hidden><?php esc_html_e( 'Mover…', 'reconectar-core' ); ?></button>
 			<?php endif; ?>
 			<button type="button" class="rc-incubadora__botao" data-rc-incubadora="compartilhar" data-rc-link="<?php echo esc_attr( $rc_link ); ?>" data-rc-copiado="<?php esc_attr_e( 'Link da página copiado.', 'reconectar-core' ); ?>" data-rc-falhou="<?php esc_attr_e( 'Não foi possível copiar. O link é:', 'reconectar-core' ); ?>" hidden><?php esc_html_e( 'Copiar link', 'reconectar-core' ); ?></button>
 		</div>

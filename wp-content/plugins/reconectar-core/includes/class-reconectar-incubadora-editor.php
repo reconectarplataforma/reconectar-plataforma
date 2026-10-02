@@ -7,6 +7,11 @@
  * **quem** recebe essa camada e entrega a ela o que o servidor sabe — rota,
  * nonce, versão da página, endereço do vendor.
  *
+ * A árvore interativa — criar, mover, arrastar — também é entregue daqui, por
+ * `assets/js/incubadora-arvore.js`, e com uma condição mais larga que a do
+ * editor: ela vale também na âncora vazia, onde não há página para editar mas
+ * há a primeira a criar.
+ *
  * O TinyMCE em si não é enfileirado aqui. O script do editor o carrega no
  * primeiro clique em "Editar": são 1,8 MB que a maioria das leituras, mesmo de
  * quem pode escrever, nunca usa.
@@ -42,13 +47,14 @@ class Reconectar_Incubadora_Editor {
 	 */
 	public static function init() {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar' ), 20 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_arvore' ), 20 );
 	}
 
 	/**
 	 * Diz se a requisição corrente deve receber o editor.
 	 *
 	 * Só a página isolada: a âncora sem páginas não tem o que editar, e criar
-	 * página é da árvore (etapa seguinte). A capacidade é a mesma que os
+	 * página é da árvore — ver `enfileirar_arvore()`. A capacidade é a mesma que os
 	 * endpoints conferem antes do nonce, e `edit_post` cobre a página aberta —
 	 * hoje todo detentor da capacidade edita qualquer página, mas a pergunta
 	 * certa é a da página.
@@ -110,6 +116,82 @@ class Reconectar_Incubadora_Editor {
 				'hoje'       => date_i18n( get_option( 'date_format' ) ),
 				'textos'     => self::textos(),
 			)
+		);
+	}
+
+	/**
+	 * Enfileira o script da árvore interativa e os nonces de criar e mover.
+	 *
+	 * Um objeto de dados próprio, e não campos a mais no do editor: o do editor
+	 * só existe na página isolada, e a âncora vazia precisa criar a primeira
+	 * página. A capacidade é a mesma dos endpoints; quem não a tem não recebe
+	 * nem o script nem os nonces.
+	 *
+	 * @return void
+	 */
+	public static function enfileirar_arvore() {
+		if ( ! Reconectar_Incubadora_Leitura::pagina_desenha_a_incubadora() || ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'reconectar-incubadora-arvore',
+			RECONECTAR_CORE_URL . 'assets/js/incubadora-arvore.js',
+			array( 'reconectar-incubadora' ),
+			Reconectar_Incubadora_Leitura::VERSAO_ASSETS,
+			true
+		);
+
+		$pagina = is_singular( Reconectar_Incubadora::POST_TYPE ) ? get_queried_object() : null;
+
+		wp_localize_script(
+			'reconectar-incubadora-arvore',
+			'reconectarIncubadoraArvore',
+			array(
+				'rota'         => self::caminho( admin_url( 'admin-post.php' ) ),
+				'acaoCriar'    => Reconectar_Incubadora_Acoes::acao( 'criar' ),
+				'nonceCriar'   => wp_create_nonce( Reconectar_Incubadora_Acoes::acao( 'criar' ) ),
+				'acaoMover'    => Reconectar_Incubadora_Acoes::acao( 'mover' ),
+				'nonceMover'   => wp_create_nonce( Reconectar_Incubadora_Acoes::acao( 'mover' ) ),
+				'atual'        => $pagina instanceof WP_Post ? (int) $pagina->ID : 0,
+				'profundidade' => Reconectar_Incubadora::PROFUNDIDADE_MAXIMA,
+				'textos'       => self::textos_da_arvore(),
+			)
+		);
+	}
+
+	/**
+	 * Textos da árvore interativa.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function textos_da_arvore() {
+		return array(
+			'tituloCampo'    => __( 'Título', 'reconectar-core' ),
+			'criar'          => __( 'Criar e editar', 'reconectar-core' ),
+			/* translators: %s: título da página mãe. */
+			'criarDentroDe'  => __( 'A página nova fica dentro de “%s”, como rascunho.', 'reconectar-core' ),
+			'criando'        => __( 'Criando a página…', 'reconectar-core' ),
+			'movendo'        => __( 'Movendo…', 'reconectar-core' ),
+			/* translators: 1: título da página, 2: título do destino. */
+			'movida'         => __( '“%1$s” agora está em %2$s.', 'reconectar-core' ),
+			'raiz'           => __( 'Incubadora (raiz)', 'reconectar-core' ),
+			'semTitulo'      => __( '(sem título)', 'reconectar-core' ),
+			'dialogoTitulo'  => __( 'Mover página', 'reconectar-core' ),
+			/* translators: %s: título da página. */
+			'dialogoAjuda'   => __( 'Escolha onde “%s” fica na árvore. As subpáginas dela vão junto.', 'reconectar-core' ),
+			'mae'            => __( 'Página mãe', 'reconectar-core' ),
+			'posicao'        => __( 'Posição', 'reconectar-core' ),
+			'noInicio'       => __( 'No início', 'reconectar-core' ),
+			/* translators: %s: título da página irmã. */
+			'depoisDe'       => __( 'Depois de “%s”', 'reconectar-core' ),
+			'mover'          => __( 'Mover', 'reconectar-core' ),
+			'cancelar'       => __( 'Cancelar', 'reconectar-core' ),
+			'semMudanca'     => __( 'A página já está nesse lugar.', 'reconectar-core' ),
+			'arrastarAjuda'  => __( 'Arraste para reordenar. Pelo teclado, use o botão Mover… da página.', 'reconectar-core' ),
+			'erroRede'       => __( 'Não foi possível falar com o servidor. Confira a conexão e tente de novo.', 'reconectar-core' ),
+			'erroResposta'   => __( 'O servidor respondeu de um jeito inesperado. Recarregue a página e tente de novo.', 'reconectar-core' ),
+			'recarregar'     => __( 'Recarregar a página', 'reconectar-core' ),
 		);
 	}
 

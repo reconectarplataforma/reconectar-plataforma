@@ -26,7 +26,7 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.3.0';
+	const VERSAO_ASSETS = '0.5.0';
 
 	/**
 	 * Registra os ganchos da tela de leitura.
@@ -184,7 +184,7 @@ class Reconectar_Incubadora_Leitura {
 	 *
 	 * @return bool
 	 */
-	private static function pagina_desenha_a_incubadora() {
+	public static function pagina_desenha_a_incubadora() {
 		if ( is_singular( Reconectar_Incubadora::POST_TYPE ) ) {
 			return true;
 		}
@@ -284,6 +284,58 @@ class Reconectar_Incubadora_Leitura {
 	 * @return string
 	 */
 	public static function renderizar( $pagina ) {
+		$contexto = self::contexto( $pagina );
+
+		ob_start();
+		include RECONECTAR_CORE_PATH . 'includes/incubadora/shell.php';
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * A árvore e a trilha refeitas, para a resposta de uma ação que as altere.
+	 *
+	 * Saem dos mesmos templates da tela inteira — ver `processar_mover()`. Os
+	 * ramos que a pessoa tinha aberto na tela vão em `$abertos`, para a árvore
+	 * nova não se fechar inteira debaixo do cursor.
+	 *
+	 * Chamar só **depois** da gravação: `mapa_visivel()` guarda o resultado por
+	 * requisição, e uma leitura anterior congelaria a árvore de antes.
+	 *
+	 * @param int   $atual_id ID da página aberta na tela, ou 0 na âncora.
+	 * @param int[] $abertos  IDs dos ramos abertos na tela.
+	 * @return array{arvore: string, trilha: string}
+	 */
+	public static function fragmentos( $atual_id, $abertos = array() ) {
+		$mapa     = self::mapa_visivel();
+		$contexto = self::contexto( isset( $mapa[ $atual_id ] ) ? $mapa[ $atual_id ] : null, $abertos );
+
+		return array(
+			'arvore' => self::html_do_template( 'arvore-corpo.php', $contexto ),
+			'trilha' => $contexto['pagina'] instanceof WP_Post ? self::html_do_template( 'trilha.php', $contexto ) : '',
+		);
+	}
+
+	/**
+	 * Inclui um template da Incubadora e devolve o que ele imprimiu.
+	 *
+	 * @param string $arquivo  Nome do arquivo em `includes/incubadora/`.
+	 * @param array  $contexto Contexto montado em `contexto()`.
+	 * @return string
+	 */
+	public static function html_do_template( $arquivo, $contexto ) {
+		ob_start();
+		include RECONECTAR_CORE_PATH . 'includes/incubadora/' . $arquivo;
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Monta o contexto que os templates da Incubadora leem.
+	 *
+	 * @param WP_Post|null $pagina  Página aberta, ou `null` para o índice.
+	 * @param int[]        $abertos IDs de ramos a desenhar abertos, além do caminho até a página.
+	 * @return array
+	 */
+	private static function contexto( $pagina, $abertos = array() ) {
 		$mapa  = self::mapa_visivel();
 		$atual = $pagina instanceof WP_Post ? (int) $pagina->ID : 0;
 
@@ -297,18 +349,17 @@ class Reconectar_Incubadora_Leitura {
 			$pagina = $mapa[ $atual ];
 		}
 
-		$contexto = array(
+		$caminho = $atual ? self::ancestrais_visiveis( $pagina, $mapa ) : array();
+
+		return array(
 			'pagina'   => $pagina,
 			'mapa'     => $mapa,
 			'filhos'   => self::agrupar_por_mae( $mapa ),
 			'atual'    => $atual,
-			'caminho'  => $atual ? self::ancestrais_visiveis( $pagina, $mapa ) : array(),
+			'caminho'  => $caminho,
+			'abertos'  => array_values( array_unique( array_merge( array_map( 'intval', wp_list_pluck( $caminho, 'ID' ) ), array_map( 'intval', (array) $abertos ) ) ) ),
 			'url_raiz' => self::url_da_ancora(),
 		);
-
-		ob_start();
-		include RECONECTAR_CORE_PATH . 'includes/incubadora/shell.php';
-		return (string) ob_get_clean();
 	}
 
 	/**
@@ -329,7 +380,7 @@ class Reconectar_Incubadora_Leitura {
 			return;
 		}
 
-		$abertos = array_map( 'intval', wp_list_pluck( $contexto['caminho'], 'ID' ) );
+		$abertos = $contexto['abertos'];
 
 		include RECONECTAR_CORE_PATH . 'includes/incubadora/arvore.php';
 	}

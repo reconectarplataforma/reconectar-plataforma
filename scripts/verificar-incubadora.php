@@ -13,8 +13,8 @@
  * e o `eval` chega depois dele (armadilha registrada no `CLAUDE.md`).
  *
  * - Com a capacidade, cria uma árvore de teste, exercita salvar, conflito,
- *   publicação, teto de profundidade e exclusão, e apaga tudo no fim.
- * - Sem ela, confere que as três operações recusam pela segunda camada — a
+ *   publicação, teto de profundidade, mover e exclusão, e apaga tudo no fim.
+ * - Sem ela, confere que as quatro operações recusam pela segunda camada — a
  *   que vale se a primeira, a do handler, regredir.
  *
  * Cada linha sai como `::ok rótulo` ou `::FALHA rótulo`, o formato que o
@@ -70,21 +70,38 @@ if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
 		wp_delete_post( $rc_criada['id'], true );
 	}
 
-	$rc_alvo = get_posts(
-		array(
-			'post_type'   => Reconectar_Incubadora::POST_TYPE,
-			'post_status' => array( 'publish', 'draft' ),
-			'numberposts' => 1,
-			'fields'      => 'ids',
-		)
+	// O alvo é provisório, criado direto por `wp_insert_post()` — que não
+	// consulta capacidade — e não uma página qualquer do banco: numa
+	// Incubadora vazia os quatro casos abaixo seriam pulados em silêncio, e a
+	// contagem do `verificar-acessos.sh` mudaria conforme o estado do banco.
+	$rc_alvo = array(
+		wp_insert_post(
+			array(
+				'post_type'    => Reconectar_Incubadora::POST_TYPE,
+				'post_status'  => 'publish',
+				'post_title'   => 'Verificação automática sem capacidade ' . time(),
+				'post_content' => '<p>original</p>',
+			)
+		),
 	);
 
-	if ( $rc_alvo ) {
+	register_shutdown_function(
+		static function () use ( $rc_alvo ) {
+			wp_delete_post( $rc_alvo[0], true );
+		}
+	);
+
+	if ( $rc_alvo[0] ) {
 		$rc_antes = get_post_field( 'post_content', $rc_alvo[0] );
 
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::salvar( array( 'pagina' => $rc_alvo[0], 'conteudo' => '<p>forjado</p>', 'forcar' => true ) ), 'capacidade' ), 'sem-capacidade-nao-salva' );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::excluir( $rc_alvo[0] ), 'capacidade' ), 'sem-capacidade-nao-exclui' );
-		$rc_caso( get_post_field( 'post_content', $rc_alvo[0] ) === $rc_antes && 'trash' !== get_post_status( $rc_alvo[0] ), 'sem-capacidade-nada-mudou' );
+
+		$rc_mae_antes = (int) get_post_field( 'post_parent', $rc_alvo[0] );
+		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_alvo[0], 'pai' => 0, 'ordem' => array( $rc_alvo[0] ) ) ), 'capacidade' ), 'sem-capacidade-nao-move' );
+		$rc_caso( get_post_field( 'post_content', $rc_alvo[0] ) === $rc_antes && 'trash' !== get_post_status( $rc_alvo[0] ) && (int) get_post_field( 'post_parent', $rc_alvo[0] ) === $rc_mae_antes, 'sem-capacidade-nada-mudou' );
+	} else {
+		$rc_caso( false, 'sem-capacidade-alvo-provisorio' );
 	}
 
 	return;
@@ -251,6 +268,112 @@ if ( $rc_outro_tipo ) {
 	);
 	$rc_caso( $rc_codigo( $rc_fora, 'inexistente' ) && get_post_field( 'post_content', $rc_outro_tipo[0] ) === $rc_antes, 'nao-grava-em-post-de-outro-tipo' );
 }
+
+/*
+ * Mover. Neste ponto a árvore de teste é:
+ *
+ *   raiz
+ *   ├── filha
+ *   └── nível 1 › nível 2 › … › nível 8
+ *
+ * O primeiro degrau da escada é o primeiro ID depois da filha em `$rc_criados`.
+ */
+$rc_degraus = array_slice( $rc_criados, 2, Reconectar_Incubadora::PROFUNDIDADE_MAXIMA );
+$rc_nivel1  = $rc_degraus[0];
+$rc_ultimo  = end( $rc_degraus );
+
+/**
+ * Lê `menu_order` e `post_parent` direto do banco, sem o cache de objeto.
+ *
+ * @param int $id ID.
+ * @return array{0: int, 1: int}
+ */
+function reconectar_verificar_incubadora_lugar( $id ) {
+	global $wpdb;
+
+	$linha = $wpdb->get_row( $wpdb->prepare( "SELECT post_parent, menu_order FROM {$wpdb->posts} WHERE ID = %d", $id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+	return array( (int) $linha->post_parent, (int) $linha->menu_order );
+}
+
+$rc_lugar          = 'reconectar_verificar_incubadora_lugar';
+$rc_modificado     = get_post_field( 'post_modified_gmt', $rc_filha['id'] );
+$rc_revisoes_filha = count( wp_get_post_revisions( $rc_filha['id'] ) );
+
+$rc_reordena = Reconectar_Incubadora_Acoes::mover(
+	array(
+		'pagina' => $rc_filha['id'],
+		'pai'    => $rc_raiz['id'],
+		'ordem'  => array( $rc_nivel1, $rc_filha['id'] ),
+	)
+);
+$rc_caso( $rc_codigo( $rc_reordena, 'movida' ) && array( $rc_raiz['id'], 1 ) === $rc_lugar( $rc_filha['id'] ) && array( $rc_raiz['id'], 0 ) === $rc_lugar( $rc_nivel1 ), 'reordena-entre-irmas' );
+$rc_caso( get_post_field( 'post_modified_gmt', $rc_filha['id'] ) === $rc_modificado && count( wp_get_post_revisions( $rc_filha['id'] ) ) === $rc_revisoes_filha, 'mover-nao-gera-revisao-nem-muda-a-data' );
+
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_raiz['id'], 'pai' => $rc_raiz['id'], 'ordem' => array( $rc_raiz['id'] ) ) ), 'pai_invalido' ), 'recusa-mover-para-dentro-de-si' );
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_raiz['id'], 'pai' => $rc_ultimo, 'ordem' => array( $rc_raiz['id'] ) ) ), 'pai_invalido' ) && 0 === $rc_lugar( $rc_raiz['id'] )[0], 'recusa-mover-para-dentro-de-descendente' );
+
+// O nível 1 tem sete níveis abaixo; sob a filha (um ancestral), ele ficaria
+// com dois, e a ponta da escada com nove.
+$rc_fundo = Reconectar_Incubadora_Acoes::mover(
+	array(
+		'pagina' => $rc_nivel1,
+		'pai'    => $rc_filha['id'],
+		'ordem'  => array( $rc_nivel1 ),
+	)
+);
+$rc_caso( $rc_codigo( $rc_fundo, 'profundidade' ) && $rc_raiz['id'] === $rc_lugar( $rc_nivel1 )[0], 'recusa-subarvore-alem-do-teto' );
+
+$rc_faltando = Reconectar_Incubadora_Acoes::mover(
+	array(
+		'pagina' => $rc_filha['id'],
+		'pai'    => $rc_raiz['id'],
+		'ordem'  => array( $rc_filha['id'] ),
+	)
+);
+$rc_caso( $rc_codigo( $rc_faltando, 'conflito' ) && 409 === $rc_faltando->get_error_data()['status'], 'ordem-sem-uma-irma-recebe-409' );
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_filha['id'], 'pai' => $rc_raiz['id'], 'ordem' => array( $rc_filha['id'], $rc_filha['id'], $rc_nivel1 ) ) ), 'conflito' ), 'ordem-com-repeticao-recebe-409' );
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_filha['id'], 'pai' => $rc_raiz['id'], 'ordem' => array( $rc_nivel1, $rc_filha['id'], $rc_ultimo ) ) ), 'conflito' ), 'ordem-com-estranha-recebe-409' );
+
+// Uma página sob a filha com o mesmo slug do nível 1: irmãs diferentes, então
+// o slug é igual. Levada para a raiz, ela passaria a dividir o endereço com
+// o nível 1 se o slug não mudasse.
+$rc_xara = Reconectar_Incubadora_Acoes::criar(
+	array(
+		'titulo' => get_the_title( $rc_nivel1 ),
+		'mae'    => $rc_filha['id'],
+	)
+);
+
+if ( ! is_wp_error( $rc_xara ) ) {
+	$rc_criados[] = $rc_xara['id'];
+	$rc_slug_xara = get_post_field( 'post_name', $rc_xara['id'] );
+
+	$rc_sobe = Reconectar_Incubadora_Acoes::mover(
+		array(
+			'pagina' => $rc_xara['id'],
+			'pai'    => $rc_raiz['id'],
+			'ordem'  => array( $rc_xara['id'], $rc_nivel1, $rc_filha['id'] ),
+		)
+	);
+	$rc_caso( get_post_field( 'post_name', $rc_nivel1 ) === $rc_slug_xara && $rc_codigo( $rc_sobe, 'movida' ) && array( $rc_raiz['id'], 0 ) === $rc_lugar( $rc_xara['id'] ), 'muda-de-mae-no-inicio-da-lista' );
+	$rc_caso( get_post_field( 'post_name', $rc_xara['id'] ) !== get_post_field( 'post_name', $rc_nivel1 ) && get_permalink( $rc_xara['id'] ) !== get_permalink( $rc_nivel1 ), 'slug-colidente-ganha-sufixo' );
+	$rc_caso( array( $rc_raiz['id'], 1 ) === $rc_lugar( $rc_nivel1 ) && array( $rc_raiz['id'], 2 ) === $rc_lugar( $rc_filha['id'] ), 'renumera-as-irmas-do-destino' );
+
+	$rc_volta = Reconectar_Incubadora_Acoes::mover(
+		array(
+			'pagina' => $rc_xara['id'],
+			'pai'    => 0,
+			'ordem'  => array_merge( wp_list_pluck( get_posts( array( 'post_type' => Reconectar_Incubadora::POST_TYPE, 'post_status' => array( 'publish', 'draft' ), 'post_parent' => 0, 'numberposts' => -1, 'orderby' => array( 'menu_order' => 'ASC', 'title' => 'ASC' ) ) ), 'ID' ), array( $rc_xara['id'] ) ),
+		)
+	);
+	$rc_caso( $rc_codigo( $rc_volta, 'movida' ) && 0 === $rc_lugar( $rc_xara['id'] )[0], 'move-para-a-raiz' );
+}
+
+// Por último: `mapa_visivel()` guarda o mapa por requisição, e chamá-lo antes
+// congelaria a árvore dos casos acima.
+$rc_fragmentos = Reconectar_Incubadora_Leitura::fragmentos( $rc_filha['id'], array() );
+$rc_caso( false !== strpos( $rc_fragmentos['arvore'], 'data-rc-id="' . $rc_filha['id'] . '"' ) && false !== strpos( $rc_fragmentos['trilha'], 'aria-current="page"' ), 'fragmentos-trazem-arvore-e-trilha' );
 
 $rc_excluida = Reconectar_Incubadora_Acoes::excluir( $rc_filha['id'] );
 $rc_caso( $rc_codigo( $rc_excluida, 'excluida' ) && 'trash' === get_post_status( $rc_filha['id'] ), 'exclui-para-a-lixeira' );
