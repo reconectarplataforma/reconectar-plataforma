@@ -26,7 +26,7 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.1.0';
+	const VERSAO_ASSETS = '0.2.1';
 
 	/**
 	 * Registra os ganchos da tela de leitura.
@@ -337,17 +337,18 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * HTML do conteúdo de uma página, pronto para a leitura.
 	 *
-	 * Ainda não há editor que grave, e por isso a saída passa só pelo
-	 * `wp_kses_post()`. O render próprio — facade de vídeo, imagem da rota
-	 * autoral — chega com o sanitizador, e substitui esta função por inteiro.
-	 * Sem `the_content`: os filtros de terceiros que pendurariam ali (embed
-	 * automático, compartilhamento, `wpautop`) desfariam a reconstrução.
+	 * Delegado a `Reconectar_Incubadora_Conteudo::html_de_leitura()`, que
+	 * sanitiza de novo o que está gravado e troca o marcador de vídeo pela
+	 * facade. Sem `the_content`: os filtros de terceiros que pendurariam ali
+	 * (embed automático, compartilhamento, `wpautop`, shortcode) desfariam a
+	 * reconstrução — um `[shortcode]` escrito por quem edita a Incubadora
+	 * rodaria com os privilégios de quem lê.
 	 *
 	 * @param WP_Post $pagina Página.
 	 * @return string
 	 */
 	public static function conteudo( $pagina ) {
-		return wp_kses_post( $pagina->post_content );
+		return Reconectar_Incubadora_Conteudo::html_de_leitura( $pagina->post_content );
 	}
 
 	/**

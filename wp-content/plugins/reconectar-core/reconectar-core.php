@@ -60,6 +60,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-forum.php';
 // a capacidade de escrita; e no plugin, não no tema, pela mesma razão das
 // campanhas: trocar de tema não pode apagar o conhecimento já escrito.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-conteudo.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-leitura.php';
 
 // O avatar local também é plugin, e não tema, porque o que ele resolve é

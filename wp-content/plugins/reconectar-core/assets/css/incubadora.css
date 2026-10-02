@@ -349,6 +349,115 @@
 	position: relative;
 }
 
+/* --- Vídeo ---------------------------------------------------------------- */
+
+/*
+ * Facade e player ocupam a mesma caixa 16:9, para que carregar o vídeo não
+ * empurre o texto abaixo dele. `aspect-ratio` no contêiner e o filho em 100%:
+ * o iframe não tem proporção intrínseca, e sem isso nasceria com os 300×150
+ * do padrão do navegador.
+ *
+ * O quadro da facade vai em `min-height`, não `height`: a 320px a caixa 16:9
+ * tem 162px e o texto pede 172 — medido. Com `height: 100%` o aviso vazava
+ * por baixo do fundo escuro, branco sobre branco. O `min-height: auto` que o
+ * `aspect-ratio` implica deixa o contêiner crescer com o quadro.
+ */
+.rc-incubadora__conteudo .rc-video {
+	aspect-ratio: 16 / 9;
+	box-sizing: border-box;
+	margin: 0 0 var(--rc-espaco, 16px);
+	max-width: 100%;
+	width: 100%;
+}
+
+.rc-incubadora__conteudo .rc-video__quadro,
+.rc-incubadora__conteudo .rc-video__player {
+	border: 0;
+	border-radius: var(--rc-raio, 8px);
+	box-sizing: border-box;
+	display: block;
+	width: 100%;
+}
+
+.rc-incubadora__conteudo .rc-video__player {
+	height: 100%;
+}
+
+/*
+ * Fundo escuro e texto branco: #1f1f1f mede ~16:1 contra o branco, e o tom
+ * neutro não sugere a marca de provedor nenhum.
+ */
+.rc-incubadora__conteudo .rc-video__quadro {
+	align-content: center;
+	background: #1f1f1f;
+	color: #fff;
+	display: grid;
+	gap: calc(var(--rc-espaco, 16px) / 2);
+	justify-items: center;
+	min-height: 100%;
+	padding: var(--rc-espaco, 16px);
+	text-align: center;
+}
+
+.rc-incubadora__conteudo .rc-video__quadro p {
+	margin: 0;
+}
+
+.rc-incubadora__conteudo .rc-video__provedor {
+	font-size: var(--rc-fonte-lg, 1.25rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+}
+
+.rc-incubadora__conteudo .rc-video__aviso {
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	max-width: 36em;
+}
+
+.rc-incubadora__conteudo .rc-video__acoes {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--rc-espaco, 16px);
+	justify-content: center;
+}
+
+/*
+ * Botão dentro de conteúdo: o Storefront veste `button` com o fundo da cor
+ * primária e texto branco, 2,30:1 — reprovado no 1.4.3. A institucional mede
+ * ~9:1 contra o branco. A classe repetida chega a (0,3,0) e vence o seletor do
+ * tema sem `!important`.
+ */
+.rc-incubadora__conteudo .rc-video__carregar.rc-video__carregar {
+	background: var(--rc-incubadora-link, #663191);
+	border: 2px solid #fff;
+	border-radius: var(--rc-raio, 8px);
+	color: #fff;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: var(--rc-fonte-base, 1rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	padding: 0.625em 1.25em;
+}
+
+.rc-incubadora__conteudo .rc-video__carregar[hidden] {
+	display: none;
+}
+
+.rc-incubadora__conteudo .rc-video__carregar:focus-visible,
+.rc-incubadora__conteudo .rc-video__link:focus-visible {
+	outline: 3px solid var(--reconectar-cor-destaque, #F1BF3D);
+	outline-offset: 2px;
+}
+
+.rc-incubadora__conteudo .rc-video__link {
+	color: #fff;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	text-decoration: underline;
+}
+
 .rc-incubadora__vazio,
 .rc-incubadora__estado-vazio {
 	color: var(--rc-incubadora-apoio);

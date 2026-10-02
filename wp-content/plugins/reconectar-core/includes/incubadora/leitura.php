@@ -78,7 +78,7 @@ $rc_rascunho   = 'draft' === $rc_pagina->post_status;
 			<p class="rc-incubadora__vazio"><?php esc_html_e( 'Esta página ainda não tem conteúdo.', 'reconectar-core' ); ?></p>
 			<?php
 		else :
-			echo $rc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- já passou pelo kses em `conteudo()`.
+			echo $rc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- reconstruído e sanitizado em `conteudo()`.
 		endif;
 		?>
 	</div>
