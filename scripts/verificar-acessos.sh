@@ -351,6 +351,7 @@ JAR_CLIENTE=/tmp/reconectar-acessos-cliente.txt
 if autenticar "demo-cliente-marina" "$SENHA_DEMO" "$JAR_CLIENTE"; then
   conferir "$JAR_CLIENTE" "$MINHA_CONTA"   "200"                "a própria conta"
   conferir "$JAR_CLIENTE" "/wp-admin/"     "302 $MINHA_CONTA"   "sem painel administrativo"
+  conferir "$JAR_CLIENTE" "/dashboard/avaliacoes-pendentes/" "302 /"   "não vê as pendências de loja alguma"
   # O lado da permissão da trava de avaliação: uma que negasse a todos passaria
   # nos casos do visitante.
   if [ -n "$PRODUTO" ]; then
@@ -368,6 +369,10 @@ echo "Vendedor (demo-sabor-da-terra)"
 JAR_VENDEDOR=/tmp/reconectar-acessos-vendedor.txt
 if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   conferir "$JAR_VENDEDOR" "/dashboard/"            "200"              "o painel é dele"
+  # A aba nova precisa do flush de reescrita (`Reconectar_Migracoes`, versão 7):
+  # sem ele o item aparece no menu e a tela responde 404.
+  conferir "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" "200"      "vê as avaliações pendentes"
+  conferir_corpo "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" 'rc-avaliacoes-pendentes' "presente" "a aba desenha a lista, não a home do painel"
   conferir "$JAR_VENDEDOR" "/comunidade/"           "200"              "participa da comunidade"
   conferir "$JAR_VENDEDOR" "/forums/"               "200"              "a listagem de perguntas"
   conferir "$JAR_VENDEDOR" "/wp-admin/"             "302 /dashboard/"  "volta ao painel dele"

@@ -83,6 +83,10 @@ require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamen
 // confere e confirma o recebimento. Depois de `class-reconectar-pagamento-direto.php`
 // porque lê a constante `STATUS_AGUARDANDO` dele.
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-comprovante.php';
+// A aba de avaliações pendentes também é da dashboard do Dokan e lê os pedidos
+// da loja; fica junto do ciclo do pedido, e não no tema, porque é regra sobre
+// quem pode ver qual pedido.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avaliacoes-pendentes.php';
 // As três classes de gateway ficam de fora daqui de propósito: elas estendem
 // `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
 // exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do
@@ -114,6 +118,7 @@ function reconectar_core_init() {
 	Reconectar_Pagamento_Pix::init();
 	Reconectar_Pagamento_Direto::init();
 	Reconectar_Comprovante::init();
+	Reconectar_Avaliacoes_Pendentes::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
 	Reconectar_Forum::init();
