@@ -62,6 +62,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-forum.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-conteudo.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-leitura.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-acoes.php';
 
 // O avatar local também é plugin, e não tema, porque o que ele resolve é
 // proteção de dados: o Gravatar entrega a um terceiro o hash do e-mail de quem
@@ -117,5 +118,6 @@ function reconectar_core_init() {
 	// primitivas para `CAP_GERIR_INCUBADORA`.
 	Reconectar_Incubadora::init();
 	Reconectar_Incubadora_Leitura::init();
+	Reconectar_Incubadora_Acoes::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );

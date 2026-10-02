@@ -354,8 +354,10 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * ID de quem fez a última edição, ou do autor se ninguém editou depois.
 	 *
-	 * `_edit_last` é gravado pelo núcleo em `wp_update_post()` com usuário
-	 * logado; uma página criada por WP-CLI não o tem.
+	 * `_edit_last` só é gravado pelo núcleo na tela de edição do `/wp-admin`
+	 * (`wp-admin/includes/post.php`), não em `wp_update_post()`; aqui quem o
+	 * grava é `Reconectar_Incubadora_Acoes::gravar()`. Uma página criada por
+	 * WP-CLI não o tem.
 	 *
 	 * @param WP_Post $pagina Página.
 	 * @return int

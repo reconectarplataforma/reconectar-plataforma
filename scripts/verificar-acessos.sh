@@ -493,7 +493,67 @@ else
   echo "  --    nenhuma categoria de fórum; criação de pergunta não verificada"
 fi
 
-rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_ADMIN"
+# Os endpoints de escrita da Incubadora só respondem a POST e devolvem JSON, por
+# isso não cabem em `conferir`. Cada caso confere o status **e** o `codigo` do
+# corpo: os três perfis barrados recebem 401 ou 403, e um 403 sozinho não diria
+# qual trava respondeu. É o `codigo` que prova a ordem dos portões — loja e
+# cliente param em `capacidade`, antes do nonce que nunca recebem; o moderador
+# passa pela capacidade e para em `nonce`. Se a ordem se invertesse, os dois
+# primeiros passariam a responder `nonce`, e um teste só de status seguiria
+# verde.
+#
+# O GET existe porque `admin-post.php` dispara a ação também por GET, lendo
+# `action` de `$_REQUEST`: sem a trava de método, um link ou uma imagem numa
+# página gravaria em nome de quem a abrisse.
+#
+# O caminho feliz não cabe aqui — o nonce que o WP-CLI gera não vale no
+# servidor — e vai por WP-CLI no fim do script.
+conferir_escrita() {
+  local jar="$1" metodo="$2" acao="$3" esperado="$4" codigo_json="$5" descricao="$6"
+  local argumentos=( -s -w '\n%{http_code}' )
+  [ -n "$jar" ] && argumentos+=( -b "$jar" )
+
+  local resposta
+  if [ "$metodo" = "GET" ]; then
+    resposta="$(curl "${argumentos[@]}" "$BASE/wp-admin/admin-post.php?action=reconectar_incubadora_$acao")"
+  else
+    resposta="$(curl "${argumentos[@]}" \
+      --data-urlencode "action=reconectar_incubadora_$acao" \
+      --data-urlencode "pagina=1" \
+      --data-urlencode "titulo=Forjado" \
+      --data-urlencode "_wpnonce=invalido" \
+      "$BASE/wp-admin/admin-post.php")"
+  fi
+
+  local codigo corpo
+  codigo="$(printf '%s' "$resposta" | tail -1)"
+  corpo="$(printf '%s' "$resposta" | sed '$d')"
+
+  total=$((total + 1))
+  if [ "$codigo" = "$esperado" ] && [[ "$corpo" == *"\"codigo\":\"$codigo_json\""* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "$acao" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: esperado %s %s, veio %s %.80s\n' "$acao" "$descricao" "$esperado" "$codigo_json" "$codigo" "$corpo"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Escrita da Incubadora por HTTP"
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  for acao in salvar criar excluir; do
+    conferir_escrita ""               POST "$acao" 401 login      "visitante é mandado entrar"
+    conferir_escrita "$JAR_CLIENTE"   POST "$acao" 403 capacidade "cliente barrado pela capacidade"
+    conferir_escrita "$JAR_VENDEDOR"  POST "$acao" 403 capacidade "loja barrada pela capacidade"
+    conferir_escrita "$JAR_MODERADOR" POST "$acao" 403 nonce      "moderador sem nonce barrado"
+    conferir_escrita "$JAR_MODERADOR" GET  "$acao" 405 metodo     "GET não grava"
+  done
+else
+  echo "  --    sessões de cliente, loja ou moderador ausentes; escrita não verificada"
+fi
+
+rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_MODERADOR" "$JAR_ADMIN"
 
 # O isolamento entre vendedores não tem URL fixa: depende de qual produto
 # pertence a quem. Vai por WP-CLI, e nas duas direções — uma trava que negasse
@@ -769,6 +829,43 @@ FIM
   fi
 else
   echo "  --    Docker Compose ausente; escrita no fórum não verificada"
+fi
+
+# O bloco HTTP mede as recusas; o caminho feliz só se exercita por WP-CLI,
+# porque o nonce que o CLI gera não vale no servidor. `verificar-incubadora.php`
+# chama as operações direto: com o moderador, cria uma árvore de teste, salva,
+# provoca conflito, publica, sobe até o teto de níveis e exclui — e apaga tudo
+# no fim; com cliente e loja, confere que a segunda camada recusa sozinha,
+# que é o que vale se a trava do handler regredir.
+#
+# `--user=<login>` e não `wp_set_current_user()`: o papel do bbPress só se
+# aplica no `init`, e o `eval` chega depois dele.
+echo "Escrita da Incubadora por WP-CLI"
+if docker compose version >/dev/null 2>&1; then
+  saida=""
+  for usuario in demo-moderador demo-cliente-marina demo-sabor-da-terra; do
+    parcial="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user="$usuario" eval-file /var/www/scripts/verificar-incubadora.php 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
+    if [ -z "$parcial" ]; then
+      parcial="FALHA $usuario-sem-resposta"
+    fi
+    saida="$saida$(printf '%s' "$parcial" | sed "s/^\([^ ]*\) /\1 $usuario: /")
+"
+  done
+
+  while IFS=" " read -r estado rotulo; do
+    [ -z "$estado" ] && continue
+    total=$((total + 1))
+    if [ "$estado" = "ok" ]; then
+      [ "$verboso" = "sim" ] && echo "  ok    $rotulo"
+    else
+      echo "  FALHA $rotulo"
+      falhas=$((falhas + 1))
+    fi
+  done <<FIM
+$saida
+FIM
+else
+  echo "  --    Docker Compose ausente; escrita da Incubadora não verificada"
 fi
 
 echo
