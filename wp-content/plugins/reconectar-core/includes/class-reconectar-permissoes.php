@@ -1413,9 +1413,29 @@ class Reconectar_Permissoes {
 			return $conteudo;
 		}
 
-		$alvo = self::caminho_de_url( get_permalink( $comunidade ) );
+		return self::remover_links_de_widget( $conteudo, array( self::caminho_de_url( get_permalink( $comunidade ) ) ) );
+	}
 
-		if ( '' === $alvo ) {
+	/**
+	 * Remove do HTML de um widget os links cujo caminho esteja na lista.
+	 *
+	 * Separado do filtro acima porque o painel da loja reaproveita a mesma
+	 * remoção com outros destinos — veja `Reconectar_Navegacao_Da_Loja`. A
+	 * comparação continua sendo pelo caminho, pela razão escrita lá.
+	 *
+	 * @param string   $conteudo HTML do widget.
+	 * @param string[] $caminhos Caminhos já reduzidos por `caminho_de_url()`.
+	 * @return string HTML sem os links daqueles caminhos.
+	 */
+	public static function remover_links_de_widget( $conteudo, $caminhos ) {
+		$caminhos = array_filter( (array) $caminhos, 'strlen' );
+
+		if ( ! is_string( $conteudo ) || false === stripos( $conteudo, '<a' ) || ! $caminhos ) {
+			return $conteudo;
+		}
+
+		// Repetida aqui porque o método é público e tem outro chamador.
+		if ( ! class_exists( 'DOMDocument' ) ) {
 			return $conteudo;
 		}
 
@@ -1458,7 +1478,7 @@ class Reconectar_Permissoes {
 		// `getElementsByTagName()`: dá para remover nós durante a iteração sem
 		// embaralhar o que ainda falta percorrer.
 		foreach ( $links as $link ) {
-			if ( self::caminho_de_url( $link->getAttribute( 'href' ) ) !== $alvo ) {
+			if ( ! in_array( self::caminho_de_url( $link->getAttribute( 'href' ) ), $caminhos, true ) ) {
 				continue;
 			}
 
@@ -1514,7 +1534,7 @@ class Reconectar_Permissoes {
 	 * @param string $url URL absoluta ou relativa.
 	 * @return string Caminho sem a barra final, ou string vazia se não houver.
 	 */
-	private static function caminho_de_url( $url ) {
+	public static function caminho_de_url( $url ) {
 		if ( ! is_string( $url ) || '' === $url ) {
 			return '';
 		}
