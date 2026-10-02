@@ -72,7 +72,13 @@ class Reconectar_Incubadora_Editor {
 
 		$pagina = get_queried_object();
 
-		return $pagina instanceof WP_Post && current_user_can( 'edit_post', $pagina->ID );
+		// Na lista de versões e numa versão antiga, o que está na tela não é a
+		// página: um "Editar" ali abriria o editor sobre o texto de outra data,
+		// e salvar gravaria a versão velha por cima da atual sem a pessoa ter
+		// pedido restauração.
+		return $pagina instanceof WP_Post
+			&& current_user_can( 'edit_post', $pagina->ID )
+			&& 'leitura' === Reconectar_Incubadora_Leitura::modo( $pagina );
 	}
 
 	/**

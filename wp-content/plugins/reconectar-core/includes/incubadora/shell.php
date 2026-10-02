@@ -59,7 +59,18 @@ $rc_url_raiz = $contexto['url_raiz'];
 		<?php if ( $rc_pagina instanceof WP_Post ) : ?>
 			<?php echo Reconectar_Incubadora_Leitura::html_do_template( 'trilha.php', $contexto ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado no template. ?>
 
-			<?php include __DIR__ . '/leitura.php'; ?>
+			<?php
+			// Lista e versão antiga no lugar da leitura, com a mesma árvore e a
+			// mesma trilha: quem está no histórico continua sabendo em que
+			// página está.
+			if ( 'historico' === $contexto['modo'] ) {
+				include __DIR__ . '/historico.php';
+			} elseif ( 'versao' === $contexto['modo'] && $contexto['versao'] instanceof WP_Post ) {
+				include __DIR__ . '/versao.php';
+			} else {
+				include __DIR__ . '/leitura.php';
+			}
+			?>
 		<?php else : ?>
 			<?php include __DIR__ . '/indice.php'; ?>
 		<?php endif; ?>

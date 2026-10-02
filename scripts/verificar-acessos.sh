@@ -542,7 +542,7 @@ conferir_escrita() {
 
 echo "Escrita da Incubadora por HTTP"
 if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
-  for acao in salvar criar mover excluir enviar; do
+  for acao in salvar criar mover excluir enviar restaurar; do
     conferir_escrita ""               POST "$acao" 401 login      "visitante é mandado entrar"
     conferir_escrita "$JAR_CLIENTE"   POST "$acao" 403 capacidade "cliente barrado pela capacidade"
     conferir_escrita "$JAR_VENDEDOR"  POST "$acao" 403 capacidade "loja barrada pela capacidade"
@@ -573,6 +573,35 @@ if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="mover"' "ausente" "loja sem o botão Mover"
 else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
+fi
+
+# O histórico mora no mesmo endereço da página, sob `?historico=1` e
+# `?versao=<ID>`. Para quem não edita, os dois parâmetros não existem: a
+# resposta é a página atual, com 200, e não um 403 — que confirmaria a quem
+# só lê que há uma versão com aquele ID. A agulha é a faixa da versão antiga
+# e o título da lista, que só saem nos dois modos.
+#
+# A versão vem da última revisão da página; sem nenhuma, `wp_save_post_revision()`
+# grava a primeira, para que a contagem de casos não dependa do estado do banco.
+echo "Histórico da Incubadora (só para quem edita)"
+versao_incubadora="$(wp_eval '
+  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+  if ( $p ) { $r = wp_get_post_revisions( $p[0], array( "posts_per_page" => 1 ) ); echo $r ? key( $r ) : (int) wp_save_post_revision( $p[0] ); }')"
+if [ -n "$caminho_incubadora" ] && [ -n "$versao_incubadora" ] && [ "$versao_incubadora" != "0" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" '?historico=1"' "presente" "moderador recebe o link Histórico"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" '?historico=1"' "ausente"  "cliente sem o link Histórico"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "presente" "moderador vê a lista de versões"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "cliente recebe a página, não a lista"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "loja recebe a página, não a lista"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "presente" "moderador vê a versão"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "cliente recebe a página atual"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "loja recebe a página atual"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "incubadora-historico.js" "ausente" "cliente sem o script de restaurar"
+  conferir "$JAR_CLIENTE"   "$caminho_incubadora?versao=999999999" "200" "versão inexistente não vaza ao cliente"
+  conferir "$JAR_MODERADOR" "$caminho_incubadora?versao=999999999" "404" "versão inexistente é 404 a quem edita"
+  conferir ""               "$caminho_incubadora?historico=1"      "302 wp-login.php" "visitante é mandado entrar"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; histórico não verificado"
 fi
 
 # Arquivos da Incubadora. A pasta fica dentro de `uploads/`, que o Apache

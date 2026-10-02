@@ -15,6 +15,10 @@
  * "Nova subpágina" e "Mover…" saem para quem pode escrever, e quem os liga é
  * o script da árvore, carregado só para essas pessoas.
  *
+ * "Histórico" é link, e não botão: funciona sem script, e a lista tem endereço
+ * próprio, que se abre em outra aba. Sai só para quem edita, pela razão de
+ * `Reconectar_Incubadora_Leitura::pode_ver_historico()`.
+ *
  * Os botões nascem `hidden` e o JS os revela: sem script, "Editar" não faria
  * nada e "Copiar link" não copiaria. As duas regiões de aviso existem desde o
  * carregamento, vazias, porque leitor de tela só anuncia mudança em região
@@ -55,6 +59,7 @@ $rc_link       = add_query_arg(
 				<button type="button" class="rc-incubadora__botao rc-incubadora__botao--primario" data-rc-incubadora="editar" hidden><?php esc_html_e( 'Editar', 'reconectar-core' ); ?></button>
 				<button type="button" class="rc-incubadora__botao" data-rc-incubadora="criar" data-rc-mae="<?php echo esc_attr( $rc_pagina->ID ); ?>" hidden><?php esc_html_e( 'Nova subpágina', 'reconectar-core' ); ?></button>
 				<button type="button" class="rc-incubadora__botao" data-rc-incubadora="mover" data-rc-pagina="<?php echo esc_attr( $rc_pagina->ID ); ?>" aria-haspopup="dialog" hidden><?php esc_html_e( 'Mover…', 'reconectar-core' ); ?></button>
+				<a class="rc-incubadora__botao" href="<?php echo esc_url( Reconectar_Incubadora_Leitura::url_de_historico( $rc_pagina, array( Reconectar_Incubadora_Leitura::PARAM_HISTORICO => 1 ) ) ); ?>"><?php esc_html_e( 'Histórico', 'reconectar-core' ); ?></a>
 			<?php endif; ?>
 			<button type="button" class="rc-incubadora__botao" data-rc-incubadora="compartilhar" data-rc-link="<?php echo esc_attr( $rc_link ); ?>" data-rc-copiado="<?php esc_attr_e( 'Link da página copiado.', 'reconectar-core' ); ?>" data-rc-falhou="<?php esc_attr_e( 'Não foi possível copiar. O link é:', 'reconectar-core' ); ?>" hidden><?php esc_html_e( 'Copiar link', 'reconectar-core' ); ?></button>
 		</div>

@@ -26,7 +26,29 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.6.1';
+	const VERSAO_ASSETS = '0.7.0';
+
+	/**
+	 * Parâmetro de URL que abre a lista de versões da página.
+	 */
+	const PARAM_HISTORICO = 'historico';
+
+	/**
+	 * Parâmetro de URL que abre uma versão antiga, pelo ID da revisão.
+	 *
+	 * Nenhum dos dois é query var do núcleo, e é por isso que podem ser lidos
+	 * de `$_GET` sem colidir com a consulta principal — `p` ou `page`, por
+	 * exemplo, trocariam a página aberta.
+	 */
+	const PARAM_VERSAO = 'versao';
+
+	/**
+	 * Quantas versões a lista mostra.
+	 *
+	 * Menos que as 30 guardadas: a lista é para achar "a de ontem", e as mais
+	 * antigas continuam alcançáveis pelo endereço até saírem do teto.
+	 */
+	const VERSOES_NA_LISTA = 20;
 
 	/**
 	 * Registra os ganchos da tela de leitura.
@@ -45,8 +67,10 @@ class Reconectar_Incubadora_Leitura {
 		// E antes de `redirect_canonical()`, em 10.
 		add_action( 'template_redirect', array( __CLASS__, 'exigir_caminho_visivel' ), 2 );
 		add_action( 'template_redirect', array( __CLASS__, 'abrir_primeira_pagina' ), 2 );
+		add_action( 'template_redirect', array( __CLASS__, 'exigir_versao_valida' ), 2 );
 
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_historico' ), 20 );
 		add_filter( 'body_class', array( __CLASS__, 'classe_do_corpo' ) );
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_item_do_visitante' ) );
 	}
@@ -108,6 +132,44 @@ class Reconectar_Incubadora_Leitura {
 		$wp_query->set_404();
 		status_header( 404 );
 		nocache_headers();
+	}
+
+	/**
+	 * Responde 404 ao endereço de uma versão que não é desta página.
+	 *
+	 * Só para quem vê o histórico — ver `modo()`: para os demais o parâmetro é
+	 * ignorado e a página sai como sempre, sem confirmar que o ID existe. A
+	 * resposta é a mesma para revisão inexistente, de outra página e de outro
+	 * tipo de post: diferenciar diria a quem tenta IDs ao acaso o que há no
+	 * banco.
+	 *
+	 * Lista e versão saem sem cache: depois de restaurar, o "voltar" do
+	 * navegador mostraria a lista de antes, sem a versão nova.
+	 *
+	 * @return void
+	 */
+	public static function exigir_versao_valida() {
+		if ( ! is_singular( Reconectar_Incubadora::POST_TYPE ) ) {
+			return;
+		}
+
+		$pagina = get_queried_object();
+		$modo   = self::modo( $pagina );
+
+		if ( 'leitura' === $modo ) {
+			return;
+		}
+
+		nocache_headers();
+
+		if ( 'versao' !== $modo || self::versao_pedida( $pagina ) ) {
+			return;
+		}
+
+		global $wp_query;
+
+		$wp_query->set_404();
+		status_header( 404 );
 	}
 
 	/**
@@ -286,6 +348,11 @@ class Reconectar_Incubadora_Leitura {
 	public static function renderizar( $pagina ) {
 		$contexto = self::contexto( $pagina );
 
+		if ( $contexto['pagina'] instanceof WP_Post ) {
+			$contexto['modo']   = self::modo( $contexto['pagina'] );
+			$contexto['versao'] = 'versao' === $contexto['modo'] ? self::versao_pedida( $contexto['pagina'] ) : null;
+		}
+
 		ob_start();
 		include RECONECTAR_CORE_PATH . 'includes/incubadora/shell.php';
 		return (string) ob_get_clean();
@@ -359,7 +426,211 @@ class Reconectar_Incubadora_Leitura {
 			'caminho'  => $caminho,
 			'abertos'  => array_values( array_unique( array_merge( array_map( 'intval', wp_list_pluck( $caminho, 'ID' ) ), array_map( 'intval', (array) $abertos ) ) ) ),
 			'url_raiz' => self::url_da_ancora(),
+			'modo'     => 'leitura',
+			'versao'   => null,
 		);
+	}
+
+	/**
+	 * Carrega o botão Restaurar, só na tela de uma versão antiga.
+	 *
+	 * Script à parte, e não no editor: na versão o editor não carrega — ver
+	 * `Reconectar_Incubadora_Editor::deve_carregar()` —, e o botão não precisa
+	 * de nada dele.
+	 *
+	 * @return void
+	 */
+	public static function enfileirar_historico() {
+		if ( ! is_singular( Reconectar_Incubadora::POST_TYPE ) ) {
+			return;
+		}
+
+		$pagina = get_queried_object();
+		$versao = 'versao' === self::modo( $pagina ) ? self::versao_pedida( $pagina ) : null;
+
+		if ( ! $versao ) {
+			return;
+		}
+
+		$url = RECONECTAR_CORE_URL . 'assets/js/incubadora-historico.js';
+
+		wp_enqueue_script( 'reconectar-incubadora-historico', $url, array(), self::VERSAO_ASSETS, true );
+		wp_localize_script(
+			'reconectar-incubadora-historico',
+			'reconectarIncubadoraHistorico',
+			array(
+				'rota'       => wp_parse_url( admin_url( 'admin-post.php' ), PHP_URL_PATH ),
+				'acao'       => Reconectar_Incubadora_Acoes::acao( 'restaurar' ),
+				'nonce'      => wp_create_nonce( Reconectar_Incubadora_Acoes::acao( 'restaurar' ) ),
+				'pagina'     => $pagina->ID,
+				'versao'     => $versao->ID,
+				'modificado' => $pagina->post_modified_gmt,
+				'textos'     => array(
+					'restaurando'  => __( 'Restaurando a versão…', 'reconectar-core' ),
+					'restaurada'   => __( 'Versão restaurada. Abrindo a página…', 'reconectar-core' ),
+					'semAlteracao' => __( 'A página já está igual a esta versão. Nada foi gravado.', 'reconectar-core' ),
+					'erroRede'     => __( 'Sem conexão com o servidor. Nada foi gravado; tente de novo.', 'reconectar-core' ),
+					'erroResposta' => __( 'O servidor respondeu de um jeito inesperado. Recarregue a página e confira se a versão foi restaurada.', 'reconectar-core' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Diz se o usuário corrente vê o histórico de versões da página.
+	 *
+	 * As versões guardam o que já foi apagado — um dado retirado da página de
+	 * propósito continua nelas. Por isso a lista é de quem pode restaurar, e
+	 * não de quem lê: a mesma pergunta dos endpoints, capacidade e `edit_post`.
+	 *
+	 * @param WP_Post $pagina Página.
+	 * @return bool
+	 */
+	public static function pode_ver_historico( $pagina ) {
+		return current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) && current_user_can( 'edit_post', $pagina->ID );
+	}
+
+	/**
+	 * O que a tela da página isolada mostra: a página, a lista de versões ou uma versão.
+	 *
+	 * Para quem não vê o histórico, sempre `leitura` — o parâmetro é ignorado,
+	 * e a resposta é a mesma página de quem não o passou.
+	 *
+	 * @param WP_Post $pagina Página aberta.
+	 * @return string `leitura`, `historico` ou `versao`.
+	 */
+	public static function modo( $pagina ) {
+		if ( ! $pagina instanceof WP_Post || ! self::pode_ver_historico( $pagina ) ) {
+			return 'leitura';
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- leitura.
+		if ( isset( $_GET[ self::PARAM_VERSAO ] ) ) {
+			return 'versao';
+		}
+
+		return isset( $_GET[ self::PARAM_HISTORICO ] ) ? 'historico' : 'leitura';
+		// phpcs:enable
+	}
+
+	/**
+	 * A revisão pedida em `?versao=`, se for desta página.
+	 *
+	 * Autossalvamento fica de fora: a Incubadora não o grava, e um que viesse
+	 * do `/wp-admin` seria o rascunho de outra pessoa, não uma versão.
+	 *
+	 * @param WP_Post $pagina Página aberta.
+	 * @return WP_Post|null
+	 */
+	public static function versao_pedida( $pagina ) {
+		$id = isset( $_GET[ self::PARAM_VERSAO ] ) ? absint( $_GET[ self::PARAM_VERSAO ] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- leitura.
+
+		return self::versao_da_pagina( $id, $pagina );
+	}
+
+	/**
+	 * A revisão pelo ID, se ela for uma versão da página.
+	 *
+	 * @param int     $versao_id ID da revisão.
+	 * @param WP_Post $pagina    Página.
+	 * @return WP_Post|null
+	 */
+	public static function versao_da_pagina( $versao_id, $pagina ) {
+		// `wp_get_post_revision()` recebe o argumento **por referência**: uma
+		// expressão ali, como `(int) $versao_id`, é erro fatal, e não aviso.
+		$versao_id = (int) $versao_id;
+		$versao    = $versao_id ? wp_get_post_revision( $versao_id ) : null;
+
+		if ( ! $versao instanceof WP_Post || (int) $versao->post_parent !== (int) $pagina->ID || wp_is_post_autosave( $versao ) ) {
+			return null;
+		}
+
+		return $versao;
+	}
+
+	/**
+	 * As versões mais recentes da página, da mais nova para a mais antiga.
+	 *
+	 * O núcleo grava a revisão **depois** de cada gravação, com o estado novo:
+	 * a primeira da lista é a página como está agora, e não a anterior. Quem a
+	 * marca como atual é a comparação de título e conteúdo, e não a posição —
+	 * uma página gravada por fora das revisões, por WP-CLI ou por importação,
+	 * não teria a dela.
+	 *
+	 * @param WP_Post $pagina Página.
+	 * @return array<int, array{versao: WP_Post, atual: bool}>
+	 */
+	public static function versoes( $pagina ) {
+		$revisoes = wp_get_post_revisions(
+			$pagina->ID,
+			array(
+				'posts_per_page' => self::VERSOES_NA_LISTA,
+				'check_enabled'  => false,
+			)
+		);
+
+		$versoes = array();
+		$achada  = false;
+
+		foreach ( $revisoes as $revisao ) {
+			if ( wp_is_post_autosave( $revisao ) ) {
+				continue;
+			}
+
+			// Só a mais recente das iguais leva o selo. Restaurar e desfazer
+			// deixa duas versões com o mesmo texto, e dois "Versão atual" na
+			// lista não dizem qual delas é a página de agora.
+			$atual  = ! $achada && self::versao_e_a_atual( $revisao, $pagina );
+			$achada = $achada || $atual;
+
+			$versoes[] = array(
+				'versao' => $revisao,
+				'atual'  => $atual,
+			);
+		}
+
+		return $versoes;
+	}
+
+	/**
+	 * Diz se a versão tem o mesmo título e conteúdo da página.
+	 *
+	 * @param WP_Post $versao Revisão.
+	 * @param WP_Post $pagina Página.
+	 * @return bool
+	 */
+	public static function versao_e_a_atual( $versao, $pagina ) {
+		return $versao->post_title === $pagina->post_title && $versao->post_content === $pagina->post_content;
+	}
+
+	/**
+	 * Endereço da página com um parâmetro de histórico, como caminho.
+	 *
+	 * Caminho, sem host, pela regra do `WP_HOME` dinâmico.
+	 *
+	 * @param WP_Post $pagina Página.
+	 * @param array   $args   Parâmetros a acrescentar.
+	 * @return string
+	 */
+	public static function url_de_historico( $pagina, $args = array() ) {
+		$url = add_query_arg( $args, get_permalink( $pagina ) );
+
+		$partes = wp_parse_url( $url );
+
+		return ( isset( $partes['path'] ) ? $partes['path'] : '/' ) . ( isset( $partes['query'] ) ? '?' . $partes['query'] : '' );
+	}
+
+	/**
+	 * Data e hora locais de uma versão, no formato do site.
+	 *
+	 * Com hora, ao contrário de `data_local()`: duas versões do mesmo dia
+	 * sairiam idênticas na lista.
+	 *
+	 * @param WP_Post $versao Revisão.
+	 * @return string
+	 */
+	public static function data_e_hora( $versao ) {
+		return date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) get_post_timestamp( $versao ) );
 	}
 
 	/**

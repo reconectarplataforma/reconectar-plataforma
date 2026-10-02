@@ -10,7 +10,7 @@
  *
  * Cada ação é dividida em duas metades. O handler (`processar_*`) cuida do
  * transporte: método, sessão, capacidade e nonce, nessa ordem. A operação
- * (`salvar`, `criar`, `mover`, `excluir`) cuida do domínio — a página existe, é deste
+ * (`salvar`, `criar`, `restaurar`…) cuida do domínio — a página existe, é deste
  * post type, o usuário pode mexer **nela** — e devolve array ou `WP_Error`. A
  * divisão existe para a verificação: `wp_send_json()` encerra o processo, e
  * um teste por WP-CLI que chamasse o handler morreria junto. Pela operação, o
@@ -42,11 +42,12 @@ class Reconectar_Incubadora_Acoes {
 	 * @var array<string, string>
 	 */
 	const ACOES = array(
-		'salvar'  => 'processar_salvar',
-		'criar'   => 'processar_criar',
-		'mover'   => 'processar_mover',
-		'excluir' => 'processar_excluir',
-		'enviar'  => 'processar_enviar',
+		'salvar'    => 'processar_salvar',
+		'criar'     => 'processar_criar',
+		'mover'     => 'processar_mover',
+		'excluir'   => 'processar_excluir',
+		'enviar'    => 'processar_enviar',
+		'restaurar' => 'processar_restaurar',
 	);
 
 	/**
@@ -69,7 +70,7 @@ class Reconectar_Incubadora_Acoes {
 	/**
 	 * Nome completo de uma ação, que é também a ação do nonce dela.
 	 *
-	 * @param string $acao `salvar`, `criar`, `mover`, `excluir` ou `enviar`.
+	 * @param string $acao `salvar`, `criar`, `mover`, `excluir`, `enviar` ou `restaurar`.
 	 * @return string
 	 */
 	public static function acao( $acao ) {
@@ -97,6 +98,27 @@ class Reconectar_Incubadora_Acoes {
 				'modificado' => isset( $_POST['modificado'] ) ? sanitize_text_field( wp_unslash( $_POST['modificado'] ) ) : '',
 				'publicar'   => ! empty( $_POST['publicar'] ),
 				'forcar'     => ! empty( $_POST['forcar'] ),
+			)
+		);
+		// phpcs:enable
+
+		self::responder( $resultado );
+	}
+
+	/**
+	 * Handler de `restaurar`.
+	 *
+	 * @return void
+	 */
+	public static function processar_restaurar() {
+		self::exigir_requisicao( 'restaurar' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- conferido em `exigir_requisicao()`.
+		$resultado = self::restaurar(
+			array(
+				'pagina'     => isset( $_POST['pagina'] ) ? absint( $_POST['pagina'] ) : 0,
+				'versao'     => isset( $_POST['versao'] ) ? absint( $_POST['versao'] ) : 0,
+				'modificado' => isset( $_POST['modificado'] ) ? sanitize_text_field( wp_unslash( $_POST['modificado'] ) ) : '',
 			)
 		);
 		// phpcs:enable
@@ -349,6 +371,88 @@ class Reconectar_Incubadora_Acoes {
 				'avisos' => $avisos,
 			)
 		);
+	}
+
+	/**
+	 * Devolve a página ao título e ao conteúdo de uma versão antiga.
+	 *
+	 * Passa por `salvar()`, e não por `wp_restore_post_revision()`: a versão
+	 * pode ter sido gravada antes de uma regra nova do sanitizador, ou pelo
+	 * `/wp-admin` por quem tem `unfiltered_html`, e restaurá-la crua poria no
+	 * banco o que a gravação normal recusaria. Pelo mesmo caminho vêm o
+	 * bloqueio otimista, o "nada a gravar" e a revisão do resultado.
+	 *
+	 * Desfazer exige que o estado de agora esteja no histórico **antes** de
+	 * ser sobrescrito. O núcleo grava a revisão depois de cada gravação, então
+	 * em regra ele já está — mas não numa página alterada por WP-CLI ou por
+	 * `mover`, que grava por `$wpdb`. `wp_save_post_revision()` cobre os dois
+	 * casos e não duplica nada: sem diferença para a última revisão, não grava.
+	 * Vai na janela sem kses pelo motivo de `gravar()`: a revisão é um
+	 * `wp_insert_post()`, e o kses de quem não tem `unfiltered_html` apagaria
+	 * dela o marcador de vídeo.
+	 *
+	 * @param array $dados `pagina`, `versao` e `modificado`.
+	 * @return array|WP_Error Estado da página, com `codigo` `restaurada` ou `sem_alteracoes`.
+	 */
+	public static function restaurar( $dados ) {
+		$dados = wp_parse_args(
+			$dados,
+			array(
+				'pagina'     => 0,
+				'versao'     => 0,
+				'modificado' => '',
+			)
+		);
+
+		$pagina = self::pagina_editavel( (int) $dados['pagina'], 'edit_post' );
+
+		if ( is_wp_error( $pagina ) ) {
+			return $pagina;
+		}
+
+		$versao = Reconectar_Incubadora_Leitura::versao_da_pagina( (int) $dados['versao'], $pagina );
+
+		if ( ! $versao ) {
+			return self::erro( 'versao_inexistente', __( 'Esta versão não existe mais. As mais antigas saem do histórico depois de 30 gravações.', 'reconectar-core' ), 404 );
+		}
+
+		if ( $dados['modificado'] !== $pagina->post_modified_gmt ) {
+			return self::erro(
+				'conflito',
+				sprintf(
+					/* translators: %s: nome de quem editou por último. */
+					__( 'A página foi alterada por %s depois que você abriu esta versão. Confira a versão atual antes de restaurar.', 'reconectar-core' ),
+					Reconectar_Incubadora_Leitura::nome_de_usuario( Reconectar_Incubadora_Leitura::editado_por( $pagina ) )
+				),
+				409,
+				array( 'modificado' => $pagina->post_modified_gmt )
+			);
+		}
+
+		kses_remove_filters();
+
+		try {
+			wp_save_post_revision( $pagina->ID );
+		} finally {
+			kses_init();
+		}
+
+		$resultado = self::salvar(
+			array(
+				'pagina'     => $pagina->ID,
+				'titulo'     => $versao->post_title,
+				'conteudo'   => $versao->post_content,
+				'modificado' => $pagina->post_modified_gmt,
+			)
+		);
+
+		if ( is_wp_error( $resultado ) || 'salva' !== $resultado['codigo'] ) {
+			return $resultado;
+		}
+
+		$resultado['codigo'] = 'restaurada';
+
+		return $resultado;
 	}
 
 	/**
@@ -651,7 +755,7 @@ class Reconectar_Incubadora_Acoes {
 	 * capacidade foi consultada. Nesta ordem, um POST forjado por `curl`
 	 * recebe `capacidade`, e é essa a trava que a verificação mede.
 	 *
-	 * @param string $acao `salvar`, `criar`, `mover` ou `excluir`.
+	 * @param string $acao Ação curta, uma das chaves de `ACOES`.
 	 * @return void
 	 */
 	private static function exigir_requisicao( $acao ) {

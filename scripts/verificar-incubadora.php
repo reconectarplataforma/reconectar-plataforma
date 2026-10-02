@@ -13,9 +13,10 @@
  * e o `eval` chega depois dele (armadilha registrada no `CLAUDE.md`).
  *
  * - Com a capacidade, cria uma árvore de teste, exercita salvar, conflito,
- *   publicação, teto de profundidade, mover, envio de arquivo e exclusão, e
+ *   publicação, teto de profundidade, mover, envio de arquivo, histórico de
+ *   versões e exclusão, e
  *   apaga tudo no fim — os arquivos enviados inclusive.
- * - Sem ela, confere que as quatro operações recusam pela segunda camada — a
+ * - Sem ela, confere que as cinco operações recusam pela segunda camada — a
  *   que vale se a primeira, a do handler, regredir.
  *
  * Cada linha sai como `::ok rótulo` ou `::FALHA rótulo`, o formato que o
@@ -98,6 +99,12 @@ if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::salvar( array( 'pagina' => $rc_alvo[0], 'conteudo' => '<p>forjado</p>', 'forcar' => true ) ), 'capacidade' ), 'sem-capacidade-nao-salva' );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::excluir( $rc_alvo[0] ), 'capacidade' ), 'sem-capacidade-nao-exclui' );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Arquivos::guardar( get_post( $rc_alvo[0] ), __FILE__, 'a.png' ), 'capacidade' ), 'sem-capacidade-nao-anexa' );
+
+		// A versão vem direto de `wp_save_post_revision()`, que não consulta
+		// capacidade: sem ela o caso pararia na versão inexistente, e não na
+		// trava que se quer medir.
+		$rc_versao_alvo = (int) wp_save_post_revision( $rc_alvo[0] );
+		$rc_caso( $rc_versao_alvo && $rc_codigo( Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_alvo[0], 'versao' => $rc_versao_alvo, 'modificado' => get_post_field( 'post_modified_gmt', $rc_alvo[0] ) ) ), 'capacidade' ), 'sem-capacidade-nao-restaura' );
 
 		$rc_mae_antes = (int) get_post_field( 'post_parent', $rc_alvo[0] );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_alvo[0], 'pai' => 0, 'ordem' => array( $rc_alvo[0] ) ) ), 'capacidade' ), 'sem-capacidade-nao-move' );
@@ -551,6 +558,56 @@ if ( ! is_wp_error( $rc_png ) && ! is_wp_error( $rc_pdf ) ) {
 } else {
 	$rc_caso( false, 'arquivo-sem-png-ou-pdf-para-o-sanitizador' );
 }
+
+// --- Histórico ---------------------------------------------------------------
+
+/**
+ * Grava título e conteúdo na página, partindo do estado atual dela.
+ *
+ * @param int    $pagina   ID da página.
+ * @param string $titulo   Título novo.
+ * @param string $conteudo Conteúdo novo.
+ * @return array|WP_Error
+ */
+function reconectar_verificar_incubadora_gravar( $pagina, $titulo, $conteudo ) {
+	return Reconectar_Incubadora_Acoes::salvar(
+		array(
+			'pagina'     => $pagina,
+			'titulo'     => $titulo,
+			'conteudo'   => $conteudo,
+			'modificado' => get_post_field( 'post_modified_gmt', $pagina ),
+		)
+	);
+}
+
+$rc_hist = $rc_filha['id'];
+reconectar_verificar_incubadora_gravar( $rc_hist, $rc_rotulo . ' v1', '<p>primeira versão</p>' );
+$rc_v1 = Reconectar_Incubadora_Leitura::versoes( get_post( $rc_hist ) );
+$rc_v1 = $rc_v1 ? $rc_v1[0]['versao']->ID : 0;
+reconectar_verificar_incubadora_gravar( $rc_hist, $rc_rotulo . ' v2', '<p>segunda versão</p>' );
+$rc_versoes = Reconectar_Incubadora_Leitura::versoes( get_post( $rc_hist ) );
+$rc_caso( $rc_versoes && $rc_versoes[0]['atual'] && 1 === count( array_filter( wp_list_pluck( $rc_versoes, 'atual' ) ) ), 'historico-uma-so-versao-atual' );
+
+$rc_quantas    = count( wp_get_post_revisions( $rc_hist ) );
+$rc_restaurada = Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_hist, 'versao' => $rc_v1, 'modificado' => get_post_field( 'post_modified_gmt', $rc_hist ) ) );
+$rc_caso(
+	$rc_codigo( $rc_restaurada, 'restaurada' )
+	&& '<p>primeira versão</p>' === get_post_field( 'post_content', $rc_hist )
+	&& $rc_rotulo . ' v1' === get_post_field( 'post_title', $rc_hist ),
+	'historico-restaura-titulo-e-conteudo'
+);
+$rc_textos = wp_list_pluck( wp_get_post_revisions( $rc_hist ), 'post_content' );
+$rc_caso( count( wp_get_post_revisions( $rc_hist ) ) > $rc_quantas && in_array( '<p>segunda versão</p>', $rc_textos, true ), 'historico-restaurar-e-desfazivel' );
+
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_hist, 'versao' => $rc_v1, 'modificado' => get_post_field( 'post_modified_gmt', $rc_hist ) ) ), 'sem_alteracoes' ), 'historico-restaurar-igual-nao-grava' );
+
+$rc_conflito = Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_hist, 'versao' => $rc_v1, 'modificado' => '2000-01-01 00:00:00' ) );
+$rc_caso( $rc_codigo( $rc_conflito, 'conflito' ) && 409 === $rc_conflito->get_error_data()['status'], 'historico-conflito-recebe-409' );
+
+// Versão de outra página, e o ID da própria página no lugar de uma versão.
+$rc_alheia = Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_raiz['id'], 'versao' => $rc_v1, 'modificado' => get_post_field( 'post_modified_gmt', $rc_raiz['id'] ) ) );
+$rc_caso( $rc_codigo( $rc_alheia, 'versao_inexistente' ) && 404 === $rc_alheia->get_error_data()['status'], 'historico-versao-alheia-recebe-404' );
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::restaurar( array( 'pagina' => $rc_hist, 'versao' => $rc_hist, 'modificado' => get_post_field( 'post_modified_gmt', $rc_hist ) ) ), 'versao_inexistente' ), 'historico-pagina-nao-e-versao' );
 
 $rc_excluida = Reconectar_Incubadora_Acoes::excluir( $rc_filha['id'] );
 $rc_caso( $rc_codigo( $rc_excluida, 'excluida' ) && 'trash' === get_post_status( $rc_filha['id'] ), 'exclui-para-a-lixeira' );
