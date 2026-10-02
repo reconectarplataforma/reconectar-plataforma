@@ -375,8 +375,12 @@ Para a home não exibir nenhum bloco vazio:
   de Super Administrador por desenho.
 - **Configuração de pagamento.** É por loja, e tem documento próprio:
   [PAGAMENTOS.md](PAGAMENTOS.md).
-- **Conteúdo editorial** — posts, páginas, fórum, campanhas da home. É o
-  território do Moderador de Conteúdo.
+- **Conteúdo editorial** — posts, páginas, fórum, campanhas da home e as
+  páginas da Incubadora. É o território do Moderador de Conteúdo, e a
+  Incubadora se escreve pelo próprio site, em `/incubadora/`, sem o
+  `/wp-admin`: veja a seção 4.6 de [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md). A
+  página âncora e o item de menu nascem do `provision.sh`; as páginas, não —
+  uma instalação nova abre a Incubadora com o botão "Criar a primeira página".
 - **Envio de e-mail.** A instalação não tem SMTP, e todo passo deste roteiro foi
   escrito para funcionar sem ele.
 - **Importação em lote.** Não há. Para volume, o caminho é WP-CLI, no molde de

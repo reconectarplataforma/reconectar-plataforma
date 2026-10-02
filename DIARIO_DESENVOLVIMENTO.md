@@ -3743,3 +3743,120 @@ zero PDFs no diretório de comprovantes, e `post_status = wc-on-hold` lido diret
 do MySQL nos três. O preço é que o clique real no botão de confirmar — o item de
 verificação que restava — só volta a ser exercitável depois que um comprovante
 novo for enviado.
+
+## 2026-10-02 — A Incubadora: uma wiki interna, escrita no próprio site
+
+**O que o usuário pediu**
+
+Um menu **Incubadora** em que Moderador, Administrador e Super Administrador
+criem páginas e subpáginas sem entrar no `/wp-admin`, na experiência do
+Confluence: árvore lateral expansível, título grande, linha de autor, tabela de
+metadados, botões Editar, Atualizar, Fechar e Compartilhar, e "Editado há N
+minutos". Vídeo por link, editor limpo e o resultado visível enquanto se edita,
+sem botão de prévia.
+
+Ao longo do plano, o usuário decidiu: leitura **só para logados**; editor
+**TinyMCE 8 auto-hospedado**; e a primeira entrega já com arrastar para
+reordenar, histórico de versões, busca e envio de imagem e arquivo. O vídeo da
+demonstração foi escolhido por ele.
+
+**Por que autoral, e não plugin de wiki**
+
+Fulcrum Wiki, Wikify, WB Member Wiki e weDocs foram avaliados e descartados:
+licença, maturidade e, sobretudo, o RBAC de cinco papéis, que nenhum deles
+acompanha sem remendo. O TinyMCE que vem com o núcleo é o 4.9, sem o plugin
+`table`. A Incubadora mora inteira no `reconectar-core` — o tema não ganhou
+módulo.
+
+**O desenho**
+
+- **Post type `incubadora_pagina`**, hierárquico, até 8 níveis. O nome tem 18
+  caracteres de propósito: `post_type` é `varchar(20)`, e `reconectar_incubadora`
+  (21) seria truncado em silêncio, a mesma armadilha do `post_status`.
+- **Capacidade `reconectar_gerir_incubadora`**, no molde da das enquetes, com
+  `VERSAO_CAPACIDADES` em 7. Quem a tem edita qualquer página — é wiki
+  colaborativa, e o autor é crédito, não dono. Loja e cliente só leem.
+- **Página âncora `/incubadora/`** e um único renderizador para ela e para o
+  single, com portão de leitura em `template_redirect` prioridade 1.
+- **Escrita por `admin-post.php` com resposta JSON**, na ordem método, login,
+  capacidade, nonce. Capacidade antes do nonce para que a trava possa ser
+  provada por `curl`. Conflito de edição por `post_modified_gmt`, com 409.
+- **Sanitização por reconstrução.** Moderador e Administrador não têm
+  `unfiltered_html`: o conteúdo é remontado por `DOMDocument` a partir de uma
+  lista fechada e passa por `wp_kses` depois. O `<iframe>` de YouTube e Vimeo vira
+  marcador; na leitura sai como capa estática, e só o clique contata o provedor.
+- **Arquivos fora da Media Library**, no molde do comprovante de pagamento:
+  pasta própria negada pelo `.htaccess`, nome sorteado de 32 caracteres, rota
+  autoral só para logados, sem SVG.
+- **Histórico** são as revisões do WordPress, limitadas a 30. **Busca** por
+  `?q=`, não `s`, que na âncora viraria a busca global.
+
+**O que foi feito, por etapa**
+
+| Etapa | Commit |
+| --- | --- |
+| Base: post type, capacidade, portão de leitura, migração 6 | `22cc981` |
+| Leitura: árvore, página, âncora, item de menu | `4c3ac57` |
+| Sanitizador e vídeo por facade | `5a9aa03` |
+| Endpoints de salvar, criar e excluir | `7209986` |
+| TinyMCE 8.9.2 vendorizado (1,8 MB) | `6a0b332` |
+| Editor na própria página | `a884d7b` |
+| Árvore interativa: criar, mover, arrastar, alternativa de teclado | `6437b5c` |
+| Envio de imagem e PDF | `3fd57c8` |
+| Histórico de versões | `04d77cc` |
+| Busca | `4b9b713` |
+| Moderador e Administrador novos já nascem moderando o fórum | `7956acd` |
+| Sete páginas de demonstração | `5aadadb` |
+
+Esta entrada é a etapa 11: documentação em `STACKS`, `PERFIS_E_PERMISSOES`,
+`DADOS_DEMONSTRACAO`, `ROTEIRO_PERFIS` (seções 1.6 e 4.6, itens 33 a 36 do
+checklist), `CADASTRO_MANUAL`, `DEPLOY` e `README`, e as armadilhas novas no
+`CLAUDE.md`.
+
+**Um defeito de fora da Incubadora, achado por ela**
+
+O `7956acd` não estava no plano. Ao medir a carga, um Moderador recém-criado não
+moderava o fórum: o bbPress pendura em `user_register` a gravação de
+`bbp_participant`, que vence o papel do WordPress, e a sincronização do projeto
+só escutava `set_user_role`. Quem nascia Moderador pelo cadastro ficava
+participante. `sincronizar_papel_no_forum_ao_cadastrar()` roda em
+`user_register` prioridade 20, depois do bbPress.
+
+**Armadilhas medidas no caminho**
+
+Todas registradas no `CLAUDE.md`; aqui, só a lista:
+
+- rascunho novo tem `post_modified_gmt` zerado, e a tela dizia "há 57 anos";
+- `<iframe>` colado no editor `inline` é carregado pelo navegador antes de o
+  servidor recusar;
+- `editor.remove()` devolve o conteúdo ao elemento e recria os iframes por um
+  instante;
+- acima de `post_max_size` o PHP esvazia `$_POST` inteiro, inclusive o `action`;
+- `query_var => false` num post type hierárquico cai em `pagename`, que só olha
+  o tipo `page`;
+- `post_status => 'any'` não alcança a lixeira;
+- a base `emojiimages` do plugin `emoticons` do TinyMCE busca imagem em CDN;
+  a configurada é `emojis`, que é texto.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| `verificar-acessos.sh` | **274 casos**, todos passando (eram 127) |
+| `verificar-incubadora.php` | 18 de operações, 21 de arquivo, 7 de histórico, 6 de busca |
+| bateria de XSS por `wp eval-file` | 70 casos, cada um com segunda passada idêntica |
+| Chrome headless, leitura | nenhuma requisição a terceiro antes do clique no vídeo |
+| Chrome headless, editor | salvar, publicar, conflito, forçar, `Ctrl+S`, fechar com pendência |
+| 320, 375 e 1280px | sem transbordo horizontal |
+| carga duas vezes | a segunda imprime "já existia" nas sete páginas |
+
+**Pendências**
+
+- **O limite efetivo de envio é 2 MB**, não os 5 MB (imagem) e 10 MB (PDF) que a
+  classe aceita: o container tem `upload_max_filesize=2M`. Elevar é decisão de
+  infraestrutura.
+- **Backup de `uploads/reconectar-incubadora/`** é da infraestrutura: a pasta não
+  está no Git nem no deploy. `limpar_orfaos()` existe, mas nada a agenda.
+- **No editor, o player é vivo** e contata o provedor ao abrir a página em
+  edição. Na leitura, não.
+- **Não há permissão por página.** Quem edita a Incubadora edita toda ela.

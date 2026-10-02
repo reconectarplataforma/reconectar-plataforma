@@ -159,6 +159,27 @@ em lugar que nada carrega.)
 | `class-reconectar-proposta-votacao.php` | governança participativa |
 | `class-reconectar-aviso-demo.php` | aviso de ambiente de demonstração |
 | `class-reconectar-forum.php` | votos, visualizações e melhor resposta do Q&A |
+| `class-reconectar-incubadora.php` | Incubadora: post type, portão de leitura, noindex, oEmbed fechado |
+| `class-reconectar-incubadora-leitura.php` | Incubadora: árvore, página, histórico e template |
+| `class-reconectar-incubadora-acoes.php` | Incubadora: endpoints de escrita (salvar, criar, mover, excluir, restaurar, enviar) |
+| `class-reconectar-incubadora-conteudo.php` | Incubadora: sanitizador por reconstrução e vídeo |
+| `class-reconectar-incubadora-arquivos.php` | Incubadora: imagem e PDF fora da Media Library |
+| `class-reconectar-incubadora-editor.php` | Incubadora: carga do TinyMCE sob demanda |
+| `class-reconectar-incubadora-busca.php` | Incubadora: busca sem acento e sem maiúscula |
+
+**A Incubadora é uma wiki interna, inteira no plugin.** Páginas e subpáginas
+do post type `incubadora_pagina`, lidas por quem está logado e escritas por
+quem tem `reconectar_gerir_incubadora` (Super Administrador, Administrador e
+Moderador), sem passar pelo `/wp-admin`. Os templates ficam em
+`includes/incubadora/`, o CSS e o JS em `assets/`, e o editor é o TinyMCE 8
+auto-hospedado em `assets/vendor/tinymce/8.9.2/` — origem, recorte e licença
+no `LEIAME.md` dali. A âncora `/incubadora/` é uma página comum com o shortcode
+`[reconectar_incubadora]`, criada pelo `provision.sh`. Os testes de operação
+ficam em `scripts/verificar-incubadora.php`, que o `verificar-acessos.sh` chama.
+
+Ela é autoral porque as wikis do diretório de plugins do WordPress foram
+avaliadas e nenhuma servia: licença, maturidade ou um RBAC que não conversa com
+os cinco papéis. E o TinyMCE do núcleo (4.9) não tem o plugin de tabela.
 
 **Por que as regras estão em plugin, e não no tema.** Trocar de tema não pode
 derrubar autorização. A migração para o Blocksy está em aberto; se o RBAC
@@ -236,6 +257,9 @@ O que a carga cria está detalhado em
 | Carregar CSS ou JS | `themes/reconectar/inc/enqueue.php` |
 | Mudar quem pode o quê | `reconectar-core/includes/class-reconectar-permissoes.php` |
 | Conferir se as permissões continuam valendo | `scripts/verificar-acessos.sh` |
+| Mudar a Incubadora (tela, árvore, histórico) | `reconectar-core/includes/class-reconectar-incubadora-leitura.php` + `includes/incubadora/` |
+| Mudar o que o editor da Incubadora aceita | `reconectar-core/includes/class-reconectar-incubadora-conteudo.php` |
+| Conferir as operações da Incubadora | `scripts/verificar-incubadora.php` |
 | Mudar o fluxo de status do pedido | `reconectar-core/includes/class-reconectar-status-pedido.php` |
 | Mudar o conteúdo da demonstração | `scripts/seed/dados-demo.php` |
 | Mudar como a demonstração é montada | `scripts/seed/demo.php` |

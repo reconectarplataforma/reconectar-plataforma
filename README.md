@@ -34,6 +34,12 @@ Este repositório é distribuído sob a licença **GPL-2.0-or-later** (ver
 dependências GPL do projeto, conforme exigido pelo edital para manter o
 código-fonte aberto e livremente reutilizável.
 
+O editor da Incubadora é o **TinyMCE 8.9.2**, auto-hospedado em
+`wp-content/plugins/reconectar-core/assets/vendor/tinymce/8.9.2/` sob a mesma
+GPL-2.0-or-later, com a tradução pt-BR do pacote `tinymce-i18n`. Origem,
+somas de verificação, recorte e licença das bibliotecas embutidas estão no
+`LEIAME.md`, no `license.md` e no `notices.txt` daquele diretório.
+
 ## Estrutura do repositório
 
 ```
@@ -44,7 +50,7 @@ reconectar-plataforma/
 ├── docker-compose.yml         # ambiente local (WordPress + MariaDB + WP-CLI)
 ├── docs/
 │   ├── STACKS.md              # as camadas da plataforma e por que cada uma existe
-│   ├── PERFIS_E_PERMISSOES.md # os três atores e a matriz de permissões
+│   ├── PERFIS_E_PERMISSOES.md # os cinco atores e a matriz de permissões
 │   ├── ROTEIRO_PERFIS.md      # roteiro de demonstração, com credenciais
 │   ├── DADOS_DEMONSTRACAO.md  # o que a carga de demonstração cria
 │   └── PAGAMENTOS.md          # meios de pagamento e o que falta decidir
@@ -53,6 +59,7 @@ reconectar-plataforma/
 │   ├── demo-completa.sh       # ambiente + provisionamento + carga, em um comando
 │   ├── seed-demo.sh           # instala ou remove só os dados de demonstração
 │   ├── verificar-acessos.sh   # testa as travas de permissão por HTTP
+│   ├── verificar-incubadora.php # operações da Incubadora por WP-CLI (chamado pelo anterior)
 │   ├── permissoes-dev.sh      # acerta dono e permissões de wp-content/
 │   └── seed/                  # catálogo declarativo e motor da carga
 └── wp-content/                 # único conteúdo de WordPress versionado

@@ -139,6 +139,12 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Ler e participar de fóruns | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Votar em pergunta ou resposta | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Marcar a melhor resposta | ✅ | ✅ | ✅ | só nas próprias perguntas | ❌ |
+| **Incubadora** | | | | | |
+| Ler as páginas publicadas | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ver rascunhos, histórico e versões antigas | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Criar, editar, publicar, mover e excluir páginas | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Restaurar versão antiga | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Enviar imagem e PDF para uma página | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Contas** | | | | | |
 | Listar, criar e editar contas de loja | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Editar a conta de um Super Administrador | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -163,6 +169,12 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Bloqueia comunidade para o cliente | `bloquear_comunidade()` | `template_redirect` |
 | Nega escrita no fórum a quem não participa | `negar_escrita_no_forum()` | `map_meta_cap` |
 | Esconde links da comunidade | `ocultar_itens_da_comunidade()` | `wp_nav_menu_objects` |
+| Dá ao Moderador e ao Administrador novos a moderação do fórum | `sincronizar_papel_no_forum_ao_cadastrar()` | `user_register` (20) |
+| Fecha a Incubadora a quem não está logado | `Reconectar_Incubadora::bloquear_leitura()` | `template_redirect` (1) |
+| Dá 404 a página da Incubadora sob mãe em rascunho | `Reconectar_Incubadora_Leitura::exigir_caminho_visivel()` | `template_redirect` (2) |
+| Esconde o item Incubadora do visitante | `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` | `wp_nav_menu_objects` |
+| Barra a escrita na Incubadora | `Reconectar_Incubadora_Acoes::processar_*()` | `admin_post_reconectar_incubadora_*` |
+| Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
 | Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
 
@@ -178,6 +190,44 @@ primitiva `publish_topics`, que todo usuário tem por causa do papel
 `bbp_participant` atribuído no registro. Sem `negar_escrita_no_forum()`, o gate
 de leitura não alcançaria a escrita. O nonce do formulário ainda barraria, mas
 uma única barreira não é uma trava: é a última que sobrou.
+
+## A Incubadora
+
+A Incubadora é a wiki interna da plataforma: páginas e subpáginas do post type
+`incubadora_pagina`, sob `/incubadora/`. Duas regras, e ambas valem pela URL
+digitada à mão:
+
+- **Ler exige estar logado.** Qualquer um dos cinco papéis lê o que está
+  publicado. O visitante vai para o login, inclusive na busca e no histórico. A
+  saída leva `noindex`, e o oEmbed das páginas responde 404 — o conteúdo é
+  interno e não pode aparecer num buscador nem embutido em outro site.
+- **Escrever exige `reconectar_gerir_incubadora`**, que o Super Administrador,
+  o Administrador e o Moderador têm. É uma wiki colaborativa: quem tem a
+  capacidade edita qualquer página, e o autor é crédito, não dono.
+
+O que cada perfil vê segue **a árvore, não a consulta**. Uma página publicada
+sob mãe em rascunho responde 404 a quem só lê, porque abri-la revelaria o
+rascunho pela trilha e pela URL. A mesma regra vale na busca: nem o título de
+um rascunho sai na lista de resultados de quem não edita.
+
+Histórico e versões antigas (`?historico=1`, `?versao=<ID>`) não existem para
+quem não edita: a resposta é a página atual, com 200. Um 403 confirmaria a quem
+só lê que existe uma versão com aquele ID.
+
+Os endpoints de escrita passam por `admin-post.php` e conferem, nesta ordem,
+método (405), login (401), **capacidade** (403) e nonce (403). A capacidade vem
+antes do nonce de propósito: é o que permite provar a trava por HTTP, porque
+cliente e loja nunca recebem um nonce válido. O corpo da resposta traz um
+`codigo` — `capacidade` ou `nonce` — que diz qual trava respondeu.
+
+Para o Administrador, a capacidade não basta sozinha:
+`negar_escrita_ao_admin_de_empresas()` nega `edit_post` a qualquer post type
+fora de uma allowlist, e o `incubadora_pagina` está nela. Sem isso, o papel
+teria a capacidade e seria barrado em silêncio.
+
+Os arquivos enviados ficam em `uploads/reconectar-incubadora/`, fora da
+biblioteca de mídia, com `.htaccess` negando o acesso direto. A única entrada é
+uma rota autoral que exige login.
 
 ## A escalada que `edit_users` abre
 
@@ -322,7 +372,7 @@ perde o que estiver em `CAPS_LEGADAS`.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 114 casos por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 274 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -332,6 +382,10 @@ que é o caminho que uma auditoria vai tentar; um teste que apenas consulta
 alguém pergunta, não que a requisição foi barrada. Onde só o HTTP não basta —
 a escalada de privilégio, as capacidades de tema, o isolamento entre vendedores
 — o script complementa com WP-CLI, e o comentário de cada bloco diz por quê.
+O caminho feliz da Incubadora — criar, salvar, publicar, mover, excluir, enviar
+arquivo, restaurar versão — também vai por WP-CLI, em
+`scripts/verificar-incubadora.php`, que o script chama no fim: o nonce que o
+WP-CLI gera não vale no navegador.
 
 Respostas medidas nesta instalação:
 
@@ -398,6 +452,11 @@ commit. Cobre o que quebrou até hoje; não cobre o que ainda não foi imaginado
 Em especial, nada dispara alarme se um plugin novo conceder
 `manage_woocommerce` ao papel `seller`. O script detectaria a consequência
 (`/wp-admin/` deixaria de redirecionar), mas só quando alguém o rodasse.
+
+**A Incubadora não tem permissão por página.** Quem tem
+`reconectar_gerir_incubadora` edita, move e exclui qualquer página, e quem está
+logado lê qualquer página publicada. Uma área restrita a um grupo exigiria
+outro desenho, não um ajuste deste.
 
 **Aparência → Temas continua acessível de leitura** aos dois papéis restritos,
 pelo motivo explicado acima. A capacidade de trocar, instalar ou editar tema
