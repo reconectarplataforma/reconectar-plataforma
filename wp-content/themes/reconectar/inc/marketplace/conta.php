@@ -98,3 +98,29 @@ function reconectar_url_do_painel_na_conta( $url, $endpoint ) {
 	return RECONECTAR_CONTA_ITEM_PAINEL === $endpoint ? admin_url() : $url;
 }
 add_filter( 'woocommerce_get_endpoint_url', 'reconectar_url_do_painel_na_conta', 10, 2 );
+
+/**
+ * Leva o Super Administrador ao `/wp-admin` depois do login por "Minha conta".
+ *
+ * Só o papel `administrator`. Os demais perfis com painel — Administrador e
+ * Moderador — seguem no link do menu da conta, e o redirecionamento automático
+ * para eles foi experimentado e descartado. O Super Administrador é diferente
+ * porque, sem isto, o Dokan o manda para `/dashboard/` (ele tem a capacidade de
+ * loja, e o filtro do Dokan roda em 20): uma tela de vendedor que não é a dele e
+ * que não tem o link do painel.
+ *
+ * Prioridade 25: depois do Dokan, e antes de `reconectar_login_volta_ao_checkout()`
+ * (30), para que quem entrou pelo checkout continue voltando ao checkout.
+ *
+ * @param string  $destino URL decidida até aqui.
+ * @param WP_User $usuario Usuário que acabou de entrar.
+ * @return string
+ */
+function reconectar_login_do_super_administrador( $destino, $usuario = null ) {
+	if ( $usuario instanceof WP_User && in_array( 'administrator', (array) $usuario->roles, true ) ) {
+		return admin_url();
+	}
+
+	return $destino;
+}
+add_filter( 'woocommerce_login_redirect', 'reconectar_login_do_super_administrador', 25, 2 );
