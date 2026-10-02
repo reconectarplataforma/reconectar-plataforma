@@ -32,6 +32,7 @@ $reconectar_modulos = array(
 	'inc/marketplace/busca-sugestoes.php',
 	'inc/marketplace/loja.php',
 	'inc/marketplace/checkout.php',
+	'inc/marketplace/so-com-login.php',
 	'inc/marketplace/conta.php',
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',

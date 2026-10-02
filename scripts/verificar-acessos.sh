@@ -265,11 +265,97 @@ else
 fi
 rm -f "$JAR_FORJADO"
 
+echo "Compra e avaliação só com login"
+# As duas travas são opções do núcleo (`woocommerce_enable_guest_checkout` e
+# `comment_registration`), gravadas pelo `provision.sh`; antes dele, medido nos
+# dois ambientes, o visitante finalizava pedido e deixava avaliação com nota.
+#
+# O produto e o checkout são descobertos pela página, não fixados: os slugs saem
+# no idioma da ativação do WooCommerce — `/product/` e `/checkout/` aqui,
+# `/produto/` e `/finalizar-compra/` em produção. O primeiro produto simples da
+# home serve, porque precisa do `add-to-cart` para montar o carrinho.
+JAR_VISITANTE=/tmp/reconectar-acessos-visitante.txt
+rm -f "$JAR_VISITANTE"
+PRODUTO=""
+ID_PRODUTO=""
+for url_produto in $(curl -s "$BASE/" | grep -o 'href="[^"]*/\(product\|produto\)/[^"#?]*"' | sed 's/^href="//;s/"$//' | sort -u | head -10); do
+  ID_PRODUTO="$(curl -s "$url_produto" | grep -o 'name="add-to-cart" value="[0-9]*"' | head -1 | grep -o '[0-9]*' || true)"
+  if [ -n "$ID_PRODUTO" ]; then
+    PRODUTO="/${url_produto#*://*/}"
+    break
+  fi
+done
+
+if [ -z "$PRODUTO" ]; then
+  echo "  --    nenhum produto simples na home; compra e avaliação não verificadas"
+else
+  conferir_corpo "" "$PRODUTO" 'id="commentform"' "ausente"  "visitante não recebe o formulário de avaliação"
+  conferir_corpo "" "$PRODUTO" 'class="must-log-in"' "presente" "visitante recebe o convite para entrar"
+
+  curl -s -c "$JAR_VISITANTE" -b "$JAR_VISITANTE" -o /dev/null -X POST "$BASE/?wc-ajax=add_to_cart" \
+    -d "product_id=$ID_PRODUTO&quantity=1"
+  FINALIZAR_COMPRA=""
+  for candidata in /checkout/ /finalizar-compra/; do
+    if [ "$(curl -s -b "$JAR_VISITANTE" -o /dev/null -w '%{http_code}' "$BASE$candidata")" = "200" ]; then
+      FINALIZAR_COMPRA="$candidata"
+      break
+    fi
+  done
+
+  if [ -z "$FINALIZAR_COMPRA" ]; then
+    echo "  --    checkout não encontrado (tentei /checkout/ e /finalizar-compra/); compra não verificada"
+  else
+    # Com o carrinho cheio: sem ele o checkout redireciona ao carrinho, e a
+    # ausência dos campos não provaria nada.
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'id="billing_email"'    "ausente"  "visitante não recebe o formulário de compra"
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'rc-entrada-checkout'   "presente" "visitante recebe o login no checkout"
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'name="redirect" value="'"$BASE$FINALIZAR_COMPRA"'"' "presente" "o login volta ao checkout"
+  fi
+
+  # A tela sem formulário prova só que ele não é oferecido; quem prova a trava é
+  # o POST direto. Sem o banco ele não é enviado, pelo mesmo motivo do POST
+  # forjado: se a trava falhasse, a avaliação ficaria no servidor.
+  ID_AVALIADO="$(wp_eval 'echo url_to_postid( home_url( "'"$PRODUTO"'" ) );')"
+  if ! banco_alcancavel || [ -z "$ID_AVALIADO" ] || [ "$ID_AVALIADO" = "0" ]; then
+    echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); POST de avaliação não verificado"
+  else
+    EMAIL_AVALIACAO="verificacao-avaliacao@example.invalid"
+    codigo_avaliacao="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/wp-comments-post.php" \
+      --data-urlencode "comment_post_ID=$ID_AVALIADO" \
+      --data-urlencode "rating=5" \
+      --data-urlencode "comment=Verificação de avaliação anônima" \
+      --data-urlencode "author=Verificação" \
+      --data-urlencode "email=$EMAIL_AVALIACAO")"
+    # A limpeza vai junto da consulta, como no POST forjado. O `type` é
+    # obrigatório: o WooCommerce tira `review` da consulta padrão de
+    # comentários, e sem ele a contagem dava 0 com a avaliação gravada — a
+    # verificação acusava só pelo HTTP, e a limpeza não apagava nada.
+    avaliacoes_criadas="$(wp_eval '
+      $c = get_comments( array( "author_email" => "'"$EMAIL_AVALIACAO"'", "status" => "all", "type" => "review", "fields" => "ids" ) );
+      foreach ( $c as $id ) { wp_delete_comment( $id, true ); }
+      echo count( $c );')"
+
+    total=$((total + 1))
+    if [ "$codigo_avaliacao" = "403" ] && [ "$avaliacoes_criadas" = "0" ]; then
+      [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "/wp-comments-post.php" "avaliação anônima recusada"
+    else
+      printf '  FALHA %-24s avaliação anônima: HTTP %s, %s gravada(s)\n' "/wp-comments-post.php" "$codigo_avaliacao" "$avaliacoes_criadas"
+      falhas=$((falhas + 1))
+    fi
+  fi
+fi
+rm -f "$JAR_VISITANTE"
+
 echo "Cliente (demo-cliente-marina)"
 JAR_CLIENTE=/tmp/reconectar-acessos-cliente.txt
 if autenticar "demo-cliente-marina" "$SENHA_DEMO" "$JAR_CLIENTE"; then
   conferir "$JAR_CLIENTE" "$MINHA_CONTA"   "200"                "a própria conta"
   conferir "$JAR_CLIENTE" "/wp-admin/"     "302 $MINHA_CONTA"   "sem painel administrativo"
+  # O lado da permissão da trava de avaliação: uma que negasse a todos passaria
+  # nos casos do visitante.
+  if [ -n "$PRODUTO" ]; then
+    conferir_corpo "$JAR_CLIENTE" "$PRODUTO" 'id="commentform"' "presente" "cliente recebe o formulário de avaliação"
+  fi
   conferir "$JAR_CLIENTE" "/dashboard/"    "302"                "sem painel de vendedor"
   conferir "$JAR_CLIENTE" "/comunidade/"   "403"                "sem comunidade"
   conferir "$JAR_CLIENTE" "/forums/"       "403"                "sem fóruns"
