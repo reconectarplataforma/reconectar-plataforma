@@ -46,6 +46,7 @@ class Reconectar_Incubadora_Acoes {
 		'criar'   => 'processar_criar',
 		'mover'   => 'processar_mover',
 		'excluir' => 'processar_excluir',
+		'enviar'  => 'processar_enviar',
 	);
 
 	/**
@@ -68,7 +69,7 @@ class Reconectar_Incubadora_Acoes {
 	/**
 	 * Nome completo de uma ação, que é também a ação do nonce dela.
 	 *
-	 * @param string $acao `salvar`, `criar`, `mover` ou `excluir`.
+	 * @param string $acao `salvar`, `criar`, `mover`, `excluir` ou `enviar`.
 	 * @return string
 	 */
 	public static function acao( $acao ) {
@@ -179,6 +180,44 @@ class Reconectar_Incubadora_Acoes {
 		$resultado = self::excluir( isset( $_POST['pagina'] ) ? absint( $_POST['pagina'] ) : 0 );
 
 		self::responder( $resultado );
+	}
+
+	/**
+	 * Handler de `enviar`: um arquivo, de imagem ou PDF, para uma página.
+	 *
+	 * `is_uploaded_file()` fica aqui, e não em `Reconectar_Incubadora_Arquivos`:
+	 * é ela que garante que o caminho temporário veio de um upload, e não de um
+	 * campo de formulário apontando para um arquivo do servidor. A conferência
+	 * de tipo e a gravação são da outra classe, que se mede por WP-CLI.
+	 *
+	 * @return void
+	 */
+	public static function processar_enviar() {
+		self::exigir_requisicao( 'enviar' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- conferido em `exigir_requisicao()`.
+		$pagina = self::pagina_editavel( isset( $_POST['pagina'] ) ? absint( $_POST['pagina'] ) : 0, 'edit_post' );
+		// phpcs:enable
+
+		if ( is_wp_error( $pagina ) ) {
+			self::responder( $pagina );
+		}
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- os campos de `$_FILES` são conferidos um a um abaixo.
+		$arquivo = isset( $_FILES['arquivo'] ) && is_array( $_FILES['arquivo'] ) ? $_FILES['arquivo'] : array();
+
+		if ( ! $arquivo || is_array( $arquivo['name'] ?? null ) ) {
+			self::responder( self::erro( 'sem_arquivo', __( 'Nenhum arquivo foi recebido.', 'reconectar-core' ), 400 ) );
+		}
+
+		$erro    = isset( $arquivo['error'] ) ? (int) $arquivo['error'] : UPLOAD_ERR_NO_FILE;
+		$caminho = isset( $arquivo['tmp_name'] ) ? (string) $arquivo['tmp_name'] : '';
+
+		if ( UPLOAD_ERR_OK === $erro && ! is_uploaded_file( $caminho ) ) {
+			self::responder( self::erro( 'sem_arquivo', __( 'Nenhum arquivo foi recebido.', 'reconectar-core' ), 400 ) );
+		}
+
+		self::responder( Reconectar_Incubadora_Arquivos::guardar( $pagina, $caminho, (string) ( $arquivo['name'] ?? '' ), $erro ) );
 	}
 
 	/* ---------------------------------------------------------------------
@@ -634,6 +673,27 @@ class Reconectar_Incubadora_Acoes {
 
 		if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
 			self::responder( self::erro( 'capacidade', __( 'Você não tem permissão para editar a Incubadora.', 'reconectar-core' ), 403 ) );
+		}
+
+		// Um corpo acima de `post_max_size` chega com `$_POST` e `$_FILES`
+		// vazios — o PHP descarta tudo, inclusive o nonce. Sem esta conferência
+		// antes do nonce, quem cola uma imagem grande lê "o formulário expirou",
+		// recarrega a página e perde o que não estava salvo.
+		$tamanho = isset( $_SERVER['CONTENT_LENGTH'] ) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+		$teto    = wp_convert_hr_to_bytes( (string) ini_get( 'post_max_size' ) );
+
+		if ( empty( $_POST ) && $teto > 0 && $tamanho > $teto ) {
+			self::responder(
+				self::erro(
+					'tamanho',
+					sprintf(
+						/* translators: %s: tamanho máximo legível, como "2 MB". */
+						__( 'O arquivo passa do limite de %s. Reduza-o e envie de novo.', 'reconectar-core' ),
+						size_format( wp_max_upload_size() )
+					),
+					413
+				)
+			);
 		}
 
 		$nonce = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';

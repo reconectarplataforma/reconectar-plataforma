@@ -115,7 +115,33 @@ class Reconectar_Incubadora_Editor {
 				'usuario'    => wp_get_current_user()->display_name,
 				'hoje'       => date_i18n( get_option( 'date_format' ) ),
 				'textos'     => self::textos(),
+				'arquivos'   => self::dados_de_arquivos(),
 			)
+		);
+	}
+
+	/**
+	 * Ação, nonce e limites do envio de arquivos.
+	 *
+	 * Os limites vão ao navegador para recusar **antes** de enviar: um arquivo
+	 * de 6 MB num servidor que aceita 2 MB levaria o tempo da transferência
+	 * inteira para ouvir "não". O servidor confere de novo, e é a conferência
+	 * dele que vale.
+	 *
+	 * @return array
+	 */
+	private static function dados_de_arquivos() {
+		$limites = Reconectar_Incubadora_Arquivos::limites();
+
+		return array(
+			'acao'              => Reconectar_Incubadora_Acoes::acao( 'enviar' ),
+			'nonce'             => wp_create_nonce( Reconectar_Incubadora_Acoes::acao( 'enviar' ) ),
+			'limiteImagem'      => $limites['imagem'],
+			'limitePdf'         => $limites['pdf'],
+			'imagens'           => array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ),
+			'aceitos'           => '.jpg,.jpeg,.png,.gif,.webp,.pdf,image/jpeg,image/png,image/gif,image/webp,application/pdf',
+			'textoLimiteImagem' => size_format( $limites['imagem'] ),
+			'textoLimitePdf'    => size_format( $limites['pdf'] ),
 		);
 	}
 
@@ -249,6 +275,15 @@ class Reconectar_Incubadora_Editor {
 			'corVerde'         => __( 'Verde', 'reconectar-core' ),
 			'corAzul'          => __( 'Azul', 'reconectar-core' ),
 			'corMarrom'        => __( 'Marrom', 'reconectar-core' ),
+			'anexar'           => __( 'Anexar imagem ou PDF', 'reconectar-core' ),
+			'enviando'         => __( 'Enviando arquivo…', 'reconectar-core' ),
+			'enviado'          => __( 'Arquivo anexado. Ele só fica na página depois de salvar.', 'reconectar-core' ),
+			/* translators: %s: tamanho máximo legível, como "2 MB". */
+			'grandeImagem'     => __( 'A imagem passa do limite de %s. Reduza-a e envie de novo.', 'reconectar-core' ),
+			/* translators: %s: tamanho máximo legível, como "2 MB". */
+			'grandePdf'        => __( 'O PDF passa do limite de %s. Reduza-o e envie de novo.', 'reconectar-core' ),
+			'tipoRecusado'     => __( 'Este tipo de arquivo não é aceito. Envie imagem JPG, PNG, GIF ou WebP, ou documento PDF.', 'reconectar-core' ),
+			'falhaEnvio'       => __( 'O arquivo não foi enviado.', 'reconectar-core' ),
 		);
 	}
 

@@ -137,6 +137,157 @@
 	}
 
 	/* ---------------------------------------------------------------------
+	 * Arquivos
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Envia um arquivo à página e resolve com os dados do servidor.
+	 *
+	 * Tipo e tamanho são conferidos aqui antes de enviar, para quem cola uma
+	 * foto de 6 MB não esperar a transferência inteira para ouvir "não". A
+	 * conferência que vale é a do servidor, que olha o conteúdo, e não o tipo
+	 * que o navegador declara.
+	 *
+	 * @param {Blob}   arquivo Arquivo ou blob colado.
+	 * @param {string} nome    Nome do arquivo.
+	 * @return {Promise} Resolve com `{url, nome, imagem, largura, altura, descricao}`;
+	 *                   rejeita com a mensagem para a pessoa.
+	 */
+	function enviarArquivo( arquivo, nome ) {
+		var regras = dados.arquivos;
+		var tipo = arquivo.type || '';
+		var imagem = regras.imagens.indexOf( tipo ) !== -1;
+
+		// Sem isso, a recusa feita aqui deixa no ar o "Arquivo anexado" do
+		// envio anterior, ao lado do alerta que diz o contrário.
+		anunciar( '' );
+
+		if ( ! imagem && 'application/pdf' !== tipo ) {
+			return Promise.reject( t.tipoRecusado );
+		}
+
+		if ( imagem && arquivo.size > regras.limiteImagem ) {
+			return Promise.reject( t.grandeImagem.replace( '%s', regras.textoLimiteImagem ) );
+		}
+
+		if ( ! imagem && arquivo.size > regras.limitePdf ) {
+			return Promise.reject( t.grandePdf.replace( '%s', regras.textoLimitePdf ) );
+		}
+
+		var corpoEnvio = new FormData();
+
+		corpoEnvio.append( 'action', regras.acao );
+		corpoEnvio.append( '_wpnonce', regras.nonce );
+		corpoEnvio.append( 'pagina', String( dados.pagina ) );
+		corpoEnvio.append( 'arquivo', arquivo, nome || 'arquivo' );
+
+		anunciar( t.enviando );
+
+		// A ação vai também na URL. Corpo acima de `post_max_size` chega com
+		// `$_POST` vazio — e sem `action` o `admin-post.php` nem chama o
+		// handler: a resposta seria um 200 em branco, lido aqui como "resposta
+		// inválida". Pela query string ele chega, e devolve o 413 que explica.
+		return fetch( dados.rota + '?action=' + encodeURIComponent( regras.acao ), {
+			method: 'POST',
+			body: corpoEnvio,
+			credentials: 'same-origin'
+		} ).then( function ( resposta ) {
+			return resposta.json().catch( function () {
+				return { success: false, data: { mensagem: t.erroResposta } };
+			} );
+		}, function () {
+			return { success: false, data: { mensagem: t.erroRede } };
+		} ).then( function ( json ) {
+			if ( ! json || ! json.success || ! json.data || ! json.data.url ) {
+				anunciar( '' );
+				throw ( json && json.data && json.data.mensagem ) || t.erroResposta;
+			}
+
+			anunciar( t.enviado );
+
+			return json.data;
+		} );
+	}
+
+	/**
+	 * Recebe as imagens coladas, arrastadas ou escolhidas na janela do TinyMCE.
+	 *
+	 * A rejeição leva `remove: true`: sem ela, a imagem recusada fica no
+	 * editor como `blob:`, que existe só nesta aba — o servidor a apagaria ao
+	 * salvar, e a pessoa só descobriria pelo aviso, depois.
+	 *
+	 * @param {Object} blobInfo Dados da imagem, do TinyMCE.
+	 * @return {Promise} Resolve com o endereço gravado.
+	 */
+	function receberImagem( blobInfo ) {
+		return enviarArquivo( blobInfo.blob(), blobInfo.filename() ).then( function ( resposta ) {
+			return resposta.url;
+		}, function ( mensagem ) {
+			alertar( t.falhaEnvio + ' ' + mensagem );
+			throw { message: mensagem, remove: true };
+		} );
+	}
+
+	/**
+	 * Abre a escolha de arquivo e insere o resultado no ponto do cursor.
+	 *
+	 * Imagem entra como `<img>` com largura e altura, que reservam o espaço
+	 * antes de ela carregar; PDF entra como link com tipo e tamanho no texto,
+	 * para quem lê saber o que vai baixar antes de clicar.
+	 *
+	 * @param {Object} editor Instância do TinyMCE.
+	 */
+	function anexar( editor ) {
+		var campo = document.createElement( 'input' );
+
+		campo.type = 'file';
+		campo.accept = dados.arquivos.aceitos;
+
+		campo.addEventListener( 'change', function () {
+			var arquivo = campo.files && campo.files[ 0 ];
+
+			if ( ! arquivo ) {
+				return;
+			}
+
+			alertar( '' );
+
+			enviarArquivo( arquivo, arquivo.name ).then( function ( resposta ) {
+				var html;
+
+				if ( resposta.imagem ) {
+					html = '<img src="' + escapar( resposta.url ) + '" width="' + resposta.largura + '" height="' + resposta.altura + '">';
+				} else {
+					html = '<a href="' + escapar( resposta.url ) + '">' + escapar( resposta.nome ) + '</a> (' + escapar( resposta.descricao ) + ')';
+				}
+
+				editor.focus();
+				editor.insertContent( html );
+
+				// A imagem entra **sem** `alt`, e a janela abre sobre ela para
+				// quem envia escrever a descrição ou marcar "decorativa". Com
+				// `alt=""` o TinyMCE abriria a janela já com "decorativa"
+				// marcada e o campo de descrição desabilitado — medido —, e a
+				// decisão viria tomada. Fechar sem responder ainda resulta em
+				// `alt=""` ao salvar: é o sanitizador que o garante.
+				if ( resposta.imagem ) {
+					var nova = editor.dom.select( 'img[src="' + resposta.url.replace( /"/g, '\\"' ) + '"]' ).pop();
+
+					if ( nova ) {
+						editor.selection.select( nova );
+						editor.execCommand( 'mceImage' );
+					}
+				}
+			}, function ( mensagem ) {
+				alertar( t.falhaEnvio + ' ' + mensagem );
+				editor.focus();
+			} );
+		} );
+
+		campo.click();
+	}
+
+	/* ---------------------------------------------------------------------
 	 * Vídeo
 	 * ------------------------------------------------------------------ */
 
@@ -389,6 +540,14 @@
 			tooltip: t.video,
 			onAction: function () {
 				abrirJanelaDeVideo( editor );
+			}
+		} );
+
+		editor.ui.registry.addButton( 'rcanexar', {
+			icon: 'upload',
+			tooltip: t.anexar,
+			onAction: function () {
+				anexar( editor );
 			}
 		} );
 
@@ -664,8 +823,8 @@
 				fixed_toolbar_container_target: ferramentas,
 				toolbar_persist: true,
 				toolbar_mode: 'wrap',
-				plugins: 'lists link media table autolink emoticons',
-				toolbar: 'blocks | bold italic underline rccodigo | bullist numlist | alignleft aligncenter alignright | forecolor | table link rcvideo rcmetadados emoticons | undo redo',
+				plugins: 'lists link media table autolink emoticons image',
+				toolbar: 'blocks | bold italic underline rccodigo | bullist numlist | alignleft aligncenter alignright | forecolor | table link image rcanexar rcvideo rcmetadados emoticons | undo redo',
 				block_formats: t.formatoParagrafo + '=p; ' + t.formatoTitulo2 + '=h2; ' + t.formatoTitulo3 + '=h3; ' + t.formatoTitulo4 + '=h4; ' + t.formatoCodigo + '=pre',
 				color_map: CORES,
 				color_cols: 3,
@@ -680,7 +839,21 @@
 				relative_urls: false,
 				remove_script_host: true,
 				convert_urls: true,
-				paste_data_images: false,
+				// Colar e arrastar imagem envia na hora, pela mesma rota do
+				// botão. `blob:` nunca chega ao servidor: `salvar()` espera os
+				// envios pendentes antes de ler o conteúdo.
+				paste_data_images: true,
+				automatic_uploads: true,
+				images_upload_handler: receberImagem,
+				images_file_types: 'jpeg,jpg,png,gif,webp',
+				images_reuse_filename: false,
+				// A janela de imagem fica para o texto alternativo; a aba de
+				// upload dela passa pelo mesmo `receberImagem`.
+				image_uploadtab: true,
+				image_dimensions: false,
+				image_description: true,
+				image_title: false,
+				a11y_advanced_options: true,
 				emoticons_database: 'emojis',
 				media_live_embeds: true,
 				sandbox_iframes: true,
@@ -868,30 +1041,40 @@
 			return;
 		}
 
-		var corpoEnvio = new FormData();
-
-		corpoEnvio.append( 'action', dados.acao );
-		corpoEnvio.append( '_wpnonce', dados.nonce );
-		corpoEnvio.append( 'pagina', String( dados.pagina ) );
-		corpoEnvio.append( 'titulo', campoTitulo.value );
-		corpoEnvio.append( 'conteudo', estado.editor.getContent() );
-		corpoEnvio.append( 'modificado', estado.modificado );
-
-		if ( publicar ) {
-			corpoEnvio.append( 'publicar', '1' );
-		}
-		if ( forcar ) {
-			corpoEnvio.append( 'forcar', '1' );
-		}
-
 		ocupar( true );
 		alertar( '' );
 		anunciar( t.salvando );
 
-		fetch( dados.rota, {
-			method: 'POST',
-			body: corpoEnvio,
-			credentials: 'same-origin'
+		// Uma imagem colada há um instante ainda pode estar em `blob:`. Ler o
+		// conteúdo antes de os envios terminarem gravaria um endereço que só
+		// existe nesta aba — e o servidor o apagaria, com aviso, sem a pessoa
+		// ter feito nada de errado. Envio que falhou já saiu do editor.
+		estado.editor.uploadImages().catch( function () {
+			return null;
+		} ).then( function () {
+			var corpoEnvio = new FormData();
+
+			corpoEnvio.append( 'action', dados.acao );
+			corpoEnvio.append( '_wpnonce', dados.nonce );
+			corpoEnvio.append( 'pagina', String( dados.pagina ) );
+			corpoEnvio.append( 'titulo', campoTitulo.value );
+			corpoEnvio.append( 'conteudo', estado.editor.getContent() );
+			corpoEnvio.append( 'modificado', estado.modificado );
+
+			if ( publicar ) {
+				corpoEnvio.append( 'publicar', '1' );
+			}
+			if ( forcar ) {
+				corpoEnvio.append( 'forcar', '1' );
+			}
+
+			anunciar( t.salvando );
+
+			return fetch( dados.rota, {
+				method: 'POST',
+				body: corpoEnvio,
+				credentials: 'same-origin'
+			} );
 		} ).then( function ( resposta ) {
 			return resposta.json().catch( function () {
 				return { success: false, data: { codigo: 'resposta', mensagem: t.erroResposta } };

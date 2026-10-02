@@ -542,7 +542,7 @@ conferir_escrita() {
 
 echo "Escrita da Incubadora por HTTP"
 if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
-  for acao in salvar criar mover excluir; do
+  for acao in salvar criar mover excluir enviar; do
     conferir_escrita ""               POST "$acao" 401 login      "visitante é mandado entrar"
     conferir_escrita "$JAR_CLIENTE"   POST "$acao" 403 capacidade "cliente barrado pela capacidade"
     conferir_escrita "$JAR_VENDEDOR"  POST "$acao" 403 capacidade "loja barrada pela capacidade"
@@ -573,6 +573,102 @@ if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="mover"' "ausente" "loja sem o botão Mover"
 else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
+fi
+
+# Arquivos da Incubadora. A pasta fica dentro de `uploads/`, que o Apache
+# serve sem passar pelo WordPress: o acesso direto tem de bater no `.htaccess`
+# (403), e a única entrada é a rota autoral, que exige login. Os cabeçalhos
+# contam tanto quanto o status — sem `nosniff` e sem a CSP com `sandbox`, um
+# arquivo que passasse pela conferência de tipo ainda poderia ser
+# interpretado como página no domínio da plataforma.
+#
+# O arquivo de teste é gravado por WP-CLI, como o moderador, porque o nonce
+# do CLI não vale no navegador; a recusa por tamanho vai por HTTP, porque é
+# exatamente o caso em que o PHP descarta o corpo antes de o WordPress ver.
+conferir_cabecalho() {
+  local jar="$1" caminho="$2" agulha="$3" descricao="$4"
+  local cabecalhos
+
+  cabecalhos="$(curl -s -D - -o /dev/null -b "$jar" "$BASE$caminho" | tr -d '\r')"
+
+  total=$((total + 1))
+  if printf '%s' "$cabecalhos" | grep -qi -- "$agulha"; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "arquivo" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: cabeçalho "%s" ausente\n' "arquivo" "$descricao" "$agulha"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Arquivos da Incubadora"
+arquivo_teste=""
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ] && docker compose version >/dev/null 2>&1; then
+  arquivo_teste="$( ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user=demo-moderador eval '
+    $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1 ) );
+    if ( ! $p ) { return; }
+    $t = wp_tempnam( "rc-acessos.png" );
+    $i = imagecreatetruecolor( 8, 8 );
+    imagepng( $i, $t );
+    $r = Reconectar_Incubadora_Arquivos::guardar( $p[0], $t, "acessos.png" );
+    wp_delete_file( $t );
+    echo is_wp_error( $r ) ? "" : $r["arquivo"];' 2>/dev/null ) | tail -1 | tr -d '\r' )"
+fi
+
+if [ -n "$arquivo_teste" ]; then
+  rota_arquivo="/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=$arquivo_teste"
+  conferir ""               "/wp-content/uploads/reconectar-incubadora/$arquivo_teste" "403" "acesso direto à pasta barrado"
+  conferir ""               "$rota_arquivo" "401" "visitante não baixa"
+  conferir "$JAR_CLIENTE"   "$rota_arquivo" "200" "cliente logado baixa"
+  conferir "$JAR_VENDEDOR"  "$rota_arquivo" "200" "loja logada baixa"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-type: image/png" "tipo vem do arquivo"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^x-content-type-options: nosniff" "navegador não adivinha o tipo"
+  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-security-policy: .*sandbox" "arquivo aberto em sandbox"
+  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=00000000000000000000000000000000.png" "404" "nome válido inexistente"
+  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=..%2F..%2F..%2Fwp-config.php" "404" "caminho fora da pasta recusado"
+
+  total=$((total + 1))
+  codigo_post="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR_CLIENTE" -X POST "$BASE$rota_arquivo")"
+  if [ "$codigo_post" = "405" ]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "arquivo" "POST não entrega"
+  else
+    printf '  FALHA %-24s POST não entrega: esperado 405, veio %s\n' "arquivo" "$codigo_post"
+    falhas=$((falhas + 1))
+  fi
+
+  ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
+    $n = "'"$arquivo_teste"'";
+    wp_delete_file( Reconectar_Incubadora_Arquivos::diretorio() . "/" . $n );
+    $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "any", "numberposts" => -1, "fields" => "ids" ) );
+    foreach ( $p as $id ) {
+      foreach ( get_post_meta( $id, Reconectar_Incubadora_Arquivos::META ) as $r ) {
+        if ( isset( $r["arquivo"] ) && $n === $r["arquivo"] ) { delete_post_meta( $id, Reconectar_Incubadora_Arquivos::META, $r ); }
+      }
+    }' >/dev/null 2>&1 )
+else
+  echo "  --    nenhuma página publicada, sessões ausentes ou Docker indisponível; entrega não verificada"
+fi
+
+# Acima de `post_max_size` o PHP descarta `$_POST` e `$_FILES` inteiros — o
+# nonce some junto, e sem a conferência de tamanho antes dele a pessoa leria
+# "link expirado" por ter enviado um arquivo grande. A ação vai na URL, que é
+# o único lugar de onde ela sobrevive.
+if [ -f "$JAR_MODERADOR" ]; then
+  corpo_grande="$(mktemp)"
+  head -c 9437184 /dev/zero > "$corpo_grande"
+  resposta_grande="$(curl -s -w '\n%{http_code}' -b "$JAR_MODERADOR" \
+    -F "action=reconectar_incubadora_enviar" -F "pagina=1" -F "arquivo=@$corpo_grande;filename=grande.png" \
+    "$BASE/wp-admin/admin-post.php?action=reconectar_incubadora_enviar")"
+  rm -f "$corpo_grande"
+
+  total=$((total + 1))
+  if [ "$(printf '%s' "$resposta_grande" | tail -1)" = "413" ] && [[ "$resposta_grande" == *'"codigo":"tamanho"'* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "enviar" "corpo acima do teto explica o tamanho"
+  else
+    printf '  FALHA %-24s corpo acima do teto: esperado 413 tamanho, veio %.80s\n' "enviar" "$resposta_grande"
+    falhas=$((falhas + 1))
+  fi
 fi
 
 rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_MODERADOR" "$JAR_ADMIN"

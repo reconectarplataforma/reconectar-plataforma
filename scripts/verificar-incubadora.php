@@ -13,7 +13,8 @@
  * e o `eval` chega depois dele (armadilha registrada no `CLAUDE.md`).
  *
  * - Com a capacidade, cria uma árvore de teste, exercita salvar, conflito,
- *   publicação, teto de profundidade, mover e exclusão, e apaga tudo no fim.
+ *   publicação, teto de profundidade, mover, envio de arquivo e exclusão, e
+ *   apaga tudo no fim — os arquivos enviados inclusive.
  * - Sem ela, confere que as quatro operações recusam pela segunda camada — a
  *   que vale se a primeira, a do handler, regredir.
  *
@@ -96,6 +97,7 @@ if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
 
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::salvar( array( 'pagina' => $rc_alvo[0], 'conteudo' => '<p>forjado</p>', 'forcar' => true ) ), 'capacidade' ), 'sem-capacidade-nao-salva' );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::excluir( $rc_alvo[0] ), 'capacidade' ), 'sem-capacidade-nao-exclui' );
+		$rc_caso( $rc_codigo( Reconectar_Incubadora_Arquivos::guardar( get_post( $rc_alvo[0] ), __FILE__, 'a.png' ), 'capacidade' ), 'sem-capacidade-nao-anexa' );
 
 		$rc_mae_antes = (int) get_post_field( 'post_parent', $rc_alvo[0] );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_alvo[0], 'pai' => 0, 'ordem' => array( $rc_alvo[0] ) ) ), 'capacidade' ), 'sem-capacidade-nao-move' );
@@ -374,6 +376,181 @@ if ( ! is_wp_error( $rc_xara ) ) {
 // congelaria a árvore dos casos acima.
 $rc_fragmentos = Reconectar_Incubadora_Leitura::fragmentos( $rc_filha['id'], array() );
 $rc_caso( false !== strpos( $rc_fragmentos['arvore'], 'data-rc-id="' . $rc_filha['id'] . '"' ) && false !== strpos( $rc_fragmentos['trilha'], 'aria-current="page"' ), 'fragmentos-trazem-arvore-e-trilha' );
+
+// Arquivos. `guardar()` recebe caminho, e não `$_FILES`, justamente para ser
+// medível aqui; `is_uploaded_file()` fica no handler, e o envio de verdade
+// pelo navegador é medido no Chrome headless.
+$rc_arquivos = array();
+$rc_temp     = trailingslashit( get_temp_dir() ) . 'rc-verificacao-' . wp_generate_password( 8, false );
+wp_mkdir_p( $rc_temp );
+
+register_shutdown_function(
+	function () use ( &$rc_arquivos, $rc_temp ) {
+		$rc_pasta = Reconectar_Incubadora_Arquivos::diretorio();
+
+		foreach ( $rc_arquivos as $rc_nome ) {
+			wp_delete_file( trailingslashit( $rc_pasta ) . $rc_nome );
+		}
+
+		foreach ( (array) glob( $rc_temp . '/*' ) as $rc_temporario ) {
+			wp_delete_file( $rc_temporario );
+		}
+
+		rmdir( $rc_temp ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	}
+);
+
+/**
+ * Grava uma imagem de teste pelo GD.
+ *
+ * @param string $caminho Destino.
+ * @param string $tipo    `png`, `jpeg` ou `gif`.
+ * @param int    $largura Largura.
+ * @param int    $altura  Altura.
+ * @return string O caminho.
+ */
+function reconectar_verificar_incubadora_imagem( $caminho, $tipo, $largura = 40, $altura = 30 ) {
+	$imagem = imagecreatetruecolor( $largura, $altura );
+	imagefill( $imagem, 0, 0, imagecolorallocate( $imagem, 49, 190, 177 ) );
+	call_user_func( 'image' . $tipo, $imagem, $caminho );
+	imagedestroy( $imagem );
+
+	return $caminho;
+}
+
+/**
+ * Envia um arquivo de teste à página e registra o nome para a limpeza.
+ *
+ * @param WP_Post  $pagina    Página.
+ * @param string   $caminho   Arquivo.
+ * @param string   $nome      Nome declarado.
+ * @param string[] $arquivos  Lista de nomes gravados, por referência.
+ * @return array|WP_Error
+ */
+function reconectar_verificar_incubadora_enviar( $pagina, $caminho, $nome, &$arquivos ) {
+	$resultado = Reconectar_Incubadora_Arquivos::guardar( $pagina, $caminho, $nome );
+
+	if ( ! is_wp_error( $resultado ) ) {
+		$arquivos[] = $resultado['arquivo'];
+	}
+
+	return $resultado;
+}
+
+$rc_imagem  = 'reconectar_verificar_incubadora_imagem';
+$rc_pagina  = get_post( $rc_filha['id'] );
+$rc_pasta   = Reconectar_Incubadora_Arquivos::diretorio();
+
+$rc_png = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_imagem( $rc_temp . '/a.png', 'png' ), 'Foto da feira.png', $rc_arquivos );
+$rc_caso(
+	$rc_codigo( $rc_png, 'enviado' )
+	&& preg_match( Reconectar_Incubadora_Conteudo::PADRAO_IMAGEM, $rc_png['arquivo'] )
+	&& '.png' === substr( $rc_png['arquivo'], -4 )
+	&& is_file( $rc_pasta . '/' . $rc_png['arquivo'] )
+	&& Reconectar_Incubadora_Conteudo::url_de_arquivo( $rc_png['arquivo'] ) === $rc_png['url'],
+	'arquivo-png-valido-e-gravado'
+);
+$rc_caso( is_file( $rc_pasta . '/.htaccess' ) && false !== strpos( (string) file_get_contents( $rc_pasta . '/.htaccess' ), 'Require all denied' ) && is_file( $rc_pasta . '/index.php' ), 'arquivo-pasta-protegida' );
+
+$rc_registros = get_post_meta( $rc_pagina->ID, Reconectar_Incubadora_Arquivos::META );
+$rc_registro  = $rc_png && ! is_wp_error( $rc_png ) ? wp_list_filter( $rc_registros, array( 'arquivo' => $rc_png['arquivo'] ) ) : array();
+$rc_registro  = $rc_registro ? reset( $rc_registro ) : array();
+$rc_caso( $rc_registro && 'Foto da feira.png' === $rc_registro['nome'] && get_current_user_id() === (int) $rc_registro['enviado_por'], 'arquivo-registrado-na-pagina' );
+
+// Um PNG chamado `.jpg` é gravado como `.png`: a extensão sai do conteúdo.
+$rc_disfarcado = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_imagem( $rc_temp . '/b.png', 'png' ), 'disfarce.jpg', $rc_arquivos );
+$rc_caso( ( $rc_codigo( $rc_disfarcado, 'enviado' ) && '.png' === substr( $rc_disfarcado['arquivo'], -4 ) ) || $rc_codigo( $rc_disfarcado, 'tipo' ), 'arquivo-extensao-sai-do-conteudo' );
+
+// EXIF com marcador: a regravação tem de tirá-lo. O segmento APP1 vai logo
+// depois do SOI, onde a câmera o põe.
+$rc_jpeg  = $rc_imagem( $rc_temp . '/c.jpg', 'jpeg' );
+$rc_tiff  = "II*\x00\x08\x00\x00\x00\x00\x00\x00\x00" . 'GPSMARCADORDETESTE';
+$rc_app1  = "Exif\x00\x00" . $rc_tiff;
+$rc_bytes = (string) file_get_contents( $rc_jpeg );
+file_put_contents( $rc_jpeg, substr( $rc_bytes, 0, 2 ) . "\xFF\xE1" . pack( 'n', strlen( $rc_app1 ) + 2 ) . $rc_app1 . substr( $rc_bytes, 2 ) );
+$rc_com_exif = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_jpeg, 'celular.jpg', $rc_arquivos );
+$rc_caso( false !== strpos( (string) file_get_contents( $rc_jpeg ), 'GPSMARCADOR' ), 'arquivo-exif-de-teste-montado' );
+$rc_caso(
+	$rc_codigo( $rc_com_exif, 'enviado' )
+	&& false === strpos( (string) file_get_contents( $rc_pasta . '/' . $rc_com_exif['arquivo'] ), 'GPSMARCADOR' ),
+	'arquivo-jpeg-perde-o-exif'
+);
+
+$rc_grande = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_imagem( $rc_temp . '/d.png', 'png', 3000, 1200 ), 'grande.png', $rc_arquivos );
+$rc_caso( $rc_codigo( $rc_grande, 'enviado' ) && 2000 === $rc_grande['largura'] && 800 === $rc_grande['altura'], 'arquivo-imagem-grande-reduzida' );
+
+$rc_gif = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_imagem( $rc_temp . '/e.gif', 'gif' ), 'animacao.gif', $rc_arquivos );
+$rc_caso( $rc_codigo( $rc_gif, 'enviado' ) && '.gif' === substr( $rc_gif['arquivo'], -4 ), 'arquivo-gif-aceito' );
+
+file_put_contents( $rc_temp . '/f.pdf', "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n" );
+$rc_pdf = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_temp . '/f.pdf', 'Relatório final.pdf', $rc_arquivos );
+$rc_caso( $rc_codigo( $rc_pdf, 'enviado' ) && '.pdf' === substr( $rc_pdf['arquivo'], -4 ) && ! $rc_pdf['imagem'], 'arquivo-pdf-valido' );
+$rc_caso( ! is_wp_error( $rc_pdf ) && 'Relatório final.pdf' === $rc_pdf['nome'] && 'PDF, 77 B' === $rc_pdf['descricao'], 'arquivo-nome-conserva-acento' );
+
+// O nome original vai ao texto do link e ao cabeçalho do download: caminho,
+// marcação e aspas não podem sobreviver a ele.
+$rc_hostil = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_temp . '/f.pdf', "..\\pasta/<b>x</b>Ata \"final\"\r\n.pdf", $rc_arquivos );
+$rc_caso( ! is_wp_error( $rc_hostil ) && ! preg_match( '#[\\\\/<>"\r\n]#', $rc_hostil['nome'] ) && '.pdf' === substr( $rc_hostil['nome'], -4 ), 'arquivo-nome-hostil-limpo' );
+
+file_put_contents( $rc_temp . '/g.png', "<?php echo 'invasao'; ?>" );
+$rc_caso( $rc_codigo( reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_temp . '/g.png', 'foto.png', $rc_arquivos ), 'tipo' ), 'arquivo-php-renomeado-recusado' );
+
+file_put_contents( $rc_temp . '/h.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' );
+$rc_caso( $rc_codigo( reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_temp . '/h.svg', 'logo.svg', $rc_arquivos ), 'tipo' ), 'arquivo-svg-recusado' );
+
+file_put_contents( $rc_temp . '/i.pdf', "não sou PDF\n" );
+$rc_caso( $rc_codigo( reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_temp . '/i.pdf', 'falso.pdf', $rc_arquivos ), 'tipo' ), 'arquivo-pdf-falso-recusado' );
+
+$rc_teto = static function () {
+	return 100;
+};
+add_filter( 'upload_size_limit', $rc_teto );
+$rc_excesso = reconectar_verificar_incubadora_enviar( $rc_pagina, $rc_imagem( $rc_temp . '/j.png', 'png', 400, 400 ), 'pesada.png', $rc_arquivos );
+remove_filter( 'upload_size_limit', $rc_teto );
+$rc_caso( $rc_codigo( $rc_excesso, 'tamanho' ) && 413 === $rc_excesso->get_error_data()['status'], 'arquivo-acima-do-teto-recebe-413' );
+
+$rc_caso( $rc_codigo( Reconectar_Incubadora_Arquivos::guardar( $rc_pagina, '', 'nada.png', UPLOAD_ERR_INI_SIZE ), 'tamanho' ), 'arquivo-erro-ini-size-vira-413' );
+
+// O sanitizador tem de manter a imagem e o link da rota — e só eles.
+if ( ! is_wp_error( $rc_png ) && ! is_wp_error( $rc_pdf ) ) {
+	$rc_com_arquivos = Reconectar_Incubadora_Acoes::salvar(
+		array(
+			'pagina'   => $rc_filha['id'],
+			'conteudo' => '<p><img src="' . $rc_png['url'] . '" alt="Feira" width="40" height="30"></p><p><a href="' . $rc_pdf['url'] . '">Relatório</a></p>',
+			'forcar'   => true,
+		)
+	);
+	$rc_gravado = get_post_field( 'post_content', $rc_filha['id'] );
+	$rc_caso(
+		$rc_codigo( $rc_com_arquivos, 'salva' ) && empty( $rc_com_arquivos['avisos'] )
+		&& false !== strpos( $rc_gravado, 'arquivo=' . $rc_png['arquivo'] )
+		&& false !== strpos( $rc_gravado, 'arquivo=' . $rc_pdf['arquivo'] ),
+		'arquivo-imagem-e-link-sobrevivem-ao-sanitizador'
+	);
+
+	// A varredura só em simulação: com `false` ela apagaria também os órfãos
+	// reais da instalação, que não são assunto de um script de verificação.
+	// O arquivo antigo e não citado entra na lista; o citado só numa revisão,
+	// não — apagá-lo faria a restauração devolver imagem quebrada.
+	$rc_velho = $rc_gif['arquivo'] ?? '';
+	if ( $rc_velho ) {
+		touch( $rc_pasta . '/' . $rc_velho, time() - 2 * DAY_IN_SECONDS );
+	}
+	touch( $rc_pasta . '/' . $rc_png['arquivo'], time() - 2 * DAY_IN_SECONDS );
+	Reconectar_Incubadora_Acoes::salvar(
+		array(
+			'pagina'   => $rc_filha['id'],
+			'conteudo' => '<p>sem imagem</p>',
+			'forcar'   => true,
+		)
+	);
+	$rc_simulado = Reconectar_Incubadora_Arquivos::limpar_orfaos();
+	$rc_caso( $rc_velho && in_array( $rc_velho, $rc_simulado, true ) && is_file( $rc_pasta . '/' . $rc_velho ), 'orfaos-simulacao-lista-sem-apagar' );
+	$rc_caso( ! in_array( $rc_grande['arquivo'] ?? '', $rc_simulado, true ), 'orfaos-recente-fica-de-fora' );
+	$rc_caso( ! in_array( $rc_png['arquivo'], $rc_simulado, true ), 'orfaos-revisao-segura-o-arquivo' );
+} else {
+	$rc_caso( false, 'arquivo-sem-png-ou-pdf-para-o-sanitizador' );
+}
 
 $rc_excluida = Reconectar_Incubadora_Acoes::excluir( $rc_filha['id'] );
 $rc_caso( $rc_codigo( $rc_excluida, 'excluida' ) && 'trash' === get_post_status( $rc_filha['id'] ), 'exclui-para-a-lixeira' );
