@@ -14,7 +14,7 @@
  *
  * - Com a capacidade, cria uma árvore de teste, exercita salvar, conflito,
  *   publicação, teto de profundidade, mover, envio de arquivo, histórico de
- *   versões e exclusão, e
+ *   versões e exclusão, mais as funções puras da busca, e
  *   apaga tudo no fim — os arquivos enviados inclusive.
  * - Sem ela, confere que as cinco operações recusam pela segunda camada — a
  *   que vale se a primeira, a do handler, regredir.
@@ -623,3 +623,27 @@ $rc_caso(
 	),
 	'nao-grava-na-lixeira'
 );
+
+// --- Busca -------------------------------------------------------------------
+//
+// Só as funções puras: o conjunto que a busca percorre é o `mapa_visivel()`,
+// já congelado acima, e quem mede o que cada perfil acha é o bloco HTTP de
+// `verificar-acessos.sh`, com sessões de verdade.
+
+if ( class_exists( 'Reconectar_Incubadora_Busca' ) ) {
+	$rc_termos = Reconectar_Incubadora_Busca::termos( 'Plano e  PLANO de Negócio' );
+	$rc_caso( array( 'plano', 'de', 'negocio' ) === $rc_termos, 'busca-termos-sem-acento-distintos-e-sem-letra-solta' );
+
+	$rc_caso( 'fim começo & meio plano.' === Reconectar_Incubadora_Busca::texto_de( '<p>fim</p><p>começo &amp; meio</p><p><strong>plano</strong>.</p>' ), 'busca-texto-bloco-separa-linha-junta' );
+	$rc_caso( '' === Reconectar_Incubadora_Busca::texto_de( '<div class="rc-video" data-rc-provedor="youtube" data-rc-id="video"></div>' ), 'busca-atributo-nao-e-texto' );
+
+	$rc_marcado = Reconectar_Incubadora_Busca::destacar( 'Um <b>negócio</b> & ÆON', Reconectar_Incubadora_Busca::termos( 'negocio aeon' ) );
+	$rc_caso( 'Um &lt;b&gt;<mark>negócio</mark>&lt;/b&gt; &amp; <mark>ÆON</mark>' === $rc_marcado, 'busca-destaque-escapa-e-alinha-acento' );
+
+	$rc_longo  = str_repeat( 'antes ', 60 ) . 'alvo ' . str_repeat( 'depois ', 60 );
+	$rc_trecho = Reconectar_Incubadora_Busca::trecho( $rc_longo, array( 'alvo' ) );
+	$rc_caso( 0 === strpos( $rc_trecho, '…antes' ) && false !== strpos( $rc_trecho, '<mark>alvo</mark>' ) && '…' === mb_substr( $rc_trecho, -1 ) && mb_strlen( wp_strip_all_tags( $rc_trecho ) ) <= Reconectar_Incubadora_Busca::TAMANHO_DO_TRECHO + 2, 'busca-trecho-em-volta-da-ocorrencia' );
+	$rc_caso( 'Texto curto.' === Reconectar_Incubadora_Busca::trecho( 'Texto curto.', array( 'ausente' ) ), 'busca-trecho-sem-ocorrencia-e-o-comeco' );
+} else {
+	$rc_caso( false, 'busca-classe-ausente' );
+}

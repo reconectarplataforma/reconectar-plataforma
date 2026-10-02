@@ -604,6 +604,34 @@ else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; histórico não verificado"
 fi
 
+# A busca lê o mesmo conjunto que a árvore, e o vazamento que importa é o do
+# rascunho: o título e o trecho sairiam na lista para quem não pode abrir a
+# página. O par criado aqui é um rascunho e uma filha **publicada** sob ele —
+# a filha é o caso que um `post_status = publish` sozinho deixaria passar,
+# porque ela está publicada e é 404 ao cliente.
+#
+# A palavra é aleatória para que nenhuma página real case com ela; o par sai
+# no fim, com ou sem falha.
+echo "Busca na Incubadora"
+palavra_busca="rcbusca$(date +%s)"
+par_busca="$(wp_eval '
+  $mae = wp_insert_post( array( "post_type" => "incubadora_pagina", "post_status" => "draft", "post_title" => "Verificação da busca", "post_content" => "<p>'"$palavra_busca"' no rascunho</p>" ) );
+  $filha = $mae ? wp_insert_post( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "post_parent" => $mae, "post_title" => "Verificação da busca, filha", "post_content" => "<p>'"$palavra_busca"' na filha</p>" ) ) : 0;
+  echo $mae && $filha ? "$mae $filha" : "";')"
+if [ -n "$par_busca" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir ""               "/incubadora/?q=$palavra_busca" "302 wp-login.php" "visitante é mandado entrar"
+  conferir "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "200" "a âncora com busca não redireciona"
+  conferir_corpo "$JAR_MODERADOR" "/incubadora/?q=$palavra_busca" "2 páginas encontradas" "presente" "moderador acha o rascunho e a filha"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "cliente não acha nenhuma das duas"
+  conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "loja não acha nenhuma das duas"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Verificação da busca" "ausente" "nem o título vaza ao cliente"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=ab" "Escreva ao menos 3 caracteres" "presente" "busca curta pede mais texto"
+  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E" "<script>alert(1)" "ausente" "texto buscado não volta como marcação"
+else
+  echo "  --    sessões ausentes, ou o par de teste não foi criado; busca não verificada"
+fi
+[ -n "$par_busca" ] && wp_eval 'foreach ( explode( " ", "'"$par_busca"'" ) as $id ) { wp_delete_post( (int) $id, true ); }' >/dev/null
+
 # Arquivos da Incubadora. A pasta fica dentro de `uploads/`, que o Apache
 # serve sem passar pelo WordPress: o acesso direto tem de bater no `.htaccess`
 # (403), e a única entrada é a rota autoral, que exige login. Os cabeçalhos

@@ -887,3 +887,122 @@ a.rc-incubadora__botao.rc-incubadora__botao {
 	line-height: var(--rc-entrelinha-compacta, 1.4);
 	overflow-wrap: anywhere;
 }
+
+/* --- Busca --------------------------------------------------------------- */
+
+.rc-incubadora__busca {
+	margin: 0 0 12px;
+}
+
+.rc-incubadora__busca-rotulo {
+	display: block;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 4px;
+}
+
+.rc-incubadora__busca-linha {
+	display: flex;
+	gap: 8px;
+}
+
+/*
+ * Classe repetida: o Storefront veste `input[type="search"]` com (0,1,1), que
+ * venceria uma classe sozinha e deixaria o campo cinza ao lado do botão
+ * branco. `max-width` junto de `width`, porque o teto do pai é outra
+ * propriedade e a cascata não acusaria a disputa. `min-width: 0` deixa o
+ * campo encolher a 320px em vez de empurrar o botão para fora da coluna.
+ */
+.rc-incubadora__busca-campo.rc-incubadora__busca-campo {
+	background: #fff;
+	border: 1px solid var(--rc-incubadora-apoio);
+	border-radius: var(--rc-raio, 8px);
+	box-shadow: none;
+	color: inherit;
+	flex: 1 1 0;
+	font-family: inherit;
+	font-size: var(--rc-fonte-base, 1rem);
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	max-width: 100%;
+	min-width: 0;
+	padding: 0.5em 0.75em;
+	width: 100%;
+}
+
+.rc-incubadora__busca-campo.rc-incubadora__busca-campo:focus {
+	outline: 2px solid var(--rc-incubadora-link);
+	outline-offset: 1px;
+}
+
+.rc-incubadora__busca-botao.rc-incubadora__busca-botao {
+	flex: 0 0 auto;
+}
+
+.rc-incubadora__resultados {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.rc-incubadora__resultado {
+	border-bottom: 1px solid var(--rc-incubadora-borda);
+	margin: 0;
+	padding: 12px 0;
+}
+
+.rc-incubadora__resultado-titulo {
+	font-size: var(--rc-fonte-lg, 1.25rem);
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 0 0 4px;
+	overflow-wrap: anywhere;
+}
+
+.rc-incubadora__resultado-titulo a {
+	color: var(--rc-incubadora-link);
+}
+
+/* `position: relative` segura o `.screen-reader-text` absoluto do "Em:". */
+.rc-incubadora__resultado-meta {
+	align-items: center;
+	color: var(--rc-incubadora-apoio);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	gap: 4px 8px;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 4px;
+	overflow-wrap: anywhere;
+	position: relative;
+}
+
+.rc-incubadora__resultado-trecho {
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+/*
+ * Fundo e cor declarados juntos: o `<mark>` herda a cor do texto em volta em
+ * alguns navegadores, e um fundo novo sem a cor ao lado é contraste que
+ * ninguém mediu. O par é o dos selos.
+ */
+.rc-incubadora__resultado mark {
+	background: var(--reconectar-cor-destaque, #F1BF3D);
+	border-radius: 2px;
+	color: var(--rc-texto-sobre-destaque, #27272a);
+	padding: 0 1px;
+}
+
+.rc-incubadora__paginacao {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: var(--rc-espaco, 16px) 0 0;
+}
+
+.rc-incubadora__paginacao-atual {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-sm, 0.875rem);
+}

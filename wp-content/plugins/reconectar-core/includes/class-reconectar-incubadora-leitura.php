@@ -26,7 +26,7 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.7.0';
+	const VERSAO_ASSETS = '0.8.0';
 
 	/**
 	 * Parâmetro de URL que abre a lista de versões da página.
@@ -183,10 +183,12 @@ class Reconectar_Incubadora_Leitura {
 	 * 302, e não 301: a primeira página muda quando alguém reordena a raiz, e
 	 * um 301 ficaria guardado no navegador apontando para a antiga.
 	 *
+	 * Com `?q=` a âncora é a tela de resultados, e fica onde está.
+	 *
 	 * @return void
 	 */
 	public static function abrir_primeira_pagina() {
-		if ( ! is_user_logged_in() || ! is_page( Reconectar_Incubadora::SLUG ) ) {
+		if ( ! is_user_logged_in() || ! is_page( Reconectar_Incubadora::SLUG ) || Reconectar_Incubadora_Busca::pedida() ) {
 			return;
 		}
 
@@ -351,6 +353,8 @@ class Reconectar_Incubadora_Leitura {
 		if ( $contexto['pagina'] instanceof WP_Post ) {
 			$contexto['modo']   = self::modo( $contexto['pagina'] );
 			$contexto['versao'] = 'versao' === $contexto['modo'] ? self::versao_pedida( $contexto['pagina'] ) : null;
+		} elseif ( Reconectar_Incubadora_Busca::pedida() ) {
+			$contexto['modo'] = 'busca';
 		}
 
 		ob_start();
