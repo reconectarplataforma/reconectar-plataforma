@@ -221,7 +221,18 @@ Na sua máquina, `chmod 400 dev.pem`.
    responde.
 5. **RBAC.** `./scripts/verificar-acessos.sh` apontado para o servidor. As travas
    não têm outro teste, e este é o primeiro ambiente onde elas rodam fora do
-   `localhost`.
+   `localhost`:
+
+   ```bash
+   RECONECTAR_ADMIN_SENHA='…' BASE=http://<dns-publico> ./scripts/verificar-acessos.sh
+   ```
+
+   Fora do `localhost` só roda a parte HTTP — 85 dos 274 casos. Os que dependem
+   do banco são pulados, porque o WP-CLI desta máquina leria o banco local, não
+   o do servidor; o POST forjado nem é enviado. "Minha conta" é sondada entre
+   `/my-account/` e `/minha-conta/` (aqui é a segunda); outro slug vai em
+   `MINHA_CONTA=/caminho/`. Sem a senha do `admin` de produção, o login dele
+   conta como uma falha.
 
 ## O que esta esteira não faz
 
