@@ -254,11 +254,15 @@ function reconectar_seletor_de_municipio() {
  * acompanha pedidos. Mandar os dois para a mesma tela obrigaria o vendedor a
  * navegar até o painel a cada acesso.
  *
- * Quem não está autenticado vê "Entrar", com o retorno para a página atual.
+ * Quem não está autenticado vê "Entrar", que leva a "Minha conta": a tela de
+ * login e de cadastro com a cara da plataforma, no lugar do `wp-login.php` do
+ * núcleo, que não tem o caminho de criar conta de comprador. Sem `redirect_to`,
+ * porque para o cliente ele já não valia: o Dokan manda todo cliente para "Minha
+ * conta" depois do login (veja `reconectar_login_volta_ao_checkout()`).
  */
 function reconectar_atalho_de_conta() {
 	if ( ! is_user_logged_in() ) {
-		$destino = wp_login_url( home_url( add_query_arg( array() ) ) );
+		$destino = wc_get_page_permalink( 'myaccount' );
 		$rotulo  = __( 'Entrar', 'reconectar' );
 	} elseif ( class_exists( 'Reconectar_Painel_Empresas' )
 		&& current_user_can( Reconectar_Permissoes::CAP_PAINEL_EMPRESAS )
