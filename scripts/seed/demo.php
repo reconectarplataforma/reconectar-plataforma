@@ -780,6 +780,197 @@ function reconectar_demo_criar_campanha( $campanha ) {
 }
 
 /**
+ * Páginas da Incubadora criadas pela carga, indexadas pela chave.
+ *
+ * Não usa `reconectar_demo_post_por_chave()` porque `post_status => any` não
+ * alcança a lixeira, e é para lá que o botão Excluir da Incubadora manda a
+ * página. Com a busca genérica, uma página da demonstração excluída pela
+ * interface faria a carga seguinte criar uma segunda com a mesma chave — e a
+ * remoção, deixar a primeira para trás na lixeira.
+ *
+ * Os status são listados um a um pela mesma razão: o rascunho da demonstração
+ * tem de ser encontrado tanto quanto as publicadas.
+ *
+ * @return array<string, int> Mapa de chave para ID.
+ */
+function reconectar_demo_paginas_da_incubadora() {
+	$ids = get_posts(
+		array(
+			'post_type'        => Reconectar_Incubadora::POST_TYPE,
+			'post_status'      => array( 'publish', 'draft', 'pending', 'private', 'trash' ),
+			'posts_per_page'   => -1,
+			'fields'           => 'ids',
+			'suppress_filters' => false,
+			'meta_key'         => RECONECTAR_DEMO_META, // phpcs:ignore WordPress.DB.SlowDBQuery
+			'meta_value'       => 1,                     // phpcs:ignore WordPress.DB.SlowDBQuery
+		)
+	);
+
+	$mapa = array();
+
+	foreach ( $ids as $id ) {
+		$chave = get_post_meta( $id, RECONECTAR_DEMO_CHAVE, true );
+
+		if ( '' !== $chave ) {
+			$mapa[ $chave ] = (int) $id;
+		}
+	}
+
+	return $mapa;
+}
+
+/**
+ * Monta o `<iframe>` que o sanitizador da Incubadora transforma em vídeo.
+ *
+ * A carga não escreve o marcador `rc-video` à mão: entrega ao sanitizador o
+ * mesmo `<iframe>` que o editor entregaria, e o marcador sai de
+ * `Reconectar_Incubadora_Conteudo::sanitizar()`. Um marcador escrito aqui
+ * seria uma segunda definição do formato, e divergiria da primeira no dia em
+ * que ela mudasse.
+ *
+ * @param string $url URL do vídeo declarada no catálogo.
+ * @return string `<iframe>`, ou vazio se a URL não for de um provedor aceito.
+ */
+function reconectar_demo_iframe_de_video( $url ) {
+	$video = Reconectar_Incubadora_Conteudo::identificar_video( $url );
+
+	if ( ! $video ) {
+		return '';
+	}
+
+	if ( 'vimeo' === $video['provedor'] ) {
+		$src = 'https://player.vimeo.com/video/' . $video['id'] . ( '' !== $video['hash'] ? '?h=' . $video['hash'] : '' );
+	} else {
+		$src = 'https://www.youtube-nocookie.com/embed/' . $video['id'];
+	}
+
+	return '<iframe src="' . esc_url( $src ) . '"></iframe>';
+}
+
+/**
+ * Cria as páginas da Incubadora.
+ *
+ * O conteúdo passa por `Reconectar_Incubadora_Conteudo::sanitizar()`, o mesmo
+ * caminho do editor, e é gravado na mesma janela sem kses que
+ * `Reconectar_Incubadora_Acoes::gravar()` abre. Sem ela, o WP-CLI roda sem
+ * usuário com `unfiltered_html`, o núcleo passa o conteúdo pela allowlist
+ * genérica de post, e o que sai no banco não é o que o editor gravaria — a
+ * demonstração mostraria um formato que a interface nunca produz.
+ *
+ * A mãe é resolvida pela chave no mapa já carregado, que cresce a cada página
+ * criada. Uma filha cuja mãe não exista é pulada com aviso, e não criada na
+ * raiz: na raiz ela apareceria num lugar da árvore que o catálogo não declara.
+ *
+ * Página que já existe não é reconciliada: alguém pode tê-la editado pela
+ * interface durante a apresentação, e sobrescrever o texto apagaria isso.
+ *
+ * @param array $incubadora Bloco `incubadora` de `dados-demo.php`.
+ * @return int Quantidade de páginas existentes ao fim, criadas ou não.
+ */
+function reconectar_demo_criar_incubadora( $incubadora ) {
+	if ( ! class_exists( 'Reconectar_Incubadora' ) ) {
+		reconectar_demo_log( '  ! Incubadora indisponível: o reconectar-core não está ativo.' );
+		return 0;
+	}
+
+	$autor = get_user_by( 'login', $incubadora['autor'] );
+
+	if ( ! $autor ) {
+		reconectar_demo_log( '  ! Autor das páginas da Incubadora não encontrado: ' . $incubadora['autor'] );
+		return 0;
+	}
+
+	$iframe = '';
+
+	if ( '' !== $incubadora['video'] ) {
+		$iframe = reconectar_demo_iframe_de_video( $incubadora['video'] );
+
+		if ( '' === $iframe ) {
+			reconectar_demo_log( '  ! O vídeo declarado não é de um provedor aceito: ' . $incubadora['video'] );
+		}
+	}
+
+	$mapa  = reconectar_demo_paginas_da_incubadora();
+	$total = 0;
+
+	foreach ( $incubadora['paginas'] as $pagina ) {
+		if ( isset( $mapa[ $pagina['chave'] ] ) ) {
+			reconectar_demo_log( '  = Página da Incubadora já existia: ' . $pagina['titulo'] );
+			$total++;
+			continue;
+		}
+
+		$mae_id = 0;
+
+		if ( ! empty( $pagina['pai'] ) ) {
+			if ( ! isset( $mapa[ $pagina['pai'] ] ) ) {
+				reconectar_demo_log( '  ! Página ' . $pagina['titulo'] . ' pulada: a mãe ' . $pagina['pai'] . ' não existe.' );
+				continue;
+			}
+
+			$mae_id = $mapa[ $pagina['pai'] ];
+		}
+
+		$tem_video = false !== strpos( $pagina['conteudo'], '{{video}}' );
+		$conteudo  = Reconectar_Incubadora_Conteudo::sanitizar( str_replace( '{{video}}', $iframe, $pagina['conteudo'] ) );
+
+		foreach ( $conteudo['avisos'] as $aviso ) {
+			reconectar_demo_log( '  ! ' . $pagina['titulo'] . ': ' . $aviso );
+		}
+
+		kses_remove_filters();
+
+		try {
+			$post_id = wp_insert_post(
+				wp_slash(
+					array_merge(
+						array(
+							'post_type'    => Reconectar_Incubadora::POST_TYPE,
+							'post_title'   => Reconectar_Incubadora_Conteudo::titulo( $pagina['titulo'] ),
+							'post_content' => $conteudo['html'],
+							'post_status'  => $pagina['status'],
+							'post_author'  => $autor->ID,
+							'post_parent'  => $mae_id,
+							'menu_order'   => (int) $pagina['ordem'],
+						),
+						reconectar_demo_datas_de_post( $pagina['dias'] )
+					)
+				),
+				true
+			);
+		} finally {
+			kses_init();
+		}
+
+		if ( is_wp_error( $post_id ) ) {
+			reconectar_demo_log( '  ! Página ' . $pagina['titulo'] . ': ' . $post_id->get_error_message() );
+			continue;
+		}
+
+		// `_edit_last` é o que a linha "Última edição" da leitura consulta, e só
+		// a tela do `/wp-admin` o grava por conta própria.
+		update_post_meta( $post_id, '_edit_last', $autor->ID );
+		update_post_meta( $post_id, RECONECTAR_DEMO_CHAVE, $pagina['chave'] );
+		update_post_meta( $post_id, RECONECTAR_DEMO_META, 1 );
+
+		$mapa[ $pagina['chave'] ] = (int) $post_id;
+		$total++;
+
+		$observacao = '';
+
+		if ( 'draft' === $pagina['status'] ) {
+			$observacao = ' (rascunho, de propósito)';
+		} elseif ( $tem_video && '' === $iframe ) {
+			$observacao = ' (sem vídeo: nenhuma URL declarada em dados-demo.php)';
+		}
+
+		reconectar_demo_log( '  + Página da Incubadora: ' . $pagina['titulo'] . $observacao );
+	}
+
+	return $total;
+}
+
+/**
  * Acerta o vínculo de uma loja que já existia com a empresa do catálogo.
  *
  * Idempotência aqui não é só "não duplicar": é convergir para o estado
@@ -2109,6 +2300,10 @@ function reconectar_demo_instalar( $dados ) {
 		}
 	}
 
+	// Depois dos moderadores, porque é um deles quem assina as páginas.
+	reconectar_demo_log( 'Criando páginas da Incubadora...' );
+	$total_incubadora = reconectar_demo_criar_incubadora( $dados['incubadora'] );
+
 	reconectar_demo_log( 'Criando lojas, produtos e avaliações...' );
 
 	$total_produtos   = 0;
@@ -2261,6 +2456,7 @@ function reconectar_demo_instalar( $dados ) {
 			$total_campanhas
 		)
 	);
+	reconectar_demo_log( sprintf( 'Incubadora: %d páginas (uma delas em rascunho, de propósito).', $total_incubadora ) );
 	reconectar_demo_log( 'A faixa de aviso de dados de demonstração está ativa no site.' );
 	reconectar_demo_log( 'Senha de lojas, clientes, administradores de empresas e moderadores: ' . RECONECTAR_DEMO_SENHA );
 	reconectar_demo_log( 'Para remover: wp eval-file scripts/seed/demo.php remover' );
@@ -2576,6 +2772,25 @@ function reconectar_demo_remover() {
 		wp_delete_post( $campanha_id, true );
 	}
 	reconectar_demo_log( sprintf( '- %d campanhas removidas.', count( $campanhas ) ) );
+
+	/*
+	 * Páginas da Incubadora, pelo mapa que também alcança a lixeira — a busca
+	 * genérica deixaria para trás a página que alguém excluiu pela interface.
+	 *
+	 * Antes dos usuários, e por um motivo próprio: o post type declara
+	 * `delete_with_user => false`, então apagar o Moderador da demonstração
+	 * deixaria as páginas no ar, assinadas por uma conta que não existe mais.
+	 *
+	 * Página real criada **sob** uma da demonstração não some junto:
+	 * `wp_delete_post()` sobe as filhas para a avó, e o filtro pela meta deixa
+	 * a página real fora da lista.
+	 */
+	$paginas_da_incubadora = reconectar_demo_paginas_da_incubadora();
+
+	foreach ( $paginas_da_incubadora as $pagina_id ) {
+		wp_delete_post( $pagina_id, true );
+	}
+	reconectar_demo_log( sprintf( '- %d páginas da Incubadora removidas.', count( $paginas_da_incubadora ) ) );
 
 	// Limpa as referências a anexos guardadas no perfil de cada loja. Clientes
 	// entram no laço e saem sem alteração: não têm perfil de loja, e o
