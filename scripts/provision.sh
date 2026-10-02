@@ -407,6 +407,38 @@ do
   fi
 done
 
+echo "== Compra e avaliação só com login =="
+# Requisito: só quem tem conta compra e avalia. O WooCommerce nasce com o
+# checkout de visitante ligado e o WordPress com comentário anônimo aberto —
+# medido nos dois ambientes, um visitante finalizava pedido e deixava avaliação
+# com nota. Quem recusa no servidor é o núcleo: `WC_Checkout` sem conta, e
+# `wp_handle_comment_submission()` com 403. A avaliação de loja não precisa de
+# linha própria: o Dokan Lite tira a nota da loja das avaliações dos produtos.
+#
+# `comment_registration` vale para todo comentário enviado por formulário, não só
+# avaliação de produto — post de blog incluído. Notas de pedido, que também são
+# comentários, o sistema grava sem passar por `wp-comments-post.php`, e o fórum é
+# bbPress: nenhum dos dois é alcançado.
+#
+# O lembrete de login do checkout fica DESLIGADO de propósito: ele imprime um
+# formulário oculto, com um texto que manda o visitante "para a seção de
+# cobrança", que ele não tem. O tema põe no lugar um bloco próprio, visível e com
+# link de cadastro — `inc/marketplace/so-com-login.php`.
+for par in \
+  "woocommerce_enable_guest_checkout=no" \
+  "woocommerce_enable_checkout_login_reminder=no" \
+  "comment_registration=1"
+do
+  opcao="${par%%=*}"
+  valor="${par#*=}"
+
+  if [ "$(wp option get "$opcao" 2>/dev/null || true)" = "$valor" ]; then
+    echo "Opção '$opcao' já é '$valor'."
+  else
+    wp option update "$opcao" "$valor"
+  fi
+done
+
 echo "== Assistente de configuração do Dokan =="
 # Sem este bloco o painel abre com a faixa "Complete your marketplace setup in
 # minutes" por cima das Configurações do Dokan, e ela não some sozinha: o

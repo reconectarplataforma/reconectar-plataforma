@@ -4,6 +4,7 @@
 #   ./scripts/verificar-acessos.sh              # roda todos os casos
 #   ./scripts/verificar-acessos.sh -v           # mostra também os que passam
 #   BASE=http://outro:porta ./scripts/verificar-acessos.sh
+#   MINHA_CONTA=/conta/ BASE=… ./scripts/verificar-acessos.sh
 #
 # Faz login de verdade como cliente, vendedor, administrador de empresas e
 # administrador, e bate em cada URL restrita, comparando o código HTTP com o
@@ -33,8 +34,8 @@ for argumento in "$@"; do
   case "$argumento" in
     -v|--verboso) verboso="sim" ;;
     -h|--help)
-      # Linhas 2 a 21: o bloco de comentário do topo, sem o shebang.
-      sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      # Linhas 2 a 22: o bloco de comentário do topo, sem o shebang.
+      sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -50,6 +51,31 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 1
 fi
 
+# A página "Minha conta" tem o slug do idioma ativo quando o WooCommerce foi
+# ativado, e ele não migra depois: `/my-account/` na máquina de
+# desenvolvimento, `/minha-conta/` em produção, onde `/my-account/` responde 404.
+# A fonte certa seria `woocommerce_myaccount_page_id`, mas ela mora no banco do
+# servidor, que este script não alcança quando `BASE` aponta para fora — o
+# WP-CLI local leria o banco da máquina errada. Daí a sondagem por HTTP, com
+# `MINHA_CONTA` para um slug que não seja nenhum dos dois.
+#
+# Sem rota encontrada o script para, em vez de seguir: os casos do cadastro e do
+# cliente acusariam 404 como falha de permissão, e o login perderia o cookie de
+# teste que a primeira requisição planta.
+if [ -z "${MINHA_CONTA:-}" ]; then
+  for candidata in /my-account/ /minha-conta/; do
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE$candidata")" = "200" ]; then
+      MINHA_CONTA="$candidata"
+      break
+    fi
+  done
+fi
+if [ -z "${MINHA_CONTA:-}" ]; then
+  echo "Página \"Minha conta\" não encontrada em $BASE (tentei /my-account/ e /minha-conta/)." >&2
+  echo "Informe o caminho: MINHA_CONTA=/caminho/ $(basename "${BASH_SOURCE[0]}")" >&2
+  exit 2
+fi
+
 falhas=0
 total=0
 
@@ -61,7 +87,7 @@ autenticar() {
   rm -f "$jar"
   # A primeira requisição existe para o WordPress plantar o cookie de teste
   # que o wp-login.php exige antes de aceitar o formulário.
-  curl -s -c "$jar" -o /dev/null "$BASE/my-account/"
+  curl -s -c "$jar" -o /dev/null "$BASE$MINHA_CONTA"
   curl -s -c "$jar" -b "$jar" -o /dev/null \
     --data-urlencode "log=$login" \
     --data-urlencode "pwd=$senha" \
@@ -150,8 +176,23 @@ conferir_corpo() {
 #
 # `tail -1` porque o `docker compose run` imprime as linhas de criação do
 # container antes da saída do comando; `tr -d '\r'` porque elas vêm com CR.
+#
+# O banco consultado é sempre o do `docker compose` desta máquina. Com `BASE`
+# apontando para outro servidor, ele não é o banco que atende as requisições: os
+# IDs viriam da instalação errada, e a conferência do POST forjado leria
+# "inexistente" num banco onde ninguém tentou cadastrar nada — um caso de
+# segurança passando sem ter medido. Fora de `localhost` esses casos são
+# pulados, e só a parte HTTP roda.
+banco_alcancavel() {
+  case "$BASE" in
+    http://localhost|http://localhost:*|http://127.0.0.1|http://127.0.0.1:*) ;;
+    *) return 1 ;;
+  esac
+  docker compose version >/dev/null 2>&1
+}
+
 wp_eval() {
-  if ! docker compose version >/dev/null 2>&1; then
+  if ! banco_alcancavel; then
     return 1
   fi
   ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval "$1" 2>/dev/null ) | tail -1 | tr -d '\r'
@@ -171,19 +212,23 @@ echo "Cadastro de loja (só administrador e administrador de empresas)"
 # `Reconectar_Cadastro_De_Lojas` fecha — e a última delas, o POST forjado, é a
 # única que prova a trava do servidor: as demais provam que a tela não oferece.
 conferir      ""                  "/vendor-onboarding/" "404"      "a página de onboarding do Dokan saiu do ar"
-conferir_corpo "" "/my-account/" 'name="shopname"'  "ausente"  "registro sem campos de loja"
-conferir_corpo "" "/my-account/" 'name="role"'      "presente" "registro declara o papel que o servidor aceita"
+conferir_corpo "" "$MINHA_CONTA" 'name="shopname"'  "ausente"  "registro sem campos de loja"
+conferir_corpo "" "$MINHA_CONTA" 'name="role"'      "presente" "registro declara o papel que o servidor aceita"
 
 JAR_FORJADO=/tmp/reconectar-acessos-forjado.txt
 EMAIL_FORJADO="verificacao-forjada@example.invalid"
 rm -f "$JAR_FORJADO"
-nonce_registro="$(curl -s -c "$JAR_FORJADO" "$BASE/my-account/" \
+nonce_registro="$(curl -s -c "$JAR_FORJADO" "$BASE$MINHA_CONTA" \
   | grep -o 'name="woocommerce-register-nonce" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//')"
 
-if [ -z "$nonce_registro" ]; then
+# Sem o banco, o POST não é enviado: se a trava falhasse, o vendedor forjado
+# ficaria no servidor, porque a limpeza é a mesma consulta que confere.
+if ! banco_alcancavel; then
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); POST forjado não verificado"
+elif [ -z "$nonce_registro" ]; then
   echo "  --    formulário de registro indisponível; POST forjado não verificado"
 else
-  curl -s -b "$JAR_FORJADO" -c "$JAR_FORJADO" -o /dev/null -X POST "$BASE/my-account/" \
+  curl -s -b "$JAR_FORJADO" -c "$JAR_FORJADO" -o /dev/null -X POST "$BASE$MINHA_CONTA" \
     --data-urlencode "email=$EMAIL_FORJADO" \
     --data-urlencode "password=verificacao-$RANDOM-$RANDOM" \
     --data-urlencode "role=seller" \
@@ -210,21 +255,108 @@ else
   total=$((total + 1))
   if [ -z "$resultado_forjado" ]; then
     total=$((total - 1))
-    echo "  --    Docker Compose ausente; POST forjado não verificado"
+    echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); POST forjado não verificado"
   elif [ "$resultado_forjado" = "inexistente" ]; then
-    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "/my-account/" "POST com role=seller recusado"
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "$MINHA_CONTA" "POST com role=seller recusado"
   else
-    printf '  FALHA %-24s POST com role=seller criou usuário (%s)\n' "/my-account/" "$resultado_forjado"
+    printf '  FALHA %-24s POST com role=seller criou usuário (%s)\n' "$MINHA_CONTA" "$resultado_forjado"
     falhas=$((falhas + 1))
   fi
 fi
 rm -f "$JAR_FORJADO"
 
+echo "Compra e avaliação só com login"
+# As duas travas são opções do núcleo (`woocommerce_enable_guest_checkout` e
+# `comment_registration`), gravadas pelo `provision.sh`; antes dele, medido nos
+# dois ambientes, o visitante finalizava pedido e deixava avaliação com nota.
+#
+# O produto e o checkout são descobertos pela página, não fixados: os slugs saem
+# no idioma da ativação do WooCommerce — `/product/` e `/checkout/` aqui,
+# `/produto/` e `/finalizar-compra/` em produção. O primeiro produto simples da
+# home serve, porque precisa do `add-to-cart` para montar o carrinho.
+JAR_VISITANTE=/tmp/reconectar-acessos-visitante.txt
+rm -f "$JAR_VISITANTE"
+PRODUTO=""
+ID_PRODUTO=""
+for url_produto in $(curl -s "$BASE/" | grep -o 'href="[^"]*/\(product\|produto\)/[^"#?]*"' | sed 's/^href="//;s/"$//' | sort -u | head -10); do
+  ID_PRODUTO="$(curl -s "$url_produto" | grep -o 'name="add-to-cart" value="[0-9]*"' | head -1 | grep -o '[0-9]*' || true)"
+  if [ -n "$ID_PRODUTO" ]; then
+    PRODUTO="/${url_produto#*://*/}"
+    break
+  fi
+done
+
+if [ -z "$PRODUTO" ]; then
+  echo "  --    nenhum produto simples na home; compra e avaliação não verificadas"
+else
+  conferir_corpo "" "$PRODUTO" 'id="commentform"' "ausente"  "visitante não recebe o formulário de avaliação"
+  conferir_corpo "" "$PRODUTO" 'class="must-log-in"' "presente" "visitante recebe o convite para entrar"
+
+  curl -s -c "$JAR_VISITANTE" -b "$JAR_VISITANTE" -o /dev/null -X POST "$BASE/?wc-ajax=add_to_cart" \
+    -d "product_id=$ID_PRODUTO&quantity=1"
+  FINALIZAR_COMPRA=""
+  for candidata in /checkout/ /finalizar-compra/; do
+    if [ "$(curl -s -b "$JAR_VISITANTE" -o /dev/null -w '%{http_code}' "$BASE$candidata")" = "200" ]; then
+      FINALIZAR_COMPRA="$candidata"
+      break
+    fi
+  done
+
+  if [ -z "$FINALIZAR_COMPRA" ]; then
+    echo "  --    checkout não encontrado (tentei /checkout/ e /finalizar-compra/); compra não verificada"
+  else
+    # Com o carrinho cheio: sem ele o checkout redireciona ao carrinho, e a
+    # ausência dos campos não provaria nada.
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'id="billing_email"'    "ausente"  "visitante não recebe o formulário de compra"
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'rc-entrada-checkout'   "presente" "visitante recebe o login no checkout"
+    conferir_corpo "$JAR_VISITANTE" "$FINALIZAR_COMPRA" 'name="redirect" value="'"$BASE$FINALIZAR_COMPRA"'"' "presente" "o login volta ao checkout"
+  fi
+
+  # A tela sem formulário prova só que ele não é oferecido; quem prova a trava é
+  # o POST direto. Sem o banco ele não é enviado, pelo mesmo motivo do POST
+  # forjado: se a trava falhasse, a avaliação ficaria no servidor.
+  ID_AVALIADO="$(wp_eval 'echo url_to_postid( home_url( "'"$PRODUTO"'" ) );')"
+  if ! banco_alcancavel || [ -z "$ID_AVALIADO" ] || [ "$ID_AVALIADO" = "0" ]; then
+    echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); POST de avaliação não verificado"
+  else
+    EMAIL_AVALIACAO="verificacao-avaliacao@example.invalid"
+    codigo_avaliacao="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/wp-comments-post.php" \
+      --data-urlencode "comment_post_ID=$ID_AVALIADO" \
+      --data-urlencode "rating=5" \
+      --data-urlencode "comment=Verificação de avaliação anônima" \
+      --data-urlencode "author=Verificação" \
+      --data-urlencode "email=$EMAIL_AVALIACAO")"
+    # A limpeza vai junto da consulta, como no POST forjado. O `type` é
+    # obrigatório: o WooCommerce tira `review` da consulta padrão de
+    # comentários, e sem ele a contagem dava 0 com a avaliação gravada — a
+    # verificação acusava só pelo HTTP, e a limpeza não apagava nada.
+    avaliacoes_criadas="$(wp_eval '
+      $c = get_comments( array( "author_email" => "'"$EMAIL_AVALIACAO"'", "status" => "all", "type" => "review", "fields" => "ids" ) );
+      foreach ( $c as $id ) { wp_delete_comment( $id, true ); }
+      echo count( $c );')"
+
+    total=$((total + 1))
+    if [ "$codigo_avaliacao" = "403" ] && [ "$avaliacoes_criadas" = "0" ]; then
+      [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "/wp-comments-post.php" "avaliação anônima recusada"
+    else
+      printf '  FALHA %-24s avaliação anônima: HTTP %s, %s gravada(s)\n' "/wp-comments-post.php" "$codigo_avaliacao" "$avaliacoes_criadas"
+      falhas=$((falhas + 1))
+    fi
+  fi
+fi
+rm -f "$JAR_VISITANTE"
+
 echo "Cliente (demo-cliente-marina)"
 JAR_CLIENTE=/tmp/reconectar-acessos-cliente.txt
 if autenticar "demo-cliente-marina" "$SENHA_DEMO" "$JAR_CLIENTE"; then
-  conferir "$JAR_CLIENTE" "/my-account/"   "200"                "a própria conta"
-  conferir "$JAR_CLIENTE" "/wp-admin/"     "302 /my-account/"   "sem painel administrativo"
+  conferir "$JAR_CLIENTE" "$MINHA_CONTA"   "200"                "a própria conta"
+  conferir "$JAR_CLIENTE" "/wp-admin/"     "302 $MINHA_CONTA"   "sem painel administrativo"
+  conferir "$JAR_CLIENTE" "/dashboard/avaliacoes-pendentes/" "302 /"   "não vê as pendências de loja alguma"
+  # O lado da permissão da trava de avaliação: uma que negasse a todos passaria
+  # nos casos do visitante.
+  if [ -n "$PRODUTO" ]; then
+    conferir_corpo "$JAR_CLIENTE" "$PRODUTO" 'id="commentform"' "presente" "cliente recebe o formulário de avaliação"
+  fi
   conferir "$JAR_CLIENTE" "/dashboard/"    "302"                "sem painel de vendedor"
   conferir "$JAR_CLIENTE" "/comunidade/"   "403"                "sem comunidade"
   conferir "$JAR_CLIENTE" "/forums/"       "403"                "sem fóruns"
@@ -237,6 +369,10 @@ echo "Vendedor (demo-sabor-da-terra)"
 JAR_VENDEDOR=/tmp/reconectar-acessos-vendedor.txt
 if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   conferir "$JAR_VENDEDOR" "/dashboard/"            "200"              "o painel é dele"
+  # A aba nova precisa do flush de reescrita (`Reconectar_Migracoes`, versão 7):
+  # sem ele o item aparece no menu e a tela responde 404.
+  conferir "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" "200"      "vê as avaliações pendentes"
+  conferir_corpo "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" 'rc-avaliacoes-pendentes' "presente" "a aba desenha a lista, não a home do painel"
   conferir "$JAR_VENDEDOR" "/comunidade/"           "200"              "participa da comunidade"
   conferir "$JAR_VENDEDOR" "/forums/"               "200"              "a listagem de perguntas"
   conferir "$JAR_VENDEDOR" "/wp-admin/"             "302 /dashboard/"  "volta ao painel dele"
@@ -661,7 +797,7 @@ conferir_cabecalho() {
 
 echo "Arquivos da Incubadora"
 arquivo_teste=""
-if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ] && docker compose version >/dev/null 2>&1; then
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ] && banco_alcancavel; then
   arquivo_teste="$( ( cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user=demo-moderador eval '
     $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1 ) );
     if ( ! $p ) { return; }
@@ -704,7 +840,7 @@ if [ -n "$arquivo_teste" ]; then
       }
     }' >/dev/null 2>&1 )
 else
-  echo "  --    nenhuma página publicada, sessões ausentes ou Docker indisponível; entrega não verificada"
+  echo "  --    nenhuma página publicada, sessões ausentes ou banco fora de alcance; entrega não verificada"
 fi
 
 # Acima de `post_max_size` o PHP descarta `$_POST` e `$_FILES` inteiros — o
@@ -734,7 +870,7 @@ rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_MODERADOR" "$JAR_ADMI
 # pertence a quem. Vai por WP-CLI, e nas duas direções — uma trava que negasse
 # tudo passaria num teste que só verifica a negação.
 echo "Isolamento entre vendedores"
-if docker compose version >/dev/null 2>&1; then
+if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
     $a = get_user_by( "login", "demo-sabor-da-terra" );
     $b = get_user_by( "login", "demo-bem-viver" );
@@ -766,7 +902,7 @@ if docker compose version >/dev/null 2>&1; then
       ;;
   esac
 else
-  echo "  --    Docker Compose ausente; isolamento não verificado"
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); isolamento não verificado"
 fi
 
 # As travas de URL acima provam que o painel técnico está fechado hoje. Este
@@ -794,7 +930,7 @@ fi
 # tela Aparência → Temas. São estes casos que provam que a tela é só de leitura;
 # nenhuma URL provaria, já que ela responde 200 de propósito.
 echo "Capacidades proibidas ao Administrador e ao Moderador"
-if docker compose version >/dev/null 2>&1; then
+if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
     $atores = array(
       "Administrador" => get_user_by( "login", "demo-admin-nosso-chao" ),
@@ -866,7 +1002,7 @@ $saida
 FIM
   fi
 else
-  echo "  --    Docker Compose ausente; capacidades não verificadas"
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); capacidades não verificadas"
 fi
 
 # A escalada de privilégio que `edit_users` abre, tentada de verdade.
@@ -884,7 +1020,7 @@ fi
 # sobre a própria conta e sobre uma loja, as mesmas capacidades precisam
 # continuar funcionando, ou o filtro teria fechado o perfil inteiro.
 echo "Escalada de privilégio pelo Administrador"
-if docker compose version >/dev/null 2>&1; then
+if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
     $ator  = get_user_by( "login", "demo-admin-nosso-chao" );
     $super = get_user_by( "login", "admin" );
@@ -941,7 +1077,7 @@ $saida
 FIM
   fi
 else
-  echo "  --    Docker Compose ausente; escalada não verificada"
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); escalada não verificada"
 fi
 
 # A trava de URL prova que o cliente não chega à listagem. Este bloco prova a
@@ -957,7 +1093,7 @@ fi
 # continua livre para o cliente, que é o que o desenho pede; quem o barra em
 # `/forums/` é o gate HTTP, não a capacidade.
 echo "Escrita no fórum"
-if docker compose version >/dev/null 2>&1; then
+if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
     $cliente  = get_user_by( "login", "demo-cliente-marina" );
     $vendedor = get_user_by( "login", "demo-sabor-da-terra" );
@@ -1003,7 +1139,7 @@ $saida
 FIM
   fi
 else
-  echo "  --    Docker Compose ausente; escrita no fórum não verificada"
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); escrita no fórum não verificada"
 fi
 
 # O bloco HTTP mede as recusas; o caminho feliz só se exercita por WP-CLI,
@@ -1016,7 +1152,7 @@ fi
 # `--user=<login>` e não `wp_set_current_user()`: o papel do bbPress só se
 # aplica no `init`, e o `eval` chega depois dele.
 echo "Escrita da Incubadora por WP-CLI"
-if docker compose version >/dev/null 2>&1; then
+if banco_alcancavel; then
   saida=""
   for usuario in demo-moderador demo-cliente-marina demo-sabor-da-terra; do
     parcial="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp --user="$usuario" eval-file /var/www/scripts/verificar-incubadora.php 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
@@ -1040,7 +1176,7 @@ if docker compose version >/dev/null 2>&1; then
 $saida
 FIM
 else
-  echo "  --    Docker Compose ausente; escrita da Incubadora não verificada"
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); escrita da Incubadora não verificada"
 fi
 
 echo
