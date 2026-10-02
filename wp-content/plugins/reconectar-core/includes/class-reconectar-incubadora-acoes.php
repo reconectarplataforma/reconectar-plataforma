@@ -528,18 +528,24 @@ class Reconectar_Incubadora_Acoes {
 	 * servidor, para o "Editado há N minutos" não depender do relógio de quem
 	 * edita. URLs saem como caminho, pela regra de `WP_HOME` dinâmico.
 	 *
+	 * `editor` e `modificado_local` refazem a linha "Última edição" da tabela de
+	 * metadados: sem eles, a tabela seguiria citando a edição anterior até a
+	 * página ser recarregada.
+	 *
 	 * @param WP_Post $pagina Página gravada.
 	 * @return array
 	 */
 	private static function estado( $pagina ) {
 		return array(
-			'id'         => (int) $pagina->ID,
-			'titulo'     => $pagina->post_title,
-			'status'     => $pagina->post_status,
-			'html'       => Reconectar_Incubadora_Conteudo::html_de_leitura( $pagina->post_content ),
-			'modificado' => $pagina->post_modified_gmt,
-			'agora'      => gmdate( 'Y-m-d H:i:s' ),
-			'url'        => self::caminho( get_permalink( $pagina ) ),
+			'id'               => (int) $pagina->ID,
+			'titulo'           => $pagina->post_title,
+			'status'           => $pagina->post_status,
+			'html'             => Reconectar_Incubadora_Conteudo::html_de_leitura( $pagina->post_content ),
+			'modificado'       => $pagina->post_modified_gmt,
+			'modificado_local' => Reconectar_Incubadora_Leitura::data_local( $pagina, 'post_modified' ),
+			'editor'           => Reconectar_Incubadora_Leitura::nome_de_usuario( Reconectar_Incubadora_Leitura::editado_por( $pagina ) ),
+			'agora'            => gmdate( 'Y-m-d H:i:s' ),
+			'url'              => self::caminho( get_permalink( $pagina ) ),
 		);
 	}
 

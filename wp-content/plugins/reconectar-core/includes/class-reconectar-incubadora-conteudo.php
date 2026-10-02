@@ -272,6 +272,10 @@ class Reconectar_Incubadora_Conteudo {
 
 		$corpo = self::analisar( $html, $ocorrencias );
 
+		if ( $corpo ) {
+			self::soltar_videos( $corpo );
+		}
+
 		$reconstruido = $corpo ? self::reconstruir_filhos( $corpo, $ocorrencias, 0 ) : '';
 		$reconstruido = wp_kses( $reconstruido, self::allowlist(), array( 'http', 'https', 'mailto', 'tel' ) );
 
@@ -575,6 +579,66 @@ class Reconectar_Incubadora_Conteudo {
 		$corpo = $documento->getElementsByTagName( 'body' )->item( 0 );
 
 		return $corpo instanceof DOMElement ? $corpo : null;
+	}
+
+	/**
+	 * Tira cada vídeo de dentro do parágrafo ou título que o contém.
+	 *
+	 * O TinyMCE trata `<iframe>` como conteúdo de linha e o insere dentro de um
+	 * `<p>`. O marcador e a facade são de bloco, e `<p><div>` não existe em
+	 * HTML: o navegador fecha o parágrafo antes do `<div>` e deixa um `<p>`
+	 * vazio de cada lado da facade — espaço em branco que ninguém escreveu, e
+	 * que volta a cada salvamento. Medido antes desta função:
+	 * `<p><iframe …></iframe></p>` era gravado como `<p><div class="rc-video" …></div></p>`.
+	 *
+	 * O vídeo vai para logo depois do bloco, e o bloco que ficar sem texto
+	 * sai. Um vídeo no meio de uma frase passa para o fim dela: dividir o
+	 * parágrafo em dois exigiria reabrir cada `<strong>` e `<a>` entre os dois
+	 * pontos, por um caso que o editor não produz sozinho.
+	 *
+	 * @param DOMElement $corpo `<body>` do documento analisado.
+	 * @return void
+	 */
+	private static function soltar_videos( DOMElement $corpo ) {
+		$xpath  = new DOMXPath( $corpo->ownerDocument );
+		$videos = $xpath->query( './/iframe | .//*[contains(concat(" ", normalize-space(@class), " "), " rc-video ")]', $corpo );
+
+		if ( ! $videos ) {
+			return;
+		}
+
+		// Cópia em array: a `DOMNodeList` é viva, e mover nós durante a
+		// iteração pularia elementos.
+		foreach ( iterator_to_array( $videos ) as $video ) {
+			$bloco = null;
+			$dentro_de_video = false;
+
+			for ( $ancestral = $video->parentNode; $ancestral && ! $ancestral->isSameNode( $corpo ); $ancestral = $ancestral->parentNode ) {
+				if ( ! $ancestral instanceof DOMElement ) {
+					continue;
+				}
+
+				// O iframe já carregado dentro de uma facade anda junto com ela.
+				if ( self::tem_classe( $ancestral, 'rc-video' ) ) {
+					$dentro_de_video = true;
+					break;
+				}
+
+				if ( in_array( strtolower( $ancestral->nodeName ), array( 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre' ), true ) ) {
+					$bloco = $ancestral;
+				}
+			}
+
+			if ( $dentro_de_video || ! $bloco ) {
+				continue;
+			}
+
+			$bloco->parentNode->insertBefore( $video, $bloco->nextSibling );
+
+			if ( '' === trim( str_replace( "\xc2\xa0", ' ', $bloco->textContent ) ) && 0 === $xpath->query( './/img | .//iframe', $bloco )->length ) {
+				$bloco->parentNode->removeChild( $bloco );
+			}
+		}
 	}
 
 	/**

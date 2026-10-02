@@ -8,7 +8,14 @@
  *
  * "Editado há N minutos" sai em `<time datetime>` com a data absoluta no
  * `title`: o relativo é o que se lê de relance, e o absoluto é o que se cita.
- * As duas datas vêm de `_gmt`, que não muda com o fuso do servidor.
+ * As duas datas vêm de `_gmt`, que não muda com o fuso do servidor. O
+ * `incubadora.js` refaz o relativo a cada meio minuto, corrigido pela hora do
+ * servidor em `data-rc-agora` — o relógio de quem lê pode estar errado.
+ *
+ * Os botões nascem `hidden` e o JS os revela: sem script, "Editar" não faria
+ * nada e "Copiar link" não copiaria. As duas regiões de aviso existem desde o
+ * carregamento, vazias, porque leitor de tela só anuncia mudança em região
+ * viva que já estava no DOM.
  *
  * @package reconectar-core
  *
@@ -20,14 +27,34 @@ defined( 'ABSPATH' ) || exit;
 $rc_titulo     = get_the_title( $rc_pagina );
 $rc_autor      = Reconectar_Incubadora_Leitura::nome_de_usuario( (int) $rc_pagina->post_author );
 $rc_editor     = Reconectar_Incubadora_Leitura::nome_de_usuario( Reconectar_Incubadora_Leitura::editado_por( $rc_pagina ) );
-$rc_modificado = (int) get_post_modified_time( 'U', true, $rc_pagina );
+// Pela data local, nunca pela GMT: `wp_insert_post()` grava `post_modified_gmt`
+// zerado num rascunho novo, e `get_post_modified_time( 'U', true )` devolve
+// `false` — medido, "Editado há 57 anos" numa página recém-criada.
+$rc_modificado = (int) get_post_timestamp( $rc_pagina, 'modified' );
 $rc_rascunho   = 'draft' === $rc_pagina->post_status;
+// O link que sobrevive a mover a página: o permalink muda com a mãe, o ID não.
+$rc_link       = add_query_arg(
+	array(
+		'post_type' => Reconectar_Incubadora::POST_TYPE,
+		'p'         => $rc_pagina->ID,
+	),
+	wp_parse_url( home_url( '/' ), PHP_URL_PATH )
+);
 ?>
-<article class="rc-incubadora__pagina" aria-labelledby="rc-incubadora-titulo">
+<article class="rc-incubadora__pagina" aria-labelledby="rc-incubadora-titulo" data-rc-agora="<?php echo esc_attr( gmdate( 'c' ) ); ?>">
 	<header class="rc-incubadora__cabecalho">
 		<?php if ( $rc_rascunho ) : ?>
 			<p class="rc-incubadora__selo rc-incubadora__selo--destaque"><?php esc_html_e( 'Rascunho — visível só para quem edita a Incubadora', 'reconectar-core' ); ?></p>
 		<?php endif; ?>
+
+		<div class="rc-incubadora__acoes">
+			<?php if ( Reconectar_Incubadora_Editor::deve_carregar() ) : ?>
+				<button type="button" class="rc-incubadora__botao rc-incubadora__botao--primario" data-rc-incubadora="editar" hidden><?php esc_html_e( 'Editar', 'reconectar-core' ); ?></button>
+			<?php endif; ?>
+			<button type="button" class="rc-incubadora__botao" data-rc-incubadora="compartilhar" data-rc-link="<?php echo esc_attr( $rc_link ); ?>" data-rc-copiado="<?php esc_attr_e( 'Link da página copiado.', 'reconectar-core' ); ?>" data-rc-falhou="<?php esc_attr_e( 'Não foi possível copiar. O link é:', 'reconectar-core' ); ?>" hidden><?php esc_html_e( 'Copiar link', 'reconectar-core' ); ?></button>
+		</div>
+		<p class="rc-incubadora__status" role="status"></p>
+		<div class="rc-incubadora__alerta" role="alert"></div>
 
 		<h1 class="rc-incubadora__titulo" id="rc-incubadora-titulo"><?php echo esc_html( '' !== $rc_titulo ? $rc_titulo : __( '(sem título)', 'reconectar-core' ) ); ?></h1>
 
@@ -37,7 +64,7 @@ $rc_rascunho   = 'draft' === $rc_pagina->post_status;
 			echo esc_html( sprintf( __( 'Criada por %s', 'reconectar-core' ), $rc_autor ) );
 			?>
 			<span aria-hidden="true">·</span>
-			<time datetime="<?php echo esc_attr( gmdate( 'c', $rc_modificado ) ); ?>" title="<?php echo esc_attr( Reconectar_Incubadora_Leitura::data_local( $rc_pagina, 'post_modified' ) ); ?>">
+			<time class="rc-incubadora__editado" data-rc-modelo="<?php /* translators: %s: tempo relativo, como "há 5 minutos". */ esc_attr_e( 'Editado %s', 'reconectar-core' ); ?>" datetime="<?php echo esc_attr( gmdate( 'c', $rc_modificado ) ); ?>" title="<?php echo esc_attr( Reconectar_Incubadora_Leitura::data_local( $rc_pagina, 'post_modified' ) ); ?>">
 				<?php
 				/* translators: %s: intervalo, como "5 minutos". */
 				echo esc_html( sprintf( __( 'Editado há %s', 'reconectar-core' ), human_time_diff( $rc_modificado, time() ) ) );
@@ -58,7 +85,7 @@ $rc_rascunho   = 'draft' === $rc_pagina->post_status;
 				</tr>
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Última edição', 'reconectar-core' ); ?></th>
-					<td>
+					<td class="rc-incubadora__ultima-edicao" data-rc-modelo="<?php /* translators: 1: data, 2: nome de quem editou. */ esc_attr_e( '%1$s, por %2$s', 'reconectar-core' ); ?>">
 						<?php
 						/* translators: 1: data, 2: nome de quem editou. */
 						echo esc_html( sprintf( __( '%1$s, por %2$s', 'reconectar-core' ), Reconectar_Incubadora_Leitura::data_local( $rc_pagina, 'post_modified' ), $rc_editor ) );

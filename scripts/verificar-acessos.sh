@@ -553,6 +553,25 @@ else
   echo "  --    sessões de cliente, loja ou moderador ausentes; escrita não verificada"
 fi
 
+# O editor é uma camada por cima da leitura, e a camada inteira — script, nonce,
+# rota — só pode chegar a quem escreve. O nonce no HTML do cliente não abriria
+# a escrita sozinho, porque a capacidade é conferida antes dele; mas é a
+# segunda trava, e esta linha é o que avisa no dia em que ela ficar sozinha.
+# A agulha é o nome do objeto de dados, que só sai junto do script.
+echo "Editor da Incubadora (só para quem escreve)"
+caminho_incubadora="$(wp_eval '
+  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+  echo $p ? wp_parse_url( get_permalink( $p[0] ), PHP_URL_PATH ) : "";')"
+if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraEditor" "presente" "moderador recebe o editor"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "cliente só lê"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "loja só lê"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" 'data-rc-incubadora="editar"' "ausente" "cliente sem o botão Editar"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "tinymce.min.js" "ausente" "o TinyMCE só carrega no clique"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
+fi
+
 rm -f "$JAR_CLIENTE" "$JAR_VENDEDOR" "$JAR_EMPRESAS" "$JAR_MODERADOR" "$JAR_ADMIN"
 
 # O isolamento entre vendedores não tem URL fixa: depende de qual produto

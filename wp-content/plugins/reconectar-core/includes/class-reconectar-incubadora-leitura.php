@@ -26,7 +26,7 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.2.1';
+	const VERSAO_ASSETS = '0.3.0';
 
 	/**
 	 * Registra os ganchos da tela de leitura.
