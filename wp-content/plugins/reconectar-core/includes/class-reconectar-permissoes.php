@@ -379,6 +379,8 @@ class Reconectar_Permissoes {
 		// Prioridade 11: revisa o que `bbp_map_meta_caps` decide em 10.
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restaurar_gestao_de_foruns' ), 11, 3 );
 		add_action( 'set_user_role', array( __CLASS__, 'sincronizar_papel_no_forum' ), 10, 2 );
+		// Prioridade 20: depois de `bbp_user_register`, em 10 — ver o método.
+		add_action( 'user_register', array( __CLASS__, 'sincronizar_papel_no_forum_ao_cadastrar' ), 20 );
 		add_action( 'template_redirect', array( __CLASS__, 'bloquear_comunidade' ) );
 		// Prioridade 1, e não a padrão: o WooCommerce registra em `admin_init` o
 		// seu próprio bloqueio (`WC_Admin::prevent_admin_access()`), que manda para
@@ -1190,6 +1192,34 @@ class Reconectar_Permissoes {
 	 */
 	public static function sincronizar_papel_no_forum( $usuario_id, $papel ) {
 		if ( ! in_array( $papel, array( self::PAPEL_MODERADOR, self::PAPEL_ADMIN_EMPRESAS ), true ) ) {
+			return;
+		}
+
+		self::aplicar_moderacao_no_forum( $usuario_id );
+	}
+
+	/**
+	 * Repete a sincronização depois que o bbPress dá o papel padrão ao cadastro.
+	 *
+	 * `wp_insert_user()` grava o papel com `set_role()` — o que dispara
+	 * `set_user_role` e `sincronizar_papel_no_forum()` — e só **depois** dispara
+	 * `user_register`. Ali o bbPress (`bbp_user_add_role_on_register()`, pelo
+	 * `bbp_user_register` em prioridade 10) chama `bbp_set_user_role()` com o
+	 * papel padrão e grava `bbp_participant` por cima do `bbp_moderator` que
+	 * acabara de ser dado.
+	 *
+	 * O sintoma não é erro: Moderador e Administrador nascem sem moderar o fórum
+	 * (`edit.php?post_type=topic` em 403), e só quem já existia quando a
+	 * migração rodou fica certo. Foi a carga de demonstração, ao recriar os
+	 * usuários, que revelou — mas vale para todo cadastro desses dois papéis.
+	 *
+	 * @param int $usuario_id Usuário recém-cadastrado.
+	 * @return void
+	 */
+	public static function sincronizar_papel_no_forum_ao_cadastrar( $usuario_id ) {
+		$usuario = get_userdata( $usuario_id );
+
+		if ( ! $usuario || ! array_intersect( array( self::PAPEL_MODERADOR, self::PAPEL_ADMIN_EMPRESAS ), (array) $usuario->roles ) ) {
 			return;
 		}
 
