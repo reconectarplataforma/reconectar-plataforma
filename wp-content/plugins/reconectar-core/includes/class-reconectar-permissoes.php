@@ -1570,7 +1570,7 @@ class Reconectar_Permissoes {
 			return;
 		}
 
-		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
+		if ( self::entra_no_painel_wp() ) {
 			return;
 		}
 
@@ -1580,6 +1580,24 @@ class Reconectar_Permissoes {
 
 		wp_safe_redirect( self::destino_fora_do_painel() );
 		exit;
+	}
+
+	/**
+	 * O usuário passa pela porta do `/wp-admin`?
+	 *
+	 * Uma resposta só para as três decisões que dependem dela — o bloqueio, a
+	 * barra administrativa e o link do painel em "Minha conta". Se divergissem, a
+	 * tela ofereceria um link que o bloqueio devolve com um redirecionamento.
+	 *
+	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
+	 * @return bool
+	 */
+	public static function entra_no_painel_wp( $usuario_id = 0 ) {
+		if ( $usuario_id ) {
+			return self::eh_administracao_tecnica( $usuario_id ) || user_can( $usuario_id, self::CAP_ADMIN_WP );
+		}
+
+		return self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP );
 	}
 
 	/**
@@ -1626,7 +1644,7 @@ class Reconectar_Permissoes {
 			return $exibir;
 		}
 
-		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
+		if ( self::entra_no_painel_wp() ) {
 			return $exibir;
 		}
 
@@ -1652,4 +1670,17 @@ class Reconectar_Permissoes {
  */
 function reconectar_pode_participar_da_comunidade() {
 	return Reconectar_Permissoes::pode_participar_da_comunidade();
+}
+
+/**
+ * O usuário atual passa pela porta do `/wp-admin`?
+ *
+ * Fachada para o tema, pela mesma razão de
+ * `reconectar_pode_participar_da_comunidade()`: o tema não conhece a classe nem
+ * a capacidade, e decide o que fazer quando o plugin não está de pé.
+ *
+ * @return bool
+ */
+function reconectar_pode_entrar_no_painel_wp() {
+	return Reconectar_Permissoes::entra_no_painel_wp();
 }
