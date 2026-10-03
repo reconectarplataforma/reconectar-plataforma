@@ -31,6 +31,17 @@
 
 <?php wp_body_open(); ?>
 
+<?php
+/*
+ * Para a loja, o Fórum, a Comunidade e a Incubadora abrem na moldura do painel
+ * do Dokan, sem nada da vitrine — veja `inc/marketplace/painel-da-loja.php`.
+ * O `footer.php` faz a mesma pergunta e fecha a moldura certa.
+ */
+if ( reconectar_tela_e_do_painel_da_loja() ) :
+	reconectar_painel_da_loja_abrir();
+else :
+	?>
+
 <?php do_action( 'storefront_before_site' ); ?>
 
 <div id="page" class="hfeed site">
@@ -116,3 +127,5 @@
 		<div class="col-full">
 
 		<?php do_action( 'storefront_content_top' ); ?>
+
+<?php endif; ?>
