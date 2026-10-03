@@ -11,7 +11,7 @@
  *
  * Este arquivo cria o destino que faltava. A página é montada por shortcode e
  * não por template porque é assim que as demais páginas autorais da plataforma
- * funcionam (`[buddypress]`, `[reconectar_painel_empresas]`), e porque uma
+ * funcionam (`[reconectar_painel_empresas]`, `[reconectar_painel_transparencia]`), e porque uma
  * página no banco pode ser renomeada, movida ou tirada do menu pelo
  * administrador sem exigir alteração de código.
  *

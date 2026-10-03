@@ -1272,9 +1272,10 @@ class Reconectar_Permissoes {
 			return true;
 		}
 
-		// A página "Comunidade" criada pelo provisionamento hospeda o shortcode
-		// `[buddypress]`. Na raiz dela o BuddyPress ainda não reporta componente
-		// algum, então ela precisa ser reconhecida pelo slug.
+		// A página "Comunidade" criada pelo provisionamento não é do BuddyPress —
+		// `Reconectar_Comunidade` a redireciona ao diretório de atividade, em
+		// prioridade 11. Ela precisa ser reconhecida pelo slug para que o cliente
+		// receba a negação aqui, antes de o redirecionamento revelar o destino.
 		if ( is_page( 'comunidade' ) ) {
 			return true;
 		}
