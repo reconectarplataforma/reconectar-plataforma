@@ -2834,9 +2834,19 @@
   padding: 8px 6px;
   border-radius: 14px;
   border: 1px solid var(--rc-borda);
-  background: var(--rc-superficie);
   color: var(--rc-texto);
   text-align: center;
+}
+
+/* O `#bbpress-forums` à frente não é enfeite. A folha do plugin declara
+   `#bbpress-forums li { background: 0 0 }`, especificidade (1,0,1), e todo
+   contador é um `li`: uma regra de classe — ou de duas — que desse fundo a ele era
+   escrita, aparecia no CSSOM e nunca pintava (`backgroundColor` em
+   `rgba(0,0,0,0)`). A borda pintava, porque o plugin não a zera, e é por isso que o
+   defeito passou: o ladrilho parecia ter fundo branco, como o cartão em volta.
+   Todo fundo de contador mora neste bloco, no mesmo grau do id. */
+#bbpress-forums .rc-forum-contador {
+  background: var(--rc-superficie);
 }
 
 .rc-forum-contador__valor {
@@ -2851,13 +2861,13 @@
   line-height: var(--rc-entrelinha-justa);
 }
 
-.rc-forum-contador--votos {
+#bbpress-forums .rc-forum-contador--votos {
   background: var(--rc-fundo);
 }
 
 /* Pergunta com resposta aceita. O verde não é o único sinal: o item seguinte da
-   lista imprime o tique, e o texto acessível diz "Pergunta resolvida". */
-.rc-forum-contador--resolvida {
+   lista imprime o tique e a palavra "Resolvida". #0e6259 sobre #e3f6f4 dá 6,4:1. */
+#bbpress-forums .rc-forum-contador--resolvida {
   background: #e3f6f4;
   border-color: #0e6259;
 }
@@ -2866,17 +2876,21 @@
   color: #0e6259;
 }
 
-.rc-forum-contador--selo {
-  width: auto;
-  height: auto;
-  min-width: 28px;
-  padding: 4px 8px;
+/* Pílula, não ladrilho: tique e palavra lado a lado. O `min-width` do ladrilho
+   cairia aqui e esticaria o selo a 94px em volta de uma palavra só. */
+#bbpress-forums .rc-forum-contador--selo {
+  flex-direction: row;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 10px;
   border: 0;
   border-radius: 999px;
   background: #e3f6f4;
   color: #0e6259;
-  font-size: var(--rc-fonte-md);
+  font-size: var(--rc-fonte-xs);
   font-weight: 700;
+  line-height: var(--rc-entrelinha-justa);
+  white-space: nowrap;
 }
 
 /* Paginação e estado vazio ----------------------------------------------- */
@@ -3733,6 +3747,17 @@
     flex-direction: column;
   }
 
+  /*
+   * Em linha, os 320px do `flex: 1 1 320px` decidem quando o corpo quebra para baixo
+   * dos contadores. Em coluna o eixo principal é o vertical, e a mesma base vira
+   * **altura**: todo cartão ganhava 320px de corpo, com 58 a 199px de vazio entre o
+   * último metadado e os contadores (medido a 375px). O defeito vinha desde a
+   * criação da regra de coluna e não tinha nome — a tela parecia só "arejada".
+   */
+  .rc-forum-card__corpo {
+    flex: 0 1 auto;
+  }
+
   .rc-forum-card__contadores {
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -3746,9 +3771,11 @@
    * `overflow-x: hidden` do Storefront escondia o estouro (`scrollX` e a sobra do
    * `documentElement` seguiam em zero). No estreito o contador vira "0 votos" em
    * linha, sem caixa — a legenda continua visível, e o que não couber quebra.
-   * O `:not` mantém o selo ✓ de fora: ele é pílula, não ladrilho.
+   * O `:not` mantém o selo ✓ de fora: ele é pílula, não ladrilho. O `#bbpress-forums`
+   * é o mesmo das regras de fundo lá de cima: sem ele o `background: none` perderia
+   * para o verde de (1,1,0) e o ladrilho resolvido voltaria a ser caixa no celular.
    */
-  .rc-forum-contador:not(.rc-forum-contador--selo) {
+  #bbpress-forums .rc-forum-contador:not(.rc-forum-contador--selo) {
     flex-direction: row;
     align-items: baseline;
     gap: 4px;

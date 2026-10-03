@@ -3744,6 +3744,149 @@ do MySQL nos três. O preço é que o clique real no botão de confirmar — o i
 verificação que restava — só volta a ser exercitável depois que um comprovante
 novo for enviado.
 
+---
+
+## 2026-10-01 — Os contadores do fórum ganham legenda, e o selo de resolvida passa a dizer o que é
+
+**O que o usuário pediu**
+
+Em duas rodadas, vendo a lista de perguntas do fórum (`/forums/`) na tela:
+
+> falta legenda para identificar cada número.
+> Pode ser ícone com tooltip ou uma legenda visível.
+
+e, depois de ver a legenda:
+
+> registra no diário e torna o Resolvida visível
+
+O defeito era de leitura, não de código: cada cartão de pergunta mostrava três
+círculos com "0", "0" e "3", e nada dizia qual era voto, qual era resposta e qual
+era visualização. O mesmo valia para o selo de pergunta resolvida, que era um ✓
+verde sem uma palavra — a frase "Pergunta resolvida" existia, mas só para o leitor
+de tela.
+
+**Legenda visível, e por que nenhuma das duas opções oferecidas**
+
+O usuário deu duas saídas e as duas foram descartadas, com razão registrada em
+`reconectar_forum_contadores()`:
+
+- **Tooltip** — não existe no toque. O celular é o uso principal da plataforma, e
+  ali `title` não aparece.
+- **Ícone** — exigiria SVG inline ou fonte de ícones. O projeto não tem etapa de
+  compilação nem CDN, e um ícone sem texto continuaria dizendo pouco a quem não o
+  conhece.
+
+Ficou o texto, por extenso, **embaixo** do número: `voto(s)`, `resposta(s)`,
+`visualização(ões)`. Concorda com o número pelo `_n()` ("1 voto", "2 votos") e
+usa `abs()` no voto, porque o saldo pode ser negativo e `_n( …, -1 )` cairia no
+plural. É o mesmo texto que o leitor de tela lê — a camada `screen-reader-text`
+que repetia a informação saiu.
+
+**O que foi feito**
+
+- **`inc/forum/componentes.php`** — `reconectar_forum_contadores()` imprime número
+  e rótulo em cada `<li>`; o selo de resolvida passa a ser tique decorativo
+  (`aria-hidden`) mais a palavra **"Resolvida"** na tela, no lugar do
+  `screen-reader-text` "Pergunta resolvida".
+- **`assets/css/marketplace.css`** — contador em ladrilho de 94px (`5.875rem`);
+  versão estreita em linha, sem caixa; selo em pílula (`--rc-fonte-xs`, 13px, no
+  lugar dos 18px que o ✓ sozinho tinha); `flex: 0 1 auto` no corpo do cartão
+  abaixo de 480px.
+
+O texto do leitor de tela mudou de "Pergunta resolvida" para "Resolvida". Dentro do
+cartão de uma pergunta o contexto já diz de que se trata, e é o que a tela mostra
+agora — as duas leituras coincidem, que era o ponto.
+
+**O estouro que o `overflow-x: hidden` escondeu**
+
+A versão estreita dos contadores passava da borda do cartão: **27px a 360px**. E
+nenhum dos dois sinais habituais acusava — `window.scrollX` e
+`documentElement.scrollWidth − clientWidth` ficavam em **0**, porque o
+`.site { overflow-x: hidden }` do Storefront recorta o excesso antes de ele virar
+rolagem. A página parecia certa e o cartão passava da tela.
+
+O que mede de verdade é a borda direita de cada elemento contra a largura útil:
+
+```js
+el.getBoundingClientRect().right  >  window.innerWidth - 16   // 16px de gutter
+```
+
+A correção foi deixar os contadores quebrar de linha (`flex-wrap: wrap`) e, no
+estreito, tirar a caixa do ladrilho — vira "0 votos" em linha. O selo fica de
+fora dessa regra por um `:not( .rc-forum-contador--selo )`, porque ele é pílula,
+não ladrilho.
+
+**Duas armadilhas, as duas mudas**
+
+*1. O `bbpress.min.css` zera o fundo de todo `li` do fórum.* A folha do plugin
+(2.6.18) declara `#bbpress-forums li { background: 0 0; margin: 0; list-style: none; }`,
+especificidade **(1,0,1)**. Todo contador é um `<li>`, então qualquer regra de uma
+ou duas classes que lhe desse `background` era escrita, aparecia no CSSOM e **nunca
+pintava**: `getComputedStyle( el ).backgroundColor` devolvia `rgba(0, 0, 0, 0)`.
+
+O que deixou o defeito passar é que a **borda** pintava — o plugin não a zera — e o
+ladrilho parecia ter fundo branco, como o cartão em volta. Os fundos do contador de
+votos (`--rc-fundo`) e do verde de resolvida **nunca tinham aparecido**; ninguém
+sentiu falta porque ninguém sabia que existiam. Só ficou visível quando o selo
+resolvido, que é pílula sem borda, saiu branco sobre branco.
+
+A correção é prefixar com `#bbpress-forums`, levando a regra ao mesmo grau do id, e
+vale **também para a variante mobile**: o `background: none` do ladrilho em linha
+perdia para o verde de (1,1,0) e o contador resolvido voltava a ser caixa no
+celular. É a mesma forma da armadilha do Storefront que veste campo por seletor de
+atributo, agora com um id no seletor.
+
+*2. `flex: 1 1 320px` vira altura quando o contêiner vira coluna.* O corpo do
+cartão declara `flex: 1 1 320px`, e os 320px são a largura mínima antes de o corpo
+quebrar para baixo dos contadores — em linha. Abaixo de 480px o cartão vira
+`flex-direction: column`, o eixo principal passa a ser o vertical, e a **mesma
+base vira altura**: todo `.rc-forum-card__corpo` ficava com 320px, com **58 a 199px
+de vazio** entre o último metadado e os contadores, medido a 375px. A tela
+parecia apenas "arejada", e por isso o defeito não tinha nome.
+
+Vinha desde o commit `c2ddc97`, que criou a regra de coluna — **pré-existente**, não
+causada por esta entrega. Foi corrigido aqui porque é uma linha, no mesmo bloco, na
+tela que estava sendo conferida: `.rc-forum-card__corpo { flex: 0 1 auto }` no
+≤480px. O vazio caiu para 16px, o `gap` do próprio cartão.
+
+**Um falso alarme, registrado para ninguém repetir a investigação**
+
+A 961 e a 1280px a lista de contadores quebra para **baixo** do texto do cartão, e
+com o selo isso parece regressão. Não é: vale para **todos** os cartões, com ou sem
+selo, porque a coluna central é estreita e o corpo tem `flex: 1 1 320px`. Medido a
+1280px, o `ul` tem 298px sem o selo (319 → 617) e 406px com ele (319 → 726), dentro
+de um cartão que vai de 302 a 923.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| lint de `componentes.php` por container | limpo |
+| base de demonstração | 7 cartões, 4 com selo de resolvida |
+| 1280px, `scrollX` | 0 |
+| 961px, fundo computado | selo e respostas `rgb(227, 246, 244)`, votos `rgb(247, 247, 248)` |
+| 375px, borda direita contra a útil (359) | cartões em 359, `ul` em 342, maior item entre 283,9 e 306,8 — **nenhum estouro** |
+| 360px, borda direita contra a útil (344) | cartões em 344, `ul` em 327, maior item 306,8, selo termina em 133,1 — nenhum estouro |
+| 320px, borda direita contra a útil (304) | cartões em 304, `ul` em 287, maior item 285,5 — nenhum estouro, `scrollX` 0 |
+| selo a 375 e a 320px | `rgb(227, 246, 244)`, 24px de altura |
+| vazio entre corpo e contadores, a 375 e a 320px | **16px nos 7 cartões** (antes: 199, 80, 83 e 58 nos quatro primeiros) |
+| ladrilhos no ≤480px | em linha, sem borda, `background` transparente |
+| contraste do verde de resolvida | `#0e6259` sobre `#e3f6f4`: **6,43:1** (WCAG 1.4.3 pede 4,5:1) |
+
+**Pendências**
+
+- **O CI do PR #10 não foi consultado.** O PR
+  ([reconectarplataforma/reconectar-plataforma#10](https://github.com/reconectarplataforma/reconectar-plataforma/pull/10))
+  foi aberto pelo próprio usuário: o classificador do modo automático negou o
+  `gh pr create` e depois o `bind_pr`, e a negação não foi contornada — o
+  monitor de CI e o Auto-fix não acompanham esse PR.
+- **O "Resolvida" visível, os fundos e o vazio do mobile ainda não estão
+  commitados.** O `dcd2cb4` — a legenda e a versão estreita — está no PR; o resto
+  desta entrada é diff de trabalho em `marketplace.css` e `componentes.php`.
+- **As duas armadilhas não entraram no `CLAUDE.md`.** O pedido foi só o diário;
+  o `#bbpress-forums li { background: 0 0 }` e o `flex: 1 1 320px` em coluna são
+  candidatas à seção Armadilhas, que é onde o próximo agente vai procurar.
+
 ## 2026-10-02 — A Incubadora: uma wiki interna, escrita no próprio site
 
 **O que o usuário pediu**

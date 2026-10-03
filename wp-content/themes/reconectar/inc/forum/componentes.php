@@ -139,6 +139,11 @@ function reconectar_forum_selo_de_papel( $autor_id ) {
  * O rótulo concorda com o número ("1 voto", "2 votos"): é o mesmo `_n()` que a
  * frase acessível usava, só sem o número dentro.
  *
+ * O selo de pergunta resolvida segue a mesma regra: o tique é decorativo
+ * (`aria-hidden`) e a palavra "Resolvida" está na tela. Só o verde e um ✓ sem
+ * texto deixavam quem não distingue a cor e quem não conhece o símbolo sem saber
+ * o que ele indicava.
+ *
  * @param WP_Post $topico Pergunta.
  */
 function reconectar_forum_contadores( $topico ) {
@@ -157,8 +162,8 @@ function reconectar_forum_contadores( $topico ) {
 			/*
 			 * O contador de respostas é o único que muda de cor — verde quando a
 			 * pergunta tem resposta aceita. A distinção não fica só na cor: o item
-			 * seguinte da lista diz "Pergunta resolvida" por extenso, para leitor
-			 * de tela e para quem não distingue o verde.
+			 * seguinte da lista diz "Resolvida" por extenso, na tela, para quem não
+			 * distingue o verde e para o leitor de tela.
 			 */
 			'valor'  => $respostas,
 			'classe' => $resolvida
@@ -183,7 +188,7 @@ function reconectar_forum_contadores( $topico ) {
 		<?php if ( $resolvida ) : ?>
 			<li class="rc-forum-contador rc-forum-contador--selo">
 				<span aria-hidden="true">&#10003;</span>
-				<span class="screen-reader-text"><?php esc_html_e( 'Pergunta resolvida', 'reconectar' ); ?></span>
+				<span><?php esc_html_e( 'Resolvida', 'reconectar' ); ?></span>
 			</li>
 		<?php endif; ?>
 	</ul>
