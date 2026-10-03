@@ -49,3 +49,7 @@ scripts/i18n/lotes/
 Thumbs.db
 .idea/
 .vscode/
+
+# Perfil do navegador das sessões de depuração: guarda cookies e sessão de login
+# do ambiente, e não pode chegar ao repositório.
+com-dbg-perfil/
