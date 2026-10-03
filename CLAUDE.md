@@ -37,7 +37,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `…/includes/class-reconectar-painel-empresas.php` | painel gerencial, rota própria fora do `/wp-admin` |
 | `…/includes/painel-empresas/` | os templates das telas do painel |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
-| `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca |
+| `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca, interação (vídeo em destaque, avaliação, comentários) |
 | `…/includes/incubadora/` | os templates da Incubadora |
 | `…/assets/vendor/tinymce/8.9.2/` | o editor da Incubadora, vendorizado; origem e licença no `LEIAME.md` |
 | `scripts/verificar-incubadora.php` | operações da Incubadora por WP-CLI, chamado pelo `verificar-acessos.sh` |
@@ -79,7 +79,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-274 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+345 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.
@@ -1440,6 +1440,21 @@ pela gravação. `<img>` só da rota autoral de arquivos: imagem externa é
 rastreador, e a LGPD conta. A bateria de 70 casos de XSS vive fora do
 repositório; ao mexer no sanitizador, cada caso precisa de segunda passada
 idêntica, ou ele não é idempotente.
+
+### `wp_set_comment_status()` só conhece os status do núcleo
+
+O comentário oculto da Incubadora vive em `comment_approved = 'rc-oculto'`, e
+`wp_set_comment_status( $id, 'rc-oculto' )` parece o caminho natural. Ele aceita
+apenas `hold`, `approve`, `spam` e `trash`: com qualquer outro valor devolve
+`false` e **não grava nada**. Medido: um teste de "resposta em fio oculto" falhou
+com o código correto, porque o fio nunca chegou a ser ocultado. Quem grava é
+`wp_update_comment()` com `comment_approved`, como faz
+`Reconectar_Incubadora_Interacao::moderar()`.
+
+O oculto fica de fora de `comments_open`, das consultas do núcleo e do feed por
+filtros da mesma classe — o tipo `rc_incubadora` não aparece num `get_comments()`
+que não o peça. Comentário de tipo novo herda esse cuidado, ou vaza para o
+`/wp-admin` e para o RSS.
 
 ## Convenções
 

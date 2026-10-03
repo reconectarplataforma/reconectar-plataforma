@@ -141,6 +141,41 @@
 	position: relative;
 }
 
+/*
+ * Dentro do painel da loja o Dokan declara
+ * `.dokan-dashboard .dokan-dashboard-content ul li { padding: 0 }`, de
+ * especificidade (0,2,2), que vence a classe sozinha: a reserva do chevron ia a
+ * zero e o ícone, absoluto, caía em cima da primeira letra do título. Medido:
+ * chevron em 153–177, texto começando em 161. Sem erro nenhum, e só no perfil
+ * Loja — Moderador e Administrador leem fora do painel.
+ *
+ * Três classes chegam a (0,3,0). E a `<article>` da página ganha o
+ * `overflow: scroll` que o Dokan dá a todo `article` no celular, o que desenha
+ * trilhos de rolagem vazios onde a barra não é sobreposta.
+ */
+.rc-incubadora .rc-incubadora__ramo > .rc-incubadora__no {
+	padding-left: 24px;
+}
+
+.dokan-dashboard .rc-incubadora .rc-incubadora__pagina {
+	overflow: visible;
+}
+
+/*
+ * A mesma regra do Dokan tira `list-style` e `margin` de todo `ul li`, e a
+ * lista do conteúdo saía sem marcador. O `ol` não é alcançado por ela, mas a
+ * declaração vai junto para as duas não divergirem. Três classes, e não duas:
+ * empatar em (0,2,2) deixaria a decisão à ordem de carga das folhas.
+ */
+.dokan-dashboard .rc-incubadora .rc-incubadora__conteudo ul li {
+	list-style: disc;
+	margin: 0 0 4px;
+}
+
+.dokan-dashboard .rc-incubadora .rc-incubadora__conteudo ol li {
+	list-style: decimal;
+}
+
 .rc-incubadora__no-link {
 	align-items: baseline;
 	border-radius: 6px;
@@ -357,12 +392,16 @@
  * o iframe não tem proporção intrínseca, e sem isso nasceria com os 300×150
  * do padrão do navegador.
  *
+ * As mesmas regras valem para o vídeo em destaque, que fica fora do texto
+ * para que o editor não o alcance. `:is()` assume a especificidade do
+ * argumento mais forte, e os dois são uma classe: nada muda na cascata.
+ *
  * O quadro da facade vai em `min-height`, não `height`: a 320px a caixa 16:9
  * tem 162px e o texto pede 172 — medido. Com `height: 100%` o aviso vazava
  * por baixo do fundo escuro, branco sobre branco. O `min-height: auto` que o
  * `aspect-ratio` implica deixa o contêiner crescer com o quadro.
  */
-.rc-incubadora__conteudo .rc-video {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video {
 	aspect-ratio: 16 / 9;
 	box-sizing: border-box;
 	margin: 0 0 var(--rc-espaco, 16px);
@@ -370,8 +409,8 @@
 	width: 100%;
 }
 
-.rc-incubadora__conteudo .rc-video__quadro,
-.rc-incubadora__conteudo .rc-video__player {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__quadro,
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__player {
 	border: 0;
 	border-radius: var(--rc-raio, 8px);
 	box-sizing: border-box;
@@ -379,7 +418,7 @@
 	width: 100%;
 }
 
-.rc-incubadora__conteudo .rc-video__player {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__player {
 	height: 100%;
 }
 
@@ -387,7 +426,7 @@
  * Fundo escuro e texto branco: #1f1f1f mede ~16:1 contra o branco, e o tom
  * neutro não sugere a marca de provedor nenhum.
  */
-.rc-incubadora__conteudo .rc-video__quadro {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__quadro {
 	align-content: center;
 	background: #1f1f1f;
 	color: #fff;
@@ -399,23 +438,23 @@
 	text-align: center;
 }
 
-.rc-incubadora__conteudo .rc-video__quadro p {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__quadro p {
 	margin: 0;
 }
 
-.rc-incubadora__conteudo .rc-video__provedor {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__provedor {
 	font-size: var(--rc-fonte-lg, 1.25rem);
 	font-weight: 600;
 	line-height: var(--rc-entrelinha-justa, 1.25);
 }
 
-.rc-incubadora__conteudo .rc-video__aviso {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__aviso {
 	font-size: var(--rc-fonte-sm, 0.875rem);
 	line-height: var(--rc-entrelinha-compacta, 1.4);
 	max-width: 36em;
 }
 
-.rc-incubadora__conteudo .rc-video__acoes {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__acoes {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
@@ -429,7 +468,7 @@
  * ~9:1 contra o branco. A classe repetida chega a (0,3,0) e vence o seletor do
  * tema sem `!important`.
  */
-.rc-incubadora__conteudo .rc-video__carregar.rc-video__carregar {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__carregar.rc-video__carregar {
 	background: var(--rc-incubadora-link, #663191);
 	border: 2px solid #fff;
 	border-radius: var(--rc-raio, 8px);
@@ -442,17 +481,17 @@
 	padding: 0.625em 1.25em;
 }
 
-.rc-incubadora__conteudo .rc-video__carregar[hidden] {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__carregar[hidden] {
 	display: none;
 }
 
-.rc-incubadora__conteudo .rc-video__carregar:focus-visible,
-.rc-incubadora__conteudo .rc-video__link:focus-visible {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__carregar:focus-visible,
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__link:focus-visible {
 	outline: 3px solid var(--reconectar-cor-destaque, #F1BF3D);
 	outline-offset: 2px;
 }
 
-.rc-incubadora__conteudo .rc-video__link {
+:is(.rc-incubadora__conteudo, .rc-incubadora__destaque) .rc-video__link {
 	color: #fff;
 	font-size: var(--rc-fonte-sm, 0.875rem);
 	text-decoration: underline;
@@ -1005,4 +1044,339 @@ a.rc-incubadora__botao.rc-incubadora__botao {
 .rc-incubadora__paginacao-atual {
 	color: var(--rc-incubadora-apoio);
 	font-size: var(--rc-fonte-sm, 0.875rem);
+}
+
+/* --- Vídeo em destaque ------------------------------------------------- */
+
+.rc-incubadora__destaque {
+	margin: 0 0 calc(1.5 * var(--rc-espaco, 16px));
+}
+
+.rc-incubadora__destaque .rc-video {
+	margin-bottom: 12px;
+}
+
+.rc-incubadora__sem-video {
+	background: var(--rc-incubadora-fundo);
+	border: 1px dashed var(--rc-incubadora-borda);
+	border-radius: var(--rc-raio, 8px);
+	padding: var(--rc-espaco, 16px);
+}
+
+.rc-incubadora__sem-video-titulo {
+	font-size: var(--rc-fonte-md, 1.125rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 0 0 12px;
+}
+
+.rc-incubadora__trocar-video summary {
+	color: var(--rc-incubadora-link);
+	cursor: pointer;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	font-weight: 600;
+}
+
+.rc-incubadora__trocar-video[open] summary {
+	margin-bottom: 12px;
+}
+
+.rc-incubadora__rotulo {
+	display: block;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	font-weight: 600;
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 4px;
+}
+
+.rc-incubadora__dica {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-xs, 0.8125rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 8px;
+}
+
+.rc-incubadora__linha-video {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/*
+ * Base `0` e não `auto`: em `flex-wrap`, quem decide a quebra é a soma das
+ * bases, e o campo com a URL inteira empurraria os botões para outra linha
+ * mesmo com espaço para eles. O `min-width` é o que faz a quebra acontecer
+ * quando o espaço acaba de verdade, no celular.
+ */
+.rc-incubadora__linha-video .rc-incubadora__campo {
+	flex: 1 1 0;
+	min-width: 14em;
+}
+
+/*
+ * Classe dobrada contra o `input[type="url"]` e o `textarea` do Storefront,
+ * que chegam a (0,1,1) e trazem fundo cinza.
+ */
+.rc-incubadora__campo.rc-incubadora__campo,
+.rc-comentarios__campo.rc-comentarios__campo {
+	background: #fff;
+	border: 1px solid #8a8a93;
+	border-radius: 6px;
+	box-shadow: none;
+	color: #1f1f1f;
+	font-family: inherit;
+	font-size: var(--rc-fonte-base, 1rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	max-width: 100%;
+	padding: 8px 10px;
+}
+
+.rc-incubadora__campo:focus-visible,
+.rc-comentarios__campo:focus-visible,
+.rc-incubadora__trocar-video summary:focus-visible,
+.rc-comentario__responder summary:focus-visible,
+.rc-avaliacao__botao:focus-visible,
+.rc-comentario__acao:focus-visible {
+	outline: 3px solid var(--reconectar-cor-destaque, #F1BF3D);
+	outline-offset: 2px;
+}
+
+/* --- Avaliação e comentários ------------------------------------------- */
+
+.rc-incubadora__interacao {
+	border-top: 1px solid var(--rc-incubadora-borda);
+	display: grid;
+	gap: calc(1.5 * var(--rc-espaco, 16px));
+	margin-top: calc(2 * var(--rc-espaco, 16px));
+	padding-top: calc(1.5 * var(--rc-espaco, 16px));
+}
+
+.rc-avaliacao {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+}
+
+.rc-avaliacao__pergunta,
+.rc-avaliacao__totais {
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	margin: 0;
+}
+
+.rc-avaliacao__totais {
+	color: var(--rc-incubadora-apoio);
+}
+
+/*
+ * As duas metades de uma pílula só, como no YouTube: uma borda arredondada
+ * por fora e um divisor no meio.
+ */
+.rc-avaliacao__form {
+	border: 1px solid var(--rc-incubadora-borda);
+	border-radius: 999px;
+	display: inline-flex;
+	overflow: hidden;
+}
+
+/*
+ * Três classes contra o `button` do Storefront, que pinta com a cor
+ * primária — 2,30:1 com o texto branco.
+ */
+.rc-avaliacao__form .rc-avaliacao__botao.rc-avaliacao__botao {
+	align-items: center;
+	background: var(--rc-incubadora-fundo);
+	border: 0;
+	border-radius: 0;
+	color: #1f1f1f;
+	cursor: pointer;
+	display: inline-flex;
+	font-family: inherit;
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	font-weight: 600;
+	gap: 6px;
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	padding: 8px 14px;
+}
+
+.rc-avaliacao__form .rc-avaliacao__botao + .rc-avaliacao__botao {
+	border-left: 1px solid var(--rc-incubadora-borda);
+}
+
+/*
+ * O estado não é só cor: o ícone sai preenchido pela institucional e o
+ * `aria-pressed` diz o mesmo ao leitor de tela.
+ */
+.rc-avaliacao__form .rc-avaliacao__botao.rc-avaliacao__botao[aria-pressed="true"] {
+	background: #ede5f4;
+	color: var(--rc-incubadora-link);
+}
+
+.rc-avaliacao__icone {
+	flex: none;
+}
+
+.rc-avaliacao__botao--nao-gostei .rc-avaliacao__icone {
+	transform: rotate(180deg);
+}
+
+.rc-avaliacao__total {
+	font-variant-numeric: tabular-nums;
+}
+
+.rc-comentarios__titulo {
+	font-size: var(--rc-fonte-lg, 1.25rem);
+	line-height: var(--rc-entrelinha-justa, 1.25);
+	margin: 0 0 var(--rc-espaco, 16px);
+}
+
+.rc-comentarios__form {
+	display: grid;
+	gap: 8px;
+	justify-items: start;
+}
+
+.rc-comentarios__form--novo {
+	margin: 0 0 calc(1.5 * var(--rc-espaco, 16px));
+}
+
+.rc-comentarios__campo.rc-comentarios__campo {
+	resize: vertical;
+	width: 100%;
+}
+
+.rc-comentarios__aviso,
+.rc-comentarios__vazio {
+	color: var(--rc-incubadora-apoio);
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	margin: 0 0 var(--rc-espaco, 16px);
+}
+
+.rc-comentarios__lista,
+.rc-comentarios__respostas {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.rc-comentarios__fio + .rc-comentarios__fio {
+	margin-top: calc(1.25 * var(--rc-espaco, 16px));
+}
+
+/* A resposta começa onde começa o texto do comentário, depois do avatar. */
+.rc-comentarios__respostas {
+	margin-top: 12px;
+	padding-left: 52px;
+}
+
+.rc-comentarios__respostas > li + li {
+	margin-top: 12px;
+}
+
+.rc-comentario {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: 40px minmax(0, 1fr);
+}
+
+.rc-comentario__avatar {
+	border-radius: 50%;
+	display: block;
+	height: 40px;
+	width: 40px;
+}
+
+.rc-comentario__cabecalho {
+	align-items: baseline;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	font-size: var(--rc-fonte-xs, 0.8125rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0 0 2px;
+}
+
+.rc-comentario__autor {
+	font-weight: 600;
+}
+
+.rc-comentario__data {
+	color: var(--rc-incubadora-apoio);
+}
+
+.rc-comentario__selo {
+	background: #fdf1d4;
+	border-radius: 4px;
+	color: #5c4400;
+	font-size: var(--rc-fonte-2xs, 0.75rem);
+	font-weight: 600;
+	padding: 1px 6px;
+}
+
+/* Quebra palavra longa — um link colado — em vez de alargar a coluna. */
+.rc-comentario__texto {
+	font-size: var(--rc-fonte-sm, 0.875rem);
+	line-height: var(--rc-entrelinha-compacta, 1.4);
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.rc-comentario--oculto .rc-comentario__texto {
+	color: var(--rc-incubadora-apoio);
+	font-style: italic;
+}
+
+.rc-comentario__acoes {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	margin-top: 4px;
+}
+
+.rc-comentario__moderar {
+	display: flex;
+	gap: 12px;
+	margin: 0;
+}
+
+.rc-comentario__responder {
+	flex: 1 1 100%;
+}
+
+.rc-comentario__responder:not([open]) {
+	flex-basis: auto;
+}
+
+.rc-comentario__responder summary {
+	color: var(--rc-incubadora-link);
+	cursor: pointer;
+	font-size: var(--rc-fonte-xs, 0.8125rem);
+	font-weight: 600;
+	list-style: none;
+}
+
+.rc-comentario__responder summary::-webkit-details-marker {
+	display: none;
+}
+
+.rc-comentario__responder[open] summary {
+	margin-bottom: 8px;
+}
+
+.rc-comentario__acao.rc-comentario__acao {
+	background: none;
+	border: 0;
+	color: var(--rc-incubadora-link);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: var(--rc-fonte-xs, 0.8125rem);
+	font-weight: 600;
+	padding: 0;
+	text-decoration: underline;
+}
+
+/* #a32c12 sobre branco mede ~7:1. */
+.rc-comentario__acao.rc-comentario__acao--perigo {
+	color: #a32c12;
 }

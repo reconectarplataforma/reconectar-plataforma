@@ -109,6 +109,63 @@ if ( ! current_user_can( Reconectar_Permissoes::CAP_GERIR_INCUBADORA ) ) {
 		$rc_mae_antes = (int) get_post_field( 'post_parent', $rc_alvo[0] );
 		$rc_caso( $rc_codigo( Reconectar_Incubadora_Acoes::mover( array( 'pagina' => $rc_alvo[0], 'pai' => 0, 'ordem' => array( $rc_alvo[0] ) ) ), 'capacidade' ), 'sem-capacidade-nao-move' );
 		$rc_caso( get_post_field( 'post_content', $rc_alvo[0] ) === $rc_antes && 'trash' !== get_post_status( $rc_alvo[0] ) && (int) get_post_field( 'post_parent', $rc_alvo[0] ) === $rc_mae_antes, 'sem-capacidade-nada-mudou' );
+
+		// --- Vídeo, avaliação e comentários, sem a capacidade de gerir ---
+		//
+		// O vídeo é escrita na página, e recusa aos dois perfis. Comentar e
+		// avaliar dependem de outra capacidade, a da comunidade: a loja tem, o
+		// cliente não — e é por isso que o mesmo arquivo mede os dois ramos.
+		$rc_caso( $rc_codigo( Reconectar_Incubadora_Interacao::definir_video( $rc_alvo[0], 'https://youtu.be/5JxN3ELqo9I' ), 'capacidade' ) && ! Reconectar_Incubadora_Interacao::video( $rc_alvo[0] ), 'sem-capacidade-nao-grava-video' );
+
+		// Um comentário de outra pessoa, gravado direto: ocultar e excluir o
+		// alheio é da moderação, e o caso precisa de um alvo que não seja do
+		// próprio perfil.
+		$rc_outro = get_users(
+			array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'fields'  => 'ID',
+				'exclude' => array( get_current_user_id() ),
+			)
+		);
+		$rc_alheio = (int) wp_insert_comment(
+			array(
+				'comment_post_ID'  => $rc_alvo[0],
+				'comment_type'     => Reconectar_Incubadora_Interacao::TIPO_COMENTARIO,
+				'comment_content'  => 'alheio',
+				'comment_approved' => '1',
+				'user_id'          => $rc_outro ? (int) $rc_outro[0] : 0,
+			)
+		);
+		$rc_caso( $rc_alheio && $rc_codigo( Reconectar_Incubadora_Interacao::moderar( $rc_alheio, 'ocultar' ), 'capacidade' ), 'sem-capacidade-nao-oculta' );
+		$rc_caso( $rc_alheio && $rc_codigo( Reconectar_Incubadora_Interacao::moderar( $rc_alheio, 'excluir' ), 'capacidade' ) && get_comment( $rc_alheio ), 'nao-exclui-comentario-alheio' );
+
+		// A trava de dez segundos é por usuário e sobrevive entre execuções.
+		delete_transient( 'rc_incubadora_comentou_' . get_current_user_id() );
+
+		if ( Reconectar_Incubadora_Interacao::pode_participar() ) {
+			$rc_proprio = Reconectar_Incubadora_Interacao::comentar( $rc_alvo[0], 'resposta da verificação', $rc_alheio );
+			$rc_caso( $rc_codigo( $rc_proprio, 'comentado' ) && $rc_alheio === $rc_proprio['mae'], 'participante-responde' );
+
+			$rc_aval = Reconectar_Incubadora_Interacao::avaliar( $rc_alvo[0], 1 );
+			$rc_caso( $rc_codigo( $rc_aval, 'avaliada' ) && 1 === $rc_aval['gostei'], 'participante-avalia' );
+
+			// Oculto o fio, a resposta visível não abre caminho até ele. Por
+			// `wp_update_comment()`, como faz `moderar()`: `wp_set_comment_status()`
+			// só aceita os status do núcleo e devolve `false` com o nosso, sem
+			// ocultar nada — e os dois casos abaixo mediriam um fio visível.
+			wp_update_comment( array( 'comment_ID' => $rc_alheio, 'comment_approved' => Reconectar_Incubadora_Interacao::OCULTO ) );
+			delete_transient( 'rc_incubadora_comentou_' . get_current_user_id() );
+			$rc_furo = ! is_wp_error( $rc_proprio ) ? Reconectar_Incubadora_Interacao::comentar( $rc_alvo[0], 'no fio oculto', $rc_proprio['comentario'] ) : null;
+			$rc_caso( $rc_codigo( $rc_furo, 'mae_inexistente' ), 'nao-responde-em-fio-oculto' );
+			$rc_caso( 0 === Reconectar_Incubadora_Interacao::contar( Reconectar_Incubadora_Interacao::conversa( $rc_alvo[0] ) ), 'fio-oculto-some-com-as-respostas' );
+
+			$rc_caso( ! is_wp_error( $rc_proprio ) && $rc_codigo( Reconectar_Incubadora_Interacao::moderar( $rc_proprio['comentario'], 'excluir' ), 'excluido' ), 'autor-exclui-o-proprio' );
+		} else {
+			$rc_caso( $rc_codigo( Reconectar_Incubadora_Interacao::comentar( $rc_alvo[0], 'forjado', 0 ), 'capacidade' ), 'sem-comunidade-nao-comenta' );
+			$rc_caso( $rc_codigo( Reconectar_Incubadora_Interacao::avaliar( $rc_alvo[0], 1 ), 'capacidade' ), 'sem-comunidade-nao-avalia' );
+			$rc_caso( array( 0, 0 ) === array_values( Reconectar_Incubadora_Interacao::totais( $rc_alvo[0] ) ) && 1 === count( get_comments( array( 'post_id' => $rc_alvo[0], 'type' => Reconectar_Incubadora_Interacao::TIPO_COMENTARIO ) ) ), 'sem-comunidade-nada-mudou' );
+		}
 	} else {
 		$rc_caso( false, 'sem-capacidade-alvo-provisorio' );
 	}
@@ -646,4 +703,57 @@ if ( class_exists( 'Reconectar_Incubadora_Busca' ) ) {
 	$rc_caso( 'Texto curto.' === Reconectar_Incubadora_Busca::trecho( 'Texto curto.', array( 'ausente' ) ), 'busca-trecho-sem-ocorrencia-e-o-comeco' );
 } else {
 	$rc_caso( false, 'busca-classe-ausente' );
+}
+
+// --- Vídeo, avaliação e comentários ------------------------------------------
+//
+// Sobre a raiz, que a esta altura está publicada: avaliar e comentar recusam
+// rascunho. Os comentários saem junto da raiz, no `wp_delete_post()` da limpeza.
+
+if ( class_exists( 'Reconectar_Incubadora_Interacao' ) && 'publish' === get_post_status( $rc_raiz['id'] ) ) {
+	$rc_i  = 'Reconectar_Incubadora_Interacao';
+	$rc_id = $rc_raiz['id'];
+
+	$rc_video = $rc_i::definir_video( $rc_id, 'https://www.youtube.com/watch?v=5JxN3ELqo9I&t=30s' );
+	$rc_caso( $rc_codigo( $rc_video, 'video_definido' ) && '5JxN3ELqo9I' === $rc_i::video( $rc_id )['id'], 'video-grava-o-id-do-youtube' );
+	$rc_invalido = $rc_i::definir_video( $rc_id, 'https://vimeo.com/76979871' );
+	$rc_caso( $rc_codigo( $rc_invalido, 'video_invalido' ) && 422 === $rc_invalido->get_error_data()['status'] && $rc_i::video( $rc_id ), 'video-de-fora-do-youtube-recusado-sem-apagar' );
+	$rc_caso( $rc_codigo( $rc_i::definir_video( $rc_id, '' ), 'video_removido' ) && ! $rc_i::video( $rc_id ), 'video-vazio-remove' );
+
+	$rc_i::avaliar( $rc_id, 1 );
+	$rc_desfeita = $rc_i::avaliar( $rc_id, 1 );
+	$rc_caso( $rc_codigo( $rc_desfeita, 'avaliada' ) && 0 === $rc_desfeita['avaliacao'] && 0 === $rc_desfeita['gostei'], 'avaliar-de-novo-desfaz' );
+	$rc_troca = $rc_i::avaliar( $rc_id, -1 );
+	$rc_caso( $rc_codigo( $rc_troca, 'avaliada' ) && 0 === $rc_troca['gostei'] && 1 === $rc_troca['nao_gostei'], 'avaliar-no-outro-sentido-troca' );
+
+	$rc_rascunho = (int) wp_insert_post(
+		array(
+			'post_type'   => Reconectar_Incubadora::POST_TYPE,
+			'post_status' => 'draft',
+			'post_title'  => $rc_rotulo . ' rascunho',
+		)
+	);
+	$rc_criados[] = $rc_rascunho;
+	$rc_caso( $rc_codigo( $rc_i::avaliar( $rc_rascunho, 1 ), 'rascunho' ), 'rascunho-nao-recebe-avaliacao' );
+
+	delete_transient( 'rc_incubadora_comentou_' . get_current_user_id() );
+	$rc_topo = $rc_i::comentar( $rc_id, "linha um\n<script>x</script>", 0 );
+	$rc_caso( $rc_codigo( $rc_topo, 'comentado' ), 'comenta' );
+	$rc_caso( $rc_codigo( $rc_i::comentar( $rc_id, 'de novo', 0 ), 'repetido' ), 'comentario-em-seguida-recebe-429' );
+
+	delete_transient( 'rc_incubadora_comentou_' . get_current_user_id() );
+	$rc_resposta = ! is_wp_error( $rc_topo ) ? $rc_i::comentar( $rc_id, 'resposta', $rc_topo['comentario'] ) : null;
+	$rc_caso( $rc_codigo( $rc_resposta, 'comentado' ), 'responde' );
+
+	$rc_gravado = ! is_wp_error( $rc_topo ) ? get_comment( $rc_topo['comentario'] ) : null;
+	$rc_caso( $rc_gravado && '' === $rc_gravado->comment_author_email && '' === $rc_gravado->comment_author_IP && false === strpos( $rc_i::texto( $rc_gravado ), '<script' ), 'grava-sem-email-sem-ip-e-escapa' );
+
+	// O tipo próprio não vaza para quem consulta comentários sem pedi-lo.
+	$rc_caso( 0 === count( get_comments( array( 'post_id' => $rc_id ) ) ) && ! comments_open( $rc_id ), 'comentarios-fora-das-consultas-do-nucleo' );
+
+	$rc_caso( ! is_wp_error( $rc_topo ) && $rc_codigo( $rc_i::moderar( $rc_topo['comentario'], 'ocultar' ), 'ocultado' ) && 2 === $rc_i::contar( $rc_i::conversa( $rc_id ) ), 'moderacao-oculta-e-continua-vendo' );
+	$rc_caso( ! is_wp_error( $rc_topo ) && $rc_codigo( $rc_i::moderar( $rc_topo['comentario'], 'mostrar' ), 'mostrado' ), 'moderacao-mostra' );
+	$rc_caso( ! is_wp_error( $rc_topo ) && $rc_codigo( $rc_i::moderar( $rc_topo['comentario'], 'excluir' ), 'excluido' ) && 0 === count( get_comments( array( 'post_id' => $rc_id, 'type' => $rc_i::TIPO_COMENTARIO, 'status' => 'all' ) ) ), 'excluir-o-topo-leva-as-respostas' );
+} else {
+	$rc_caso( false, 'interacao-sem-pagina-publicada' );
 }

@@ -896,6 +896,7 @@ function reconectar_demo_criar_incubadora( $incubadora ) {
 	foreach ( $incubadora['paginas'] as $pagina ) {
 		if ( isset( $mapa[ $pagina['chave'] ] ) ) {
 			reconectar_demo_log( '  = Página da Incubadora já existia: ' . $pagina['titulo'] );
+			reconectar_demo_video_em_destaque( $mapa[ $pagina['chave'] ], $pagina, $incubadora['video'] );
 			$total++;
 			continue;
 		}
@@ -965,9 +966,58 @@ function reconectar_demo_criar_incubadora( $incubadora ) {
 		}
 
 		reconectar_demo_log( '  + Página da Incubadora: ' . $pagina['titulo'] . $observacao );
+		reconectar_demo_video_em_destaque( $post_id, $pagina, $incubadora['video'] );
 	}
 
 	return $total;
+}
+
+/**
+ * Aplica o vídeo em destaque a uma página do catálogo, uma vez por instalação.
+ *
+ * A meta é gravada direto, e não por `Reconectar_Incubadora_Interacao::definir_video()`:
+ * a operação confere `edit_post` do usuário corrente, e o WP-CLI da carga roda
+ * sem usuário. O formato é o mesmo, porque sai do mesmo `identificar_video()`.
+ *
+ * A marca de aplicação é o que separa "nunca teve vídeo" de "a moderação
+ * tirou o vídeo": conferir só a meta do vídeo devolveria à página, a cada
+ * carga, o vídeo que alguém removeu de propósito. Página que já tem vídeo —
+ * definido pela interface antes da carga — fica com o dela.
+ *
+ * @param int    $post_id ID da página.
+ * @param array  $pagina  Entrada do catálogo.
+ * @param string $url     URL declarada no bloco `incubadora`.
+ * @return void
+ */
+function reconectar_demo_video_em_destaque( $post_id, $pagina, $url ) {
+	if ( empty( $pagina['destaque'] ) || ! class_exists( 'Reconectar_Incubadora_Interacao' ) ) {
+		return;
+	}
+
+	$marca = '_reconectar_demo_video_aplicado';
+
+	if ( get_post_meta( $post_id, $marca, true ) ) {
+		reconectar_demo_log( '  = Vídeo em destaque já aplicado: ' . $pagina['titulo'] );
+		return;
+	}
+
+	if ( Reconectar_Incubadora_Interacao::video( $post_id ) ) {
+		update_post_meta( $post_id, $marca, 1 );
+		reconectar_demo_log( '  = Vídeo em destaque já existia: ' . $pagina['titulo'] );
+		return;
+	}
+
+	$video = '' !== $url ? Reconectar_Incubadora_Conteudo::identificar_video( $url ) : null;
+
+	// O destaque é só YouTube, como na interface; o texto aceita também Vimeo.
+	if ( ! $video || 'youtube' !== $video['provedor'] ) {
+		reconectar_demo_log( '  ! ' . $pagina['titulo'] . ': sem vídeo em destaque (a URL declarada não é do YouTube).' );
+		return;
+	}
+
+	update_post_meta( $post_id, Reconectar_Incubadora_Interacao::META_VIDEO, $video );
+	update_post_meta( $post_id, $marca, 1 );
+	reconectar_demo_log( '  + Vídeo em destaque: ' . $pagina['titulo'] );
 }
 
 /**
