@@ -37,6 +37,7 @@ $reconectar_modulos = array(
 	'inc/marketplace/cabecalho.php',
 	'inc/marketplace/rodape.php',
 	'inc/marketplace/barra-inferior.php',
+	'inc/marketplace/painel-da-loja.php',
 
 	// Seções da home. Cada arquivo se registra sozinho na action
 	// `reconectar_home`, com a prioridade que define sua posição na página.

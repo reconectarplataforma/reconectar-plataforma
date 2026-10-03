@@ -529,15 +529,41 @@ else
 fi
 
 echo "== Página da Comunidade (BuddyPress) =="
-if ! wp post list --post_type=page --title="Comunidade" --field=ID | grep -q .; then
+# A página nasce vazia: `Reconectar_Comunidade` a redireciona ao diretório de
+# atividade. O conteúdo antigo, `[buddypress]`, é um shortcode que o BuddyPress
+# 14 não registra, e saía cru na tela. Ela existe porque menu e rodapé apontam
+# para ela pelo ID.
+comunidade_id="$(wp post list --post_type=page --title="Comunidade" --field=ID | head -n1)"
+if [ -z "$comunidade_id" ]; then
   wp post create \
     --post_type=page \
     --post_title="Comunidade" \
     --post_status=publish \
-    --post_content="[buddypress]"
+    --post_content=""
+elif [ "$(wp post get "$comunidade_id" --field=post_content)" = "[buddypress]" ]; then
+  # Reparo das instalações provisionadas antes: só toca o conteúdo que o
+  # próprio script gravou, nunca o que o administrador tiver escrito ali.
+  wp post update "$comunidade_id" --post_content=""
+  echo "Página 'Comunidade' sem o shortcode inexistente."
 else
   echo "Página 'Comunidade' já existe."
 fi
+
+echo "== Títulos dos diretórios do BuddyPress =="
+# O BuddyPress cria as páginas dos diretórios no idioma da ativação, como o
+# WooCommerce (veja a armadilha no CLAUDE.md), e o título delas é o <h1> da
+# tela. Só traduz o título de fábrica: renomeado à mão, fica como está. O slug
+# não muda — é a URL do diretório.
+for par in "activity:Activity:Comunidade" "members:Members:Membros"; do
+  componente="${par%%:*}"; resto="${par#*:}"; de="${resto%%:*}"; para="${resto#*:}"
+  pagina_id="$(wp option pluck bp-pages "$componente" 2>/dev/null || true)"
+  [ -n "$pagina_id" ] || continue
+  if [ "$(wp post get "$pagina_id" --field=post_title 2>/dev/null || true)" = "$de" ]; then
+    wp post update "$pagina_id" --post_title="$para"
+  else
+    echo "Diretório '$componente' já tem título próprio."
+  fi
+done
 
 echo "== Página do Painel de Empresas =="
 # A página é a âncora da rota do Administrador de Empresas: a URL do painel é

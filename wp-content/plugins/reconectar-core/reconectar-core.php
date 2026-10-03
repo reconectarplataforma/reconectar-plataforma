@@ -56,6 +56,10 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-campanha.php';
 // de negócio, não aparência.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-forum.php';
 
+// A página "Comunidade" leva ao diretório de atividade do BuddyPress, que não
+// tem shortcode para ela hospedar.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-comunidade.php';
+
 // A wiki da Incubadora. Depois de `class-reconectar-permissoes.php`, de onde lê
 // a capacidade de escrita; e no plugin, não no tema, pela mesma razão das
 // campanhas: trocar de tema não pode apagar o conhecimento já escrito.
@@ -127,6 +131,7 @@ function reconectar_core_init() {
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
 	Reconectar_Forum::init();
+	Reconectar_Comunidade::init();
 	// Também depois de `Reconectar_Permissoes`: o post type aponta suas
 	// primitivas para `CAP_GERIR_INCUBADORA`.
 	Reconectar_Incubadora::init();

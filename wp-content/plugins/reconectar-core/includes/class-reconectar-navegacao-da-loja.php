@@ -10,8 +10,17 @@
  * O cliente não muda: a comunidade já lhe é negada, e a Incubadora, que ele lê,
  * continua no menu.
  *
- * Só a navegação muda. Nenhuma permissão é tocada: a loja segue abrindo as três
- * áreas pela URL, e é exatamente para lá que os itens novos do painel apontam.
+ * E não só o link: para a loja, as três áreas **abrem dentro** da moldura do
+ * painel — a barra lateral do Dokan à esquerda, sem o cabeçalho, o rodapé e a
+ * barra inferior da vitrine. As URLs são as de sempre (`/forums/`,
+ * `/comunidade/`, `/incubadora/…`): mover as rotas para dentro de `/dashboard/`
+ * obrigaria a reescrever o roteamento do bbPress, do BuddyPress e da
+ * Incubadora, e cada link já gravado — notificação, e-mail, resposta citada —
+ * levaria ao 404. O que muda é a casca, decidida aqui por
+ * `area_corrente()` e desenhada pelo tema em `header.php` e `footer.php`.
+ *
+ * Nenhuma permissão é tocada: a loja segue abrindo as três áreas pelos mesmos
+ * portões de antes.
  *
  * @package reconectar-core
  */
@@ -22,6 +31,11 @@ defined( 'ABSPATH' ) || exit;
  * Navegação da comunidade e da Incubadora para a loja.
  */
 class Reconectar_Navegacao_Da_Loja {
+
+	/**
+	 * Identificador do script do layout React do painel, no Dokan.
+	 */
+	const SCRIPT_DO_LAYOUT = 'dokan-vendor-dashboard';
 
 	/**
 	 * Registra os ganchos.
@@ -36,6 +50,9 @@ class Reconectar_Navegacao_Da_Loja {
 		add_filter( 'dokan_get_dashboard_nav', array( __CLASS__, 'registrar_menu' ) );
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_itens_do_menu' ), 20 );
 		add_filter( 'widget_custom_html_content', array( __CLASS__, 'ocultar_links_do_widget' ), 20 );
+		add_filter( 'dokan_dashboard_nav_active', array( __CLASS__, 'marcar_item_ativo' ) );
+		add_filter( 'body_class', array( __CLASS__, 'classes_do_corpo' ), 30 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_layout_do_painel' ), 20 );
 	}
 
 	/**
@@ -49,6 +66,169 @@ class Reconectar_Navegacao_Da_Loja {
 	 */
 	public static function mora_no_painel() {
 		return is_user_logged_in() && Reconectar_Permissoes::eh_vendedor( get_current_user_id() );
+	}
+
+	/**
+	 * Chave do item do painel que corresponde à tela corrente, ou vazio.
+	 *
+	 * Vazio para quem não é loja: Moderador, Administrador e cliente seguem vendo
+	 * as três áreas na moldura da vitrine. O reconhecimento repete o de
+	 * `Reconectar_Permissoes::requisicao_e_de_comunidade()` — os post types do
+	 * bbPress, o componente do BuddyPress e a página `comunidade`, que na raiz
+	 * não reporta componente nenhum. O fórum é testado primeiro porque o perfil
+	 * de usuário do bbPress também é do BuddyPress quando os dois estão ligados.
+	 *
+	 * @return string `rc-forum`, `rc-comunidade`, `rc-incubadora` ou vazio.
+	 */
+	public static function area_corrente() {
+		if ( ! self::mora_no_painel() ) {
+			return '';
+		}
+
+		if ( function_exists( 'is_bbpress' ) && is_bbpress() ) {
+			return 'rc-forum';
+		}
+
+		if ( ( function_exists( 'bp_current_component' ) && bp_current_component() ) || is_page( 'comunidade' ) ) {
+			return 'rc-comunidade';
+		}
+
+		// Dois `if` e não um `&&` com `class_exists()`: com a classe ainda não
+		// carregada, o primeiro termo curto-circuitaria o autoload.
+		if ( class_exists( 'Reconectar_Incubadora' ) ) {
+			if ( Reconectar_Incubadora::requisicao_e_da_incubadora() ) {
+				return 'rc-incubadora';
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Marca o item da área corrente na barra lateral do Dokan.
+	 *
+	 * O Dokan deduz o item ativo do caminho da requisição depois de `/dashboard/`,
+	 * e fora dele a dedução não casa com chave nenhuma: sem este filtro, nenhum
+	 * item sairia marcado, e a loja não saberia em que área está.
+	 *
+	 * @param string $ativo Chave que o Dokan deduziu.
+	 * @return string
+	 */
+	public static function marcar_item_ativo( $ativo ) {
+		$area = self::area_corrente();
+
+		return '' !== $area ? $area : $ativo;
+	}
+
+	/**
+	 * Veste o `<body>` das três áreas como o do painel.
+	 *
+	 * As sidebars do Storefront saem sempre: reservariam 26% da largura para uma
+	 * coluna que a moldura não imprime (veja `reconectar_ajustar_classes_de_layout()`,
+	 * no tema).
+	 *
+	 * As duas classes do Dokan só entram se o layout React tiver sido carregado.
+	 * O `style.css` dele declara, sob `.dokan-dashboard`, a barra lateral clássica
+	 * em `visibility: hidden` e o `.dokan-dashboard-content` em `display: none`, à
+	 * espera de o React os remontar. Com a classe e sem o script, a tela sai em
+	 * branco — medido, com a barra ocupando 250px invisíveis. Sem as duas, a
+	 * moldura cai na barra lateral clássica, que é feia e funciona.
+	 *
+	 * @param string[] $classes Classes do `<body>`.
+	 * @return string[]
+	 */
+	public static function classes_do_corpo( $classes ) {
+		if ( '' === self::area_corrente() ) {
+			return $classes;
+		}
+
+		$classes   = array_values( array_diff( $classes, array( 'right-sidebar', 'left-sidebar' ) ) );
+		$classes[] = 'rc-no-painel-da-loja';
+
+		if ( wp_script_is( self::SCRIPT_DO_LAYOUT, 'enqueued' ) ) {
+			$classes[] = 'dokan-dashboard';
+			$classes[] = 'dokan-dashboard-fullwidth-template';
+		}
+
+		return $classes;
+	}
+
+	/**
+	 * Carrega, nas três áreas, o layout React do painel e os estilos dele.
+	 *
+	 * O Dokan 4 desenha o painel em React: a barra lateral e a barra do topo saem
+	 * de `dokan-vendor-dashboard`, que `FullWidthVendorLayout` só registra quando
+	 * `dokan_is_seller_dashboard()` responde sim — isto é, na página `/dashboard/`.
+	 * O registro não é só o arquivo: monta `vendorDashboardLayoutConfig`, com o
+	 * menu, a loja e o avatar, e copiar essa montagem para cá a congelaria na
+	 * versão de hoje do Dokan.
+	 *
+	 * Por isso os dois métodos públicos dele são chamados aqui, com
+	 * `dokan_get_current_page_id` respondendo a página do painel **só durante a
+	 * chamada**. Filtrar a requisição inteira faria `dokan_is_seller_dashboard()`
+	 * responder sim em todo o Dokan — e ele troca o template da página
+	 * (`rewrite_vendor_dashboard_template`) e carrega os mais de 200 scripts do
+	 * painel por esse mesmo teste.
+	 *
+	 * Tudo é condicional: sem Dokan, sem o contêiner ou com o layout `legacy`, o
+	 * script não fica enfileirado, e `classes_do_corpo()` cai na barra clássica.
+	 *
+	 * @return void
+	 */
+	public static function enfileirar_layout_do_painel() {
+		if ( '' === self::area_corrente() ) {
+			return;
+		}
+
+		foreach ( array( 'dokan-style', 'dokan-fontawesome' ) as $estilo ) {
+			if ( wp_style_is( $estilo, 'registered' ) ) {
+				wp_enqueue_style( $estilo );
+			}
+		}
+
+		// O pacote nouveau do BuddyPress, ao detectar o Storefront, dá ao
+		// `#buddypress` margem negativa (-90px medidos) para ele vazar do
+		// `.col-full`. Na moldura não há `.col-full`: o diretório invadia a barra
+		// lateral, cortando a primeira aba, e transbordava à direita. Inline, preso
+		// ao estilo do Dokan, porque só existe enquanto a moldura existe.
+		if ( wp_style_is( 'dokan-style', 'enqueued' ) ) {
+			wp_add_inline_style(
+				'dokan-style',
+				'.rc-painel-da-loja #buddypress.buddypress-wrap{margin-left:0;margin-right:0;width:auto;max-width:100%}'
+			);
+		}
+
+		$classe = 'WeDevs\\Dokan\\Shortcodes\\FullWidthVendorLayout';
+		if ( ! function_exists( 'dokan_get_container' ) || ! function_exists( 'dokan_get_option' ) || ! class_exists( $classe ) ) {
+			return;
+		}
+
+		$pagina_do_painel = absint( dokan_get_option( 'dashboard', 'dokan_pages' ) );
+		if ( ! $pagina_do_painel ) {
+			return;
+		}
+
+		try {
+			$layout = dokan_get_container()->get( $classe );
+		} catch ( Throwable $erro ) {
+			return;
+		}
+
+		if ( ! method_exists( $layout, 'register_vendor_dashboard_assets' ) || ! method_exists( $layout, 'enqueue_vendor_dashboard_assets' ) ) {
+			return;
+		}
+
+		$fingir_painel = static function () use ( $pagina_do_painel ) {
+			return $pagina_do_painel;
+		};
+
+		add_filter( 'dokan_get_current_page_id', $fingir_painel );
+		try {
+			$layout->register_vendor_dashboard_assets();
+			$layout->enqueue_vendor_dashboard_assets();
+		} finally {
+			remove_filter( 'dokan_get_current_page_id', $fingir_painel );
+		}
 	}
 
 	/**
@@ -186,4 +366,13 @@ class Reconectar_Navegacao_Da_Loja {
  */
 function reconectar_comunidade_mora_no_painel_da_loja() {
 	return Reconectar_Navegacao_Da_Loja::mora_no_painel();
+}
+
+/**
+ * Fachada para o tema: a tela corrente abre na moldura do painel da loja?
+ *
+ * @return bool
+ */
+function reconectar_tela_no_painel_da_loja() {
+	return '' !== Reconectar_Navegacao_Da_Loja::area_corrente();
 }

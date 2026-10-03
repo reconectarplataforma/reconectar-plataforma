@@ -359,6 +359,7 @@ if autenticar "demo-cliente-marina" "$SENHA_DEMO" "$JAR_CLIENTE"; then
   fi
   conferir "$JAR_CLIENTE" "/dashboard/"    "302"                "sem painel de vendedor"
   conferir "$JAR_CLIENTE" "/comunidade/"   "403"                "sem comunidade"
+  conferir "$JAR_CLIENTE" "/activity/"     "403"                "sem diretório da comunidade"
   conferir "$JAR_CLIENTE" "/forums/"       "403"                "sem fóruns"
   conferir "$JAR_CLIENTE" "/painel-empresas/" "403"             "não administra empresa alguma"
 else
@@ -373,7 +374,8 @@ if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   # sem ele o item aparece no menu e a tela responde 404.
   conferir "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" "200"      "vê as avaliações pendentes"
   conferir_corpo "$JAR_VENDEDOR" "/dashboard/avaliacoes-pendentes/" 'rc-avaliacoes-pendentes' "presente" "a aba desenha a lista, não a home do painel"
-  conferir "$JAR_VENDEDOR" "/comunidade/"           "200"              "participa da comunidade"
+  conferir "$JAR_VENDEDOR" "/comunidade/"           "302 /activity/" "participa da comunidade, pelo diretório"
+  conferir "$JAR_VENDEDOR" "/activity/"             "200" "participa da comunidade"
   conferir "$JAR_VENDEDOR" "/forums/"               "200"              "a listagem de perguntas"
   conferir "$JAR_VENDEDOR" "/wp-admin/"             "302 /dashboard/"  "volta ao painel dele"
   conferir "$JAR_VENDEDOR" "/wp-admin/plugins.php"  "403"              "não gere plugins"
@@ -422,7 +424,8 @@ JAR_EMPRESAS=/tmp/reconectar-acessos-empresas.txt
 if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
   conferir "$JAR_EMPRESAS" "/painel-empresas/"      "200" "o painel é dele"
   conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200" "a listagem das lojas sob sua gestão"
-  conferir "$JAR_EMPRESAS" "/comunidade/"           "200" "participa da comunidade"
+  conferir "$JAR_EMPRESAS" "/comunidade/"           "302 /activity/" "participa da comunidade, pelo diretório"
+  conferir "$JAR_EMPRESAS" "/activity/"             "200" "participa da comunidade"
   conferir "$JAR_EMPRESAS" "/wp-admin/"             "200" "entra no painel técnico"
   conferir "$JAR_EMPRESAS" "/wp-admin/users.php"    "200" "configura as contas das lojas"
   conferir "$JAR_EMPRESAS" "/wp-admin/nav-menus.php" "200" "cria menus"
@@ -478,7 +481,8 @@ if autenticar "demo-moderador" "$SENHA_DEMO" "$JAR_MODERADOR"; then
   conferir "$JAR_MODERADOR" "/wp-admin/"              "200" "entra no painel técnico"
   conferir "$JAR_MODERADOR" "/wp-admin/nav-menus.php" "200" "cria menus"
   conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reconectar_campanha" "200" "publica campanhas"
-  conferir "$JAR_MODERADOR" "/comunidade/"            "200" "modera a comunidade"
+  conferir "$JAR_MODERADOR" "/comunidade/"           "302 /activity/" "modera a comunidade, pelo diretório"
+  conferir "$JAR_MODERADOR" "/activity/"             "200" "modera a comunidade"
   conferir "$JAR_MODERADOR" "/forums/"                "200" "tem acesso ao fórum"
   conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=forum"     "200" "administra os fóruns"
   conferir "$JAR_MODERADOR" "/wp-admin/post-new.php?post_type=forum" "200" "cria fóruns"
@@ -508,7 +512,8 @@ JAR_ADMIN=/tmp/reconectar-acessos-admin.txt
 if autenticar "admin" "$SENHA_ADMIN" "$JAR_ADMIN"; then
   conferir "$JAR_ADMIN" "/wp-admin/"            "200" "painel completo"
   conferir "$JAR_ADMIN" "/wp-admin/plugins.php" "200" "gere plugins"
-  conferir "$JAR_ADMIN" "/comunidade/"          "200" "administra a comunidade"
+  conferir "$JAR_ADMIN" "/comunidade/"           "302 /activity/" "administra a comunidade, pelo diretório"
+  conferir "$JAR_ADMIN" "/activity/"             "200" "administra a comunidade"
   conferir "$JAR_ADMIN" "/painel-empresas/"     "200" "também administra empresas"
 else
   falhas=$((falhas + 1))

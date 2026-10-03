@@ -14,6 +14,14 @@
 
 ?>
 
+<?php
+// A moldura do painel da loja não tem rodapé nem barra inferior: o painel do
+// Dokan não tem, e a navegação dela é a barra lateral.
+if ( reconectar_tela_e_do_painel_da_loja() ) :
+	reconectar_painel_da_loja_fechar();
+else :
+	?>
+
 		</div><!-- .col-full -->
 	</div><!-- #content -->
 
@@ -51,6 +59,7 @@
  * esbarrar neles logo depois do cabeçalho.
  */
 reconectar_barra_inferior();
+endif;
 ?>
 
 <?php wp_footer(); ?>
