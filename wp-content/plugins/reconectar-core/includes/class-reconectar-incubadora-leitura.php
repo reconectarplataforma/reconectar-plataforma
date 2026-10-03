@@ -26,7 +26,7 @@ class Reconectar_Incubadora_Leitura {
 	/**
 	 * Versão dos assets, para invalidar o cache do navegador.
 	 */
-	const VERSAO_ASSETS = '0.8.0';
+	const VERSAO_ASSETS = '0.10.0';
 
 	/**
 	 * Parâmetro de URL que abre a lista de versões da página.

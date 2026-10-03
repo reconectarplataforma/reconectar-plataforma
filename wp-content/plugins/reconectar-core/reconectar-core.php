@@ -66,6 +66,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-acoes.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-arquivos.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-editor.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-busca.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-interacao.php';
 
 // O avatar local também é plugin, e não tema, porque o que ele resolve é
 // proteção de dados: o Gravatar entrega a um terceiro o hash do e-mail de quem
@@ -87,6 +88,9 @@ require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-comprov
 // da loja; fica junto do ciclo do pedido, e não no tema, porque é regra sobre
 // quem pode ver qual pedido.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avaliacoes-pendentes.php';
+// O menu do painel da loja aponta para a comunidade e a Incubadora, e a
+// navegação do site deixa de apontar para elas quando quem navega é a loja.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-navegacao-da-loja.php';
 // As três classes de gateway ficam de fora daqui de propósito: elas estendem
 // `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
 // exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do
@@ -119,6 +123,7 @@ function reconectar_core_init() {
 	Reconectar_Pagamento_Direto::init();
 	Reconectar_Comprovante::init();
 	Reconectar_Avaliacoes_Pendentes::init();
+	Reconectar_Navegacao_Da_Loja::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
 	Reconectar_Forum::init();
@@ -130,5 +135,6 @@ function reconectar_core_init() {
 	Reconectar_Incubadora_Arquivos::init();
 	Reconectar_Incubadora_Editor::init();
 	Reconectar_Incubadora_Busca::init();
+	Reconectar_Incubadora_Interacao::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );

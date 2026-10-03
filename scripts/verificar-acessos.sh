@@ -740,6 +740,96 @@ else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; histórico não verificado"
 fi
 
+# Vídeo, avaliação e comentários: três capacidades em jogo, e a tela é o que
+# denuncia a troca de uma pela outra. O cliente lê a conversa e não participa;
+# a loja comenta e avalia, mas o vídeo e a moderação são de quem gere a
+# Incubadora. O aviso do cliente é agulha **presente** de propósito: só a
+# ausência do formulário passaria também com a seção inteira fora do ar.
+echo "Interação na Incubadora (vídeo, avaliação e comentários)"
+if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-comentarios__aviso"        "presente" "cliente lê a conversa e vê o aviso"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-avaliacao__form"           "ausente"  "cliente sem os botões de avaliar"
+  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-comentarios__form--novo"   "ausente"  "cliente sem o campo de comentário"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-comentarios__form--novo"   "presente" "loja comenta"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-avaliacao__form"           "presente" "loja avalia"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-incubadora__form-video"    "ausente"  "loja sem o formulário de vídeo"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-comentario__moderar"       "ausente"  "loja sem ocultar comentário"
+  conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "rc-incubadora__form-video"    "presente" "moderador define o vídeo"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; interação não verificada"
+fi
+
+# As quatro ações respondem por `wp_die()`, em HTML — o formulário funciona sem
+# script, e quem o envia volta por redirecionamento. Por isso a agulha é a
+# mensagem de cada trava, e não um `codigo` em JSON: as quatro são distintas, e
+# é o texto que prova **qual** portão respondeu. Um 403 sozinho não separaria a
+# capacidade do nonce, e o nonce inválido aqui é de propósito — sem ele, o caso
+# do moderador mediria uma gravação de verdade.
+conferir_interacao() {
+  local jar="$1" metodo="$2" acao="$3" esperado="$4" agulha="$5" descricao="$6"
+  local argumentos=( -s -w '\n%{http_code}' )
+  [ -n "$jar" ] && argumentos+=( -b "$jar" )
+
+  local resposta
+  if [ "$metodo" = "GET" ]; then
+    resposta="$(curl "${argumentos[@]}" "$BASE/wp-admin/admin-post.php?action=reconectar_incubadora_$acao")"
+  else
+    resposta="$(curl "${argumentos[@]}" \
+      --data-urlencode "action=reconectar_incubadora_$acao" \
+      --data-urlencode "pagina=1" \
+      --data-urlencode "comentario=1" \
+      --data-urlencode "texto=Forjado" \
+      --data-urlencode "video=https://youtu.be/5JxN3ELqo9I" \
+      --data-urlencode "_wpnonce=invalido" \
+      "$BASE/wp-admin/admin-post.php")"
+  fi
+
+  local codigo corpo
+  codigo="$(printf '%s' "$resposta" | tail -1)"
+  corpo="$(printf '%s' "$resposta" | sed '$d')"
+
+  total=$((total + 1))
+  if [ "$codigo" = "$esperado" ] && [[ "$corpo" == *"$agulha"* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "$acao" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: esperado %s "%s", veio %s\n' "$acao" "$descricao" "$esperado" "$agulha" "$codigo"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Interação na Incubadora por HTTP"
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  sessao="Sua sessão expirou"
+  capacidade="Você não tem permissão para esta ação na Incubadora"
+  nonce="O formulário expirou"
+  metodo="Esta ação só aceita envio de formulário"
+
+  for acao in video avaliar comentar moderar; do
+    conferir_interacao ""               POST "$acao" 401 "$sessao" "visitante é mandado entrar"
+    conferir_interacao "$JAR_MODERADOR" GET  "$acao" 405 "$metodo" "GET não grava"
+    conferir_interacao "$JAR_MODERADOR" POST "$acao" 403 "$nonce"  "moderador sem nonce barrado"
+  done
+
+  # A linha que separa os perfis: comentar e avaliar são da comunidade, o vídeo
+  # é de quem gere. A loja passa da capacidade nas duas primeiras e para no
+  # nonce — se parasse em `capacidade`, a comunidade teria perdido a voz; se o
+  # cliente parasse no nonce, teria ganho. `moderar` também é da comunidade no
+  # transporte, porque quem comentou exclui o próprio comentário: ocultar e
+  # excluir o alheio a operação recusa, e isso se mede por WP-CLI, no fim.
+  conferir_interacao "$JAR_CLIENTE"  POST comentar 403 "$capacidade" "cliente não comenta"
+  conferir_interacao "$JAR_CLIENTE"  POST avaliar  403 "$capacidade" "cliente não avalia"
+  conferir_interacao "$JAR_VENDEDOR" POST comentar 403 "$nonce"      "loja passa da capacidade ao comentar"
+  conferir_interacao "$JAR_VENDEDOR" POST avaliar  403 "$nonce"      "loja passa da capacidade ao avaliar"
+  conferir_interacao "$JAR_VENDEDOR" POST video    403 "$capacidade" "loja não define o vídeo"
+  conferir_interacao "$JAR_VENDEDOR" POST moderar  403 "$nonce"      "loja passa da capacidade ao moderar"
+  conferir_interacao "$JAR_CLIENTE"  POST moderar  403 "$capacidade" "cliente não modera"
+  conferir_interacao "$JAR_CLIENTE"  POST video    403 "$capacidade" "cliente não define o vídeo"
+else
+  echo "  --    sessões de cliente, loja ou moderador ausentes; interação não verificada"
+fi
+
 # A busca lê o mesmo conjunto que a árvore, e o vazamento que importa é o do
 # rascunho: o título e o trecho sairiam na lista para quem não pode abrir a
 # página. O par criado aqui é um rascunho e uma filha **publicada** sob ele —

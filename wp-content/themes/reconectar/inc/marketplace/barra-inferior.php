@@ -96,18 +96,14 @@ function reconectar_itens_da_barra_inferior() {
 		$perfil_nome = is_user_logged_in() ? __( 'Perfil', 'reconectar' ) : __( 'Entrar', 'reconectar' );
 	}
 
-	// Colhidos antes do envelope de login: é com estes caminhos que a marcação de
-	// página atual compara. Depois de `wp_login_url()` os dois viram
-	// `/wp-login.php` e nenhum item voltaria a acender.
-	$pedidos_destino = $pedidos_url;
-	$perfil_destino  = $perfil_url;
-
-	// Sem sessão, os dois atalhos de área logada passam pelo login e voltam ao
-	// destino pedido. A alternativa seria um link que leva a uma tela de login
-	// sem retorno, e o usuário teria de refazer o caminho à mão depois de entrar.
+	// Sem sessão, os dois atalhos de área logada levam a "Minha conta", a tela de
+	// entrada da plataforma — com cadastro, ao contrário do `wp-login.php` — e a
+	// mesma do "Entrar" do cabeçalho. Os dois, e não só o "Perfil": depois do
+	// login o Dokan manda o cliente a "Minha conta" qualquer que seja o destino,
+	// então um "Pedidos" apontando para o endpoint prometeria um retorno que não
+	// acontece.
 	if ( ! is_user_logged_in() ) {
-		$pedidos_url = wp_login_url( $pedidos_url );
-		$perfil_url  = wp_login_url( $perfil_url );
+		$pedidos_url = $conta_url;
 	}
 
 	$itens = array(
@@ -131,13 +127,13 @@ function reconectar_itens_da_barra_inferior() {
 			'url'    => $pedidos_url,
 			'rotulo' => __( 'Pedidos', 'reconectar' ),
 			'icone'  => 'pedidos',
-			'atual'  => reconectar_url_e_a_pagina_atual( $pedidos_destino ),
+			'atual'  => reconectar_url_e_a_pagina_atual( $pedidos_url ),
 		),
 		array(
 			'url'    => $perfil_url,
 			'rotulo' => $perfil_nome,
 			'icone'  => 'perfil',
-			'atual'  => reconectar_url_e_a_pagina_atual( $perfil_destino ),
+			'atual'  => reconectar_url_e_a_pagina_atual( $perfil_url ),
 		),
 	);
 

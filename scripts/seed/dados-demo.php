@@ -1020,6 +1020,11 @@ return array(
 	 * equipe do projeto, nunca inventada aqui: um ID plausível de YouTube abriria
 	 * um vídeo qualquer de terceiro dentro da plataforma. Vazia, a página sai sem
 	 * vídeo e a carga avisa.
+	 *
+	 * `destaque` põe a mesma URL como vídeo em destaque da página — o player do
+	 * topo, que é como a moderação publica vídeo no dia a dia. É aplicado uma
+	 * vez por instalação, inclusive em página que já existia: quem o remover
+	 * pela interface não o vê voltar na próxima carga.
 	 */
 	'incubadora' => array(
 		'autor'   => 'demo-moderador',
@@ -1046,6 +1051,7 @@ return array(
 				'chave'    => 'incubadora-guia-do-vendedor',
 				'titulo'   => 'Guia do vendedor',
 				'status'   => 'publish',
+				'destaque' => true,
 				'ordem'    => 10,
 				'dias'     => 28,
 				'conteudo' => '<p>O caminho de uma loja, do cadastro do primeiro produto até o dinheiro na conta. Cada etapa tem a sua página logo abaixo desta.</p>'

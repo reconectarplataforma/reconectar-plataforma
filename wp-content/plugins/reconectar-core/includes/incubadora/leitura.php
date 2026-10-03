@@ -19,6 +19,10 @@
  * próprio, que se abre em outra aba. Sai só para quem edita, pela razão de
  * `Reconectar_Incubadora_Leitura::pode_ver_historico()`.
  *
+ * O vídeo em destaque (`destaque.php`) e a avaliação com os comentários
+ * (`interacao.php`) ficam fora de `.rc-incubadora__conteudo`: o editor troca o
+ * `innerHTML` daquele bloco, e nenhum dos dois é texto da página.
+ *
  * Os botões nascem `hidden` e o JS os revela: sem script, "Editar" não faria
  * nada e "Copiar link" não copiaria. As duas regiões de aviso existem desde o
  * carregamento, vazias, porque leitor de tela só anuncia mudança em região
@@ -106,6 +110,8 @@ $rc_link       = add_query_arg(
 		</table>
 	</header>
 
+	<?php include __DIR__ . '/destaque.php'; ?>
+
 	<div class="rc-incubadora__conteudo">
 		<?php
 		$rc_html = Reconectar_Incubadora_Leitura::conteudo( $rc_pagina );
@@ -119,4 +125,6 @@ $rc_link       = add_query_arg(
 		endif;
 		?>
 	</div>
+
+	<?php include __DIR__ . '/interacao.php'; ?>
 </article>

@@ -113,6 +113,10 @@
 		player.focus();
 	}
 
+	// O texto da página e o vídeo em destaque, que fica fora do texto para que
+	// o editor não o alcance. Nenhum outro `.rc-video` da tela vira player.
+	var SELETOR_BOTAO = '.rc-incubadora__conteudo .rc-video__carregar, .rc-incubadora__destaque .rc-video__carregar';
+
 	/**
 	 * Revela os botões cujo destino passa na conferência.
 	 *
@@ -120,10 +124,10 @@
 	 * devolve ao corpo o HTML de leitura, com facades novas e botões `hidden`.
 	 */
 	function prepararBotoes() {
-		var botoes = document.querySelectorAll( '.rc-incubadora__conteudo .rc-video__carregar[hidden]' );
+		var botoes = document.querySelectorAll( SELETOR_BOTAO );
 
 		Array.prototype.forEach.call( botoes, function ( botao ) {
-			if ( playerAceito( botao.getAttribute( 'data-rc-src' ) || '' ) ) {
+			if ( botao.hidden && playerAceito( botao.getAttribute( 'data-rc-src' ) || '' ) ) {
 				botao.hidden = false;
 			}
 		} );
@@ -132,7 +136,7 @@
 	// Delegado, e não um ouvinte por botão, pelo mesmo motivo de
 	// `prepararBotoes()`: os botões são trocados sem recarregar a página.
 	document.addEventListener( 'click', function ( evento ) {
-		var botao = evento.target.closest && evento.target.closest( '.rc-incubadora__conteudo .rc-video__carregar' );
+		var botao = evento.target.closest && evento.target.closest( SELETOR_BOTAO );
 
 		if ( botao && ! botao.hidden && ! botao.closest( '[contenteditable="true"]' ) ) {
 			carregar( botao );

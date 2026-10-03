@@ -327,6 +327,26 @@ class Reconectar_Incubadora_Conteudo {
 	}
 
 	/**
+	 * A facade de um vídeo guardado fora do conteúdo — o vídeo em destaque.
+	 *
+	 * Revalida antes de montar, como a troca de marcador em
+	 * `html_de_leitura()`: quem chama passa o que leu de uma meta, e a meta
+	 * pode ter chegado ao banco por qualquer caminho.
+	 *
+	 * @param array $video Vídeo como guardado: `provedor`, `id`, `hash`.
+	 * @return string Vazio se o vídeo não passar na validação.
+	 */
+	public static function facade_de_video( $video ) {
+		if ( ! is_array( $video ) || ! isset( $video['provedor'], $video['id'] ) ) {
+			return '';
+		}
+
+		$video = self::video_valido( (string) $video['provedor'], (string) $video['id'], isset( $video['hash'] ) ? (string) $video['hash'] : '' );
+
+		return $video ? self::facade( $video ) : '';
+	}
+
+	/**
 	 * Identifica um vídeo aceito a partir de uma URL de página ou de player.
 	 *
 	 * Aceita as formas que a barra de endereços e o botão "Compartilhar" dos

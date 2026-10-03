@@ -313,9 +313,9 @@ endpoint.
 | Página | Mãe | Status |
 |---|---|---|
 | Comece por aqui | — | publicada |
-| Guia do vendedor | — | publicada |
+| Guia do vendedor | — | publicada, com vídeo em destaque |
 | Cadastrar um produto | Guia do vendedor | publicada |
-| Receber por PIX | Guia do vendedor | publicada, com vídeo |
+| Receber por PIX | Guia do vendedor | publicada, com vídeo no texto |
 | Governança | — | publicada |
 | Como funcionam as enquetes | Governança | publicada |
 | Atas e decisões | Governança | **rascunho** |
@@ -336,6 +336,13 @@ inventa: um ID plausível de YouTube abriria o vídeo de um terceiro qualquer
 dentro da plataforma. Com a chave vazia, a página sai sem vídeo e a carga
 avisa. Na leitura, o vídeo é uma capa estática; o player do
 `youtube-nocookie.com` só carrega no clique.
+
+A mesma URL é o **vídeo em destaque** do "Guia do vendedor" — o player no topo
+da página, acima do texto, que é como a moderação publica vídeo no dia a dia;
+"Receber por PIX" mostra o outro formato, o vídeo dentro do texto, pelo editor.
+O destaque é marcado com `destaque => true` no catálogo e aplicado **uma vez por
+instalação**, inclusive em página que já existia: quem o remover pela interface
+não o vê voltar na próxima carga, e página que já tinha vídeo fica com o dela.
 
 **Lojas, clientes, Administradores e Moderador entram com a mesma senha**,
 `reconectar-demo`, definida

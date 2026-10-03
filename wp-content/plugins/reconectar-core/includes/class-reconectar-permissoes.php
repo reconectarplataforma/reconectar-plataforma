@@ -1413,9 +1413,29 @@ class Reconectar_Permissoes {
 			return $conteudo;
 		}
 
-		$alvo = self::caminho_de_url( get_permalink( $comunidade ) );
+		return self::remover_links_de_widget( $conteudo, array( self::caminho_de_url( get_permalink( $comunidade ) ) ) );
+	}
 
-		if ( '' === $alvo ) {
+	/**
+	 * Remove do HTML de um widget os links cujo caminho esteja na lista.
+	 *
+	 * Separado do filtro acima porque o painel da loja reaproveita a mesma
+	 * remoção com outros destinos — veja `Reconectar_Navegacao_Da_Loja`. A
+	 * comparação continua sendo pelo caminho, pela razão escrita lá.
+	 *
+	 * @param string   $conteudo HTML do widget.
+	 * @param string[] $caminhos Caminhos já reduzidos por `caminho_de_url()`.
+	 * @return string HTML sem os links daqueles caminhos.
+	 */
+	public static function remover_links_de_widget( $conteudo, $caminhos ) {
+		$caminhos = array_filter( (array) $caminhos, 'strlen' );
+
+		if ( ! is_string( $conteudo ) || false === stripos( $conteudo, '<a' ) || ! $caminhos ) {
+			return $conteudo;
+		}
+
+		// Repetida aqui porque o método é público e tem outro chamador.
+		if ( ! class_exists( 'DOMDocument' ) ) {
 			return $conteudo;
 		}
 
@@ -1458,7 +1478,7 @@ class Reconectar_Permissoes {
 		// `getElementsByTagName()`: dá para remover nós durante a iteração sem
 		// embaralhar o que ainda falta percorrer.
 		foreach ( $links as $link ) {
-			if ( self::caminho_de_url( $link->getAttribute( 'href' ) ) !== $alvo ) {
+			if ( ! in_array( self::caminho_de_url( $link->getAttribute( 'href' ) ), $caminhos, true ) ) {
 				continue;
 			}
 
@@ -1514,7 +1534,7 @@ class Reconectar_Permissoes {
 	 * @param string $url URL absoluta ou relativa.
 	 * @return string Caminho sem a barra final, ou string vazia se não houver.
 	 */
-	private static function caminho_de_url( $url ) {
+	public static function caminho_de_url( $url ) {
 		if ( ! is_string( $url ) || '' === $url ) {
 			return '';
 		}
@@ -1570,7 +1590,7 @@ class Reconectar_Permissoes {
 			return;
 		}
 
-		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
+		if ( self::entra_no_painel_wp() ) {
 			return;
 		}
 
@@ -1580,6 +1600,24 @@ class Reconectar_Permissoes {
 
 		wp_safe_redirect( self::destino_fora_do_painel() );
 		exit;
+	}
+
+	/**
+	 * O usuário passa pela porta do `/wp-admin`?
+	 *
+	 * Uma resposta só para as três decisões que dependem dela — o bloqueio, a
+	 * barra administrativa e o link do painel em "Minha conta". Se divergissem, a
+	 * tela ofereceria um link que o bloqueio devolve com um redirecionamento.
+	 *
+	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
+	 * @return bool
+	 */
+	public static function entra_no_painel_wp( $usuario_id = 0 ) {
+		if ( $usuario_id ) {
+			return self::eh_administracao_tecnica( $usuario_id ) || user_can( $usuario_id, self::CAP_ADMIN_WP );
+		}
+
+		return self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP );
 	}
 
 	/**
@@ -1626,7 +1664,7 @@ class Reconectar_Permissoes {
 			return $exibir;
 		}
 
-		if ( self::eh_administracao_tecnica() || current_user_can( self::CAP_ADMIN_WP ) ) {
+		if ( self::entra_no_painel_wp() ) {
 			return $exibir;
 		}
 
@@ -1652,4 +1690,17 @@ class Reconectar_Permissoes {
  */
 function reconectar_pode_participar_da_comunidade() {
 	return Reconectar_Permissoes::pode_participar_da_comunidade();
+}
+
+/**
+ * O usuário atual passa pela porta do `/wp-admin`?
+ *
+ * Fachada para o tema, pela mesma razão de
+ * `reconectar_pode_participar_da_comunidade()`: o tema não conhece a classe nem
+ * a capacidade, e decide o que fazer quando o plugin não está de pé.
+ *
+ * @return bool
+ */
+function reconectar_pode_entrar_no_painel_wp() {
+	return Reconectar_Permissoes::entra_no_painel_wp();
 }

@@ -27,6 +27,10 @@ defined( 'ABSPATH' ) || exit;
  * A consulta passa por `function_exists()` porque o tema não pode depender do
  * plugin: sem ele não há bloqueio nenhum, e esconder o card deixaria a área
  * aberta e invisível ao mesmo tempo.
+ *
+ * A terceira condição é de navegação, não de permissão: para a loja, a
+ * comunidade mora no menu do painel do Dokan e sai das telas de compra —
+ * `Reconectar_Navegacao_Da_Loja`, que também a tira do menu e do rodapé.
  */
 function reconectar_home_comunidade_transparencia() {
 	$comunidade    = get_page_by_path( 'comunidade' );
@@ -35,6 +39,12 @@ function reconectar_home_comunidade_transparencia() {
 	if ( $comunidade
 		&& function_exists( 'reconectar_pode_participar_da_comunidade' )
 		&& ! reconectar_pode_participar_da_comunidade() ) {
+		$comunidade = null;
+	}
+
+	if ( $comunidade
+		&& function_exists( 'reconectar_comunidade_mora_no_painel_da_loja' )
+		&& reconectar_comunidade_mora_no_painel_da_loja() ) {
 		$comunidade = null;
 	}
 
