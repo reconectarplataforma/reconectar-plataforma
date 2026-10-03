@@ -5077,3 +5077,220 @@
     display: none;
   }
 }
+
+/* ==========================================================================
+   Comunidade (diretório de atividade do BuddyPress)
+   ========================================================================== */
+
+/*
+ * O nouveau dimensiona a atividade em proporção da coluna, e não do conteúdo:
+ * o avatar ocupa 15% da largura e cresce até os 150px do arquivo pedido — medido
+ * a 1920px, 153px de silhueta e o texto começando 246px à direita da borda do
+ * card. O botão de publicar tem `width: 8em` fixo, 112px, onde "Publicar
+ * atualização" em Poppins não cabe: sai cortado em "Publicar atualiz".
+ *
+ * Na moldura do painel da loja soma-se o Dokan:
+ * `.dokan-dashboard .dokan-dashboard-content ul li` zera margem e padding de
+ * todo item de lista, e o avatar encosta na borda do card. O `#buddypress` em
+ * cada seletor é o que vence as duas folhas sem `!important` — elas param em
+ * (0,3,2), e um id passa à frente de qualquer combinação de classes.
+ */
+#buddypress .activity-list.bp-list {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+#buddypress .activity-list .activity-item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: var(--rc-espaco);
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+}
+
+/* O clearfix do item viraria a primeira célula da grade, e o avatar desceria
+   para a coluna do texto. */
+#buddypress .activity-list .activity-item::before,
+#buddypress .activity-list .activity-item::after {
+  content: none;
+}
+
+#buddypress .activity-list .activity-item div.item-avatar {
+  float: none;
+  width: auto;
+  margin: 0;
+}
+
+#buddypress .activity-list .activity-item div.item-avatar img,
+#buddypress #whats-new-avatar img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  max-width: none;
+  border-radius: 50%;
+}
+
+#buddypress .activity-list .activity-item .activity-content {
+  margin: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-header {
+  width: auto;
+  margin: 0;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+#buddypress .activity-list .activity-item .activity-header p {
+  margin: 0;
+}
+
+/* O bbPress põe a resposta do fórum em citação, com a barra à esquerda; o
+   nouveau soma a ela um fundo cinza e 1em de recuo nos quatro lados. A barra
+   basta para dizer que o texto é citado. */
+#buddypress .activity-list .activity-item .activity-content .activity-inner {
+  margin: 8px 0 0;
+  padding: 0 0 0 12px;
+  background: transparent;
+  font-size: var(--rc-fonte-base);
+}
+
+#buddypress .activity-list .activity-item .activity-inner p:last-child {
+  margin-bottom: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-meta {
+  margin: 8px 0 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* --- Publicar ------------------------------------------------------------ */
+
+#buddypress #whats-new-form {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+#buddypress #whats-new-avatar,
+#buddypress #whats-new-content,
+#buddypress #whats-new-options {
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
+/* As opções e os botões nascem depois do clique no campo, por script, como
+   irmãos do avatar: sem isto cairiam na coluna de 48px. */
+#buddypress #whats-new-form > :not(#whats-new-avatar) {
+  grid-column: 2;
+}
+
+/* `margin-left: 0` desfaz os 55px que o nouveau dá ao `.in-profile` para
+   desviar do avatar flutuante: na grade o avatar já tem coluna própria, e o
+   recuo saía dobrado. */
+#buddypress .activity-update-form #whats-new-submit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  float: none;
+  margin-left: 0;
+}
+
+#buddypress .activity-update-form #whats-new-submit input {
+  width: auto;
+  margin: 0;
+  padding: 0.5em 1.25em;
+  font-size: var(--rc-fonte-sm);
+}
+
+/* --- Busca e filtro ------------------------------------------------------ */
+
+/*
+ * Os dois contêineres viram flex, e os dois trazem `clearfix` do nouveau: o
+ * `::before`/`::after` dele passaria a ocupar posição na linha — a mesma
+ * armadilha do clearfix que vira grid item. `content: none` apaga a caixa.
+ */
+#buddypress .subnav-filters,
+#buddypress .subnav-filters .subnav-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+#buddypress .subnav-filters {
+  justify-content: space-between;
+  margin: var(--rc-espaco) 0;
+}
+
+/* `min-width: 0` corta a cadeia de largura mínima: sem ele, a do campo de
+   busca subia até aqui e a linha passava da tela — medido, 386px numa coluna
+   de 327 a 375px. */
+#buddypress .subnav-filters .subnav-search {
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 520px;
+}
+
+#buddypress .subnav-filters::before,
+#buddypress .subnav-filters::after,
+#buddypress .subnav-filters .subnav-search::before,
+#buddypress .subnav-filters .subnav-search::after,
+#buddypress .subnav-filters .component-filters::before,
+#buddypress .subnav-filters .component-filters::after {
+  content: none;
+}
+
+#buddypress .subnav-filters .feed,
+#buddypress .subnav-filters .dir-search,
+#buddypress .subnav-filters .component-filters,
+#buddypress .subnav-filters .component-filters .filter {
+  float: none;
+  margin: 0;
+}
+
+#buddypress .subnav-filters .dir-search {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Campo e lupa numa caixa só: o nouveau desenha a borda em cada um, e a lupa
+   ficava separada do campo por um vão. */
+#buddypress .subnav-filters .bp-dir-search-form {
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+  overflow: hidden;
+}
+
+#buddypress .subnav-filters .bp-dir-search-form input[type="search"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.5em 0.75em;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--rc-fonte-base);
+}
+
+#buddypress .subnav-filters .bp-dir-search-form button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 0.75em;
+  border: 0;
+  background: transparent;
+  color: var(--rc-texto);
+}

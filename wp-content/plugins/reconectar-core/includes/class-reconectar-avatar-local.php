@@ -56,9 +56,29 @@ class Reconectar_Avatar_Local {
 	 * Vale para os dois caminhos de saída do núcleo: `get_avatar()`, que monta
 	 * o `<img>`, e `get_avatar_url()`, usada por plugins que só querem o
 	 * endereço. Ambas passam por `get_avatar_data()`.
+	 *
+	 * O BuddyPress tem um terceiro caminho, que não passa por ali:
+	 * `bp_core_fetch_avatar()` monta a URL do Gravatar sozinho, e o diretório
+	 * de atividade saía com `www.gravatar.com/avatar/<hash>` em cada item —
+	 * medido, pela página da Comunidade. `bp_core_fetch_avatar_no_grav` desliga
+	 * esse ramo, e o padrão que ele usa no lugar passa por `bp_core_avatar_default`,
+	 * onde entra o mesmo arquivo local. A foto que alguém enviou no perfil não é
+	 * tocada: os dois filtros só valem para quem não tem avatar próprio.
 	 */
 	public static function init() {
 		add_filter( 'get_avatar_data', array( __CLASS__, 'substituir_gravatar' ) );
+		add_filter( 'bp_core_fetch_avatar_no_grav', '__return_true' );
+		add_filter( 'bp_core_avatar_default', array( __CLASS__, 'url' ) );
+		add_filter( 'bp_core_avatar_default_thumb', array( __CLASS__, 'url' ) );
+	}
+
+	/**
+	 * Endereço do avatar padrão servido pela instalação.
+	 *
+	 * @return string URL do arquivo local.
+	 */
+	public static function url() {
+		return RECONECTAR_CORE_URL . self::ARQUIVO;
 	}
 
 	/**
@@ -86,7 +106,7 @@ class Reconectar_Avatar_Local {
 			return $args;
 		}
 
-		$args['url'] = RECONECTAR_CORE_URL . self::ARQUIVO;
+		$args['url'] = self::url();
 
 		return $args;
 	}
