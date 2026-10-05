@@ -277,9 +277,9 @@ nem moldura vazia. É a mesma regra de honestidade dos pedidos: campo vazio é
 melhor que placeholder.
 
 **4 categorias de fórum**, **6 perguntas**, **6 respostas** e **13 tags**. As
-categorias são post types `forum` do bbPress e ficam ao lado do "Fórum Geral"
-que o provisionamento cria — este último não é da demonstração e não sai na
-remoção.
+categorias são post types `forum` do bbPress e ficam ao lado do "Fórum Geral" e
+do "Cooperação e parcerias", que o provisionamento cria — esses dois não são da
+demonstração e não saem na remoção.
 
 | Categoria | Perguntas |
 |---|---|

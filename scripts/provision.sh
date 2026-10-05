@@ -654,6 +654,46 @@ else
   echo "Já existe pelo menos um fórum."
 fi
 
+echo "== Fórum de cooperação (bbPress) =="
+# O módulo Cooperação do ERS passa pelo fórum: RF23 (cooperação e parcerias),
+# RF25 (indicação de profissionais e iniciativas) e RF26 (eventos comunitários)
+# pedem discussão "por meio do fórum". Os fóruns temáticos da carga de
+# demonstração somem no `seed-demo.sh remover`, e o "Fórum Geral" acima só nasce
+# numa instalação sem fórum nenhum — então este precisa de bloco próprio, ou não
+# atravessa o deploy.
+#
+# A guarda é a meta `_reconectar_forum_chave`, nunca o título nem o slug: o
+# administrador renomeia pelo painel, e o bloco recriaria o fórum ao lado do
+# original. A lixeira entra na busca de propósito: fórum que o administrador
+# mandou para lá foi decisão dele, e o provisionamento não o desfaz. Os status
+# `hidden` e `closed` são os de fórum do bbPress, que `any` não cobre.
+#
+# `bbp_insert_forum()`, e não `wp post create`: é ela que grava o tipo, o status
+# e os contadores do bbPress.
+if ! wp post list --post_type=forum --post_status=publish,private,hidden,closed,draft,pending,trash \
+    --meta_key=_reconectar_forum_chave --meta_value=cooperacao --field=ID | grep -q .; then
+  wp eval '
+    $id = bbp_insert_forum(
+      array(
+        "post_title"   => "Cooperação e parcerias",
+        "post_content" => "Parcerias entre lojas e iniciativas, troca de serviços, indicação de profissionais e divulgação de eventos da comunidade.",
+        "post_parent"  => 0,
+      ),
+      array(
+        "forum_type" => "forum",
+        "status"     => "open",
+      )
+    );
+    if ( ! $id ) {
+      WP_CLI::error( "Falha ao criar o fórum de cooperação." );
+    }
+    update_post_meta( $id, "_reconectar_forum_chave", "cooperacao" );
+    WP_CLI::success( "Fórum de cooperação criado: ID $id." );
+  '
+else
+  echo "Fórum de cooperação já existe."
+fi
+
 echo "== Título da listagem de lojas =="
 # A página é criada pelo Dokan com o título "Store List", em inglês, e é ela que
 # o tema usa como vitrine de lojas. O renome só acontece enquanto o título ainda
