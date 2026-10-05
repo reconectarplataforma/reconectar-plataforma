@@ -322,6 +322,26 @@ function reconectar_reposicionar_paginacao_do_catalogo() {
 add_action( 'after_setup_theme', 'reconectar_reposicionar_paginacao_do_catalogo', 20 );
 
 /**
+ * Tira da página de produto a navegação para o produto anterior e o seguinte.
+ *
+ * O Storefront pendura `storefront_single_product_pagination` em
+ * `woocommerce_after_single_product_summary` na prioridade 30 — medido pelo
+ * `$wp_filter`. A ordem que ela segue é a de publicação no catálogo inteiro,
+ * então o "próximo" de uma almofada pode ser o produto de outra loja, de outra
+ * categoria: um atalho que não leva a lugar relacionado com o que se olha. Os
+ * relacionados, logo abaixo, já fazem esse papel com critério.
+ *
+ * Em `after_setup_theme` prioridade 20 pela mesma razão de
+ * `reconectar_reposicionar_paginacao_do_catalogo()`: o filho carrega antes do pai.
+ *
+ * @return void
+ */
+function reconectar_remover_paginacao_de_produto() {
+	remove_action( 'woocommerce_after_single_product_summary', 'storefront_single_product_pagination', 30 );
+}
+add_action( 'after_setup_theme', 'reconectar_remover_paginacao_de_produto', 20 );
+
+/**
  * Chama a loja de "Loja" na linha do carrinho, onde o Dokan escreve "Vendedor".
  *
  * `dokan_product_seller_info()` está pendurado em `woocommerce_get_item_data` na
