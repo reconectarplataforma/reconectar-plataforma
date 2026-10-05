@@ -4003,3 +4003,145 @@ Todas registradas no `CLAUDE.md`; aqui, só a lista:
 - **No editor, o player é vivo** e contata o provedor ao abrir a página em
   edição. Na leitura, não.
 - **Não há permissão por página.** Quem edita a Incubadora edita toda ela.
+
+---
+
+## 2026-10-05 — Serviços no mercado: solicitação sem pagamento, resposta da loja pela plataforma
+
+**O que o usuário pediu**
+
+Que o e-commerce aceite produtos da categoria **Serviço**, para o usuário
+escolher um prestador pela plataforma. O pagamento sai zerado. A observação do
+pedido vira a solicitação, e o prestador é avisado e responde pela plataforma
+com o valor ou com "farei orçamento". Com o fórum de cooperação como canal de
+divulgação, isso atende ao RF24.
+
+O usuário decidiu três pontos no plano:
+
+- Pagamento e execução são **combinados fora** da plataforma, e o pedido
+  termina em "Respondido".
+- O carrinho **pode misturar** serviço e produto.
+- O preço aparece como **"A combinar"**.
+
+**O desenho**
+
+- **Categoria Serviços**, criada pelo `provision.sh`. É reconhecida pela meta
+  de termo `_reconectar_categoria_chave = servicos`, e não pelo slug, porque o
+  administrador pode renomeá-la. As subcategorias contam como serviço.
+- **`Reconectar_Servicos`**, uma classe nova do plugin:
+  - Grava todo serviço com preço `0`, virtual e vendido individualmente, no
+    `woocommerce_before_product_object_save`, que cobre o Dokan, o `/wp-admin` e
+    o WP-CLI. A loja não preenche nada novo: basta escolher a categoria.
+    Preço vazio deixaria o produto não comprável.
+  - Na vitrine, no carrinho, no recibo e nos e-mails o preço aparece como
+    "A combinar", e o botão diz "Solicitar serviço".
+  - Com serviço no carrinho, a observação do checkout passa a ser obrigatória,
+    com rótulo de solicitação.
+- **Dois status**:
+  - `wc-solicitado` ("Aguardando resposta");
+  - `wc-respondido` ("Respondido").
+  - Nenhum dos dois conta como pago, porque uma venda de R$ 0 combinada fora
+    não é receita da plataforma.
+  - `encaminhar_solicitacao()` leva o pedido de serviço a `solicitado` em
+    `woocommerce_order_status_changed` prioridade 20. Isso acontece depois de o
+    Dokan propagar o status aos sub-pedidos (10) e antes de ele concluir
+    sozinho o sub-pedido pago sem processamento (99).
+- **Pagamento direto**: a loja que tem só serviço no carrinho não passa pela
+  validação de meio, não recebe seletor nem meio gravado e não ganha instrução
+  de PIX. O pedido de produtos segue como antes. Uma loja **sem** PIX nem conta
+  pode receber solicitação.
+- **Aviso à loja**:
+  - um bloco no e-mail de pedido novo do Dokan, com a solicitação e o link;
+  - aviso no alto da lista de pedidos;
+  - solicitações sem resposta no topo da lista, por `posts_clauses`.
+- **Resposta**: formulário no detalhe do pedido do painel da loja, por
+  `admin-post.php`.
+  - O formulário pede valor ou orçamento, mais a mensagem.
+  - O nonce é por pedido e só a loja dona responde.
+  - A resposta grava meta no sub-pedido e uma nota ao cliente, que dispara o
+    e-mail `customer_note` com a loja como Reply-To.
+  - O valor informado **não altera o total**: é o registro da proposta.
+  - A loja pode responder de novo, e o histórico fica nas notas.
+- **Visão do cliente**: o bloco "Resposta do prestador" no recibo e em "Minha
+  conta", com a loja, o valor ou orçamento, a mensagem e a data.
+- **Carga**: "Bordado personalizado sob encomenda" no Ateliê Raízes, a loja só
+  com PIX, que serve para provar que a solicitação passa sem pedir meio de
+  pagamento.
+
+**Defeitos de fora achados no caminho**
+
+O painel da loja mostrava um **selo de status vazio** para `conferencia`,
+`preparacao` e `enviado` desde que esses status nasceram. O Dokan resolve
+rótulo e cor num `switch` fechado. Os filtros novos de
+`Reconectar_Status_Pedido` corrigem também esses três.
+
+**Armadilhas medidas no caminho**
+
+Registradas no `CLAUDE.md`:
+
+- Em `product_cat`, `get_terms()` com `meta_key` devolve vazio, porque o
+  WooCommerce troca a chave pela meta `order`.
+- `get_saved_products_category()` do Dokan é um leitor que grava. Em seleção de
+  categoria única, ele reduziu `[artesanato, servicos]` a `[artesanato]`, e o
+  pedido do serviço nasceu como compra comum.
+- O `switch` fechado de status do Dokan, descrito acima.
+- O e-mail de pedido novo do Dokan só dispara `woocommerce_email_after_order_table`.
+  Um bloco pendurado em `woocommerce_email_order_details` sumiria justamente do
+  e-mail da loja.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| `verificar-acessos.sh` | **357 casos**, todos passando (eram 345) |
+| Resposta por HTTP | visitante 400; cliente, outra loja e moderador 403 com nonce forjado, em POST e em GET |
+| Trava de propriedade por WP-CLI | só a loja dona responde. Recusados: outra loja, cliente, moderador, Administrador de empresa e visitante |
+| Carrinho só de serviço | sem seletor de meio, observação obrigatória, pedido em "Aguardando resposta", recibo sem PIX nem "R$ 0,00 a pagar" |
+| Carrinho misto | sub-pedido do serviço em "Aguardando resposta" e o de produto no fluxo de comprovante |
+| Resposta da loja | status "Respondido", nota ao cliente, bloco no recibo |
+| E-mails | capturados por `pre_wp_mail`, porque o container não envia |
+| Regressão | pedido só de produto com seletor, instrução PIX e comprovante como antes |
+| Pedidos de teste | removidos, junto das linhas de `wp_dokan_orders` e `wp_dokan_vendor_balance` |
+
+**Pendências**
+
+- Na interface nova do painel (React), a lista de pedidos não recebe o aviso
+  nem o botão "Responder". A loja chega pela ordenação e pelo rótulo
+  "Aguardando resposta", e responde no detalhe do pedido.
+- O envio real de e-mail não foi medido neste ambiente.
+
+---
+
+## 2026-10-05 — Ícones SVG nas categorias
+
+**O que foi feito**
+- 22 ícones autorais em `themes/reconectar/assets/icones/categorias/`, cobrindo
+  as seis categorias-mãe, as quinze subcategorias da carga e a Serviços. São
+  traços em `currentColor`, com `aria-hidden`: o nome da categoria logo abaixo
+  é o texto acessível.
+- `reconectar_icone_de_categoria()` lê a meta de termo
+  `_reconectar_categoria_icone`. Subcategoria sem ícone herda o da mãe.
+- O card de categoria mostra o primeiro que existir: ícone, miniatura, inicial.
+- `scripts/icones-de-categoria.php` grava a meta. Quem o chama é o
+  `provision.sh` e, ao terminar, a carga de demonstração.
+
+**Decisões técnicas**
+- **Arquivo do tema, não anexo.** Anexo mora em `uploads/`, que não atravessa
+  o deploy (a armadilha do `custom_logo`). Além disso, SVG na biblioteca de
+  mídia é vetor de XSS. A meta guarda só o nome, validado por
+  `^[a-z0-9-]+$` e pela existência do arquivo.
+- **O ícone vence a miniatura.** As miniaturas da demonstração são PNG com o
+  nome escrito, que repetiam o texto do card logo abaixo.
+- **O script só acrescenta.** Termo com ícone não é tocado, e nenhuma
+  categoria é criada. O slug identifica o termo só na primeira associação;
+  Serviços é encontrada pela `_reconectar_categoria_chave`.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| Script, 1ª execução | 22 termos com "+" |
+| Script, 2ª execução | 22 termos com "já tem ícone" |
+| Home | 6 cards, 6 com ícone |
+| `/categorias/` | 16 cards, 16 com ícone, conferidos em captura de tela a 1300px e a 375px |
+| Contraste do traço `#1c6f68` | 5,32:1 sobre `#e3f6f4`, 4,81:1 sobre `#cbeeea` (hover) |

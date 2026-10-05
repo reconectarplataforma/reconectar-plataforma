@@ -1219,6 +1219,25 @@
   font-weight: 600;
 }
 
+/* Ícone da categoria (`assets/icones/categorias/`). O traço é `currentColor`, e
+   o tom escuro da primária sobre o fundo claro dela mantém o desenho legível —
+   medido, 5,3:1, e 4,8:1 no fundo do hover — mesmo sendo decorativo
+   (`aria-hidden`): o nome logo abaixo é que carrega o significado. */
+.rc-card-categoria__figura--icone {
+  background: #e3f6f4;
+  color: #1c6f68;
+}
+
+.rc-card-categoria__figura--icone svg {
+  height: 40px;
+  width: 40px;
+}
+
+.rc-card-categoria:hover .rc-card-categoria__figura--icone,
+.rc-card-categoria:focus-visible .rc-card-categoria__figura--icone {
+  background: #cbeeea;
+}
+
 .rc-card-categoria__nome {
   font-size: var(--rc-fonte-sm);
   line-height: var(--rc-entrelinha-compacta);
@@ -4836,6 +4855,14 @@
   margin: 0 0.75rem 0.75rem;
 }
 
+/* Mesmo tom informativo do "sem meio": o prestador não recebe agora por
+   decisão do fluxo de serviço, e nada aqui é erro de quem compra. */
+.rc-checkout .rc-checkout__servico {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  margin: 0 0.75rem 0.75rem;
+}
+
 /* --- Resumo da compra --------------------------------------------------- */
 
 .rc-checkout .rc-checkout__totais {
@@ -5293,4 +5320,16 @@
   border: 0;
   background: transparent;
   color: var(--rc-texto);
+}
+
+/* --- Serviço: preço "A combinar" ---------------------------------------- */
+
+/* O serviço sai a R$ 0 no banco e "A combinar" na tela (`Reconectar_Servicos`).
+   Peso normal e cor de texto, não a do preço: é ausência de valor, e pintá-lo
+   como preço faria "A combinar" competir com os números da vitrine. */
+.rc-preco-a-combinar {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  font-style: italic;
+  font-weight: 400;
 }

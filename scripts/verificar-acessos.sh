@@ -694,6 +694,56 @@ else
   echo "  --    sessões de cliente, loja ou moderador ausentes; escrita não verificada"
 fi
 
+# A resposta a uma solicitação de serviço grava no pedido e manda e-mail ao
+# cliente, então a rota precisa recusar quem não é a loja dona. Por HTTP só a
+# primeira camada é alcançável: o nonce leva o id do pedido, e o servidor só o
+# emite no detalhe que a própria loja abre — com nonce forjado, todo perfil
+# para nele. A trava de propriedade, que é a que vale se o nonce vazar, vai por
+# WP-CLI no fim do script.
+#
+# O visitante recebe 400 e não 403: não há `admin_post_nopriv_` registrado, e o
+# `admin-post.php` morre antes de chegar ao handler.
+conferir_resposta_servico() {
+  local jar="$1" metodo="$2" esperado="$3" descricao="$4"
+  local argumentos=( -s -o /dev/null -w '%{http_code}' )
+  [ -n "$jar" ] && argumentos+=( -b "$jar" )
+
+  local codigo
+  if [ "$metodo" = "GET" ]; then
+    codigo="$(curl "${argumentos[@]}" "$BASE/wp-admin/admin-post.php?action=reconectar_responder_servico&pedido=1")"
+  else
+    codigo="$(curl "${argumentos[@]}" \
+      --data-urlencode "action=reconectar_responder_servico" \
+      --data-urlencode "pedido=1" \
+      --data-urlencode "_wpnonce=invalido" \
+      --data-urlencode "tipo=valor" \
+      --data-urlencode "valor=1" \
+      --data-urlencode "mensagem=Forjado" \
+      "$BASE/wp-admin/admin-post.php")"
+  fi
+
+  total=$((total + 1))
+  if [ "$codigo" = "$esperado" ]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "servico $metodo" "$descricao"
+    return 0
+  fi
+
+  printf '  FALHA %-24s %s: esperado %s, veio %s\n' "servico $metodo" "$descricao" "$esperado" "$codigo"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+echo "Resposta a solicitação de serviço por HTTP"
+conferir_resposta_servico "" POST 400 "visitante não alcança o handler"
+if [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir_resposta_servico "$JAR_CLIENTE"   POST 403 "cliente sem nonce barrado"
+  conferir_resposta_servico "$JAR_VENDEDOR"  POST 403 "loja sem nonce barrada"
+  conferir_resposta_servico "$JAR_MODERADOR" POST 403 "moderador sem nonce barrado"
+  conferir_resposta_servico "$JAR_VENDEDOR"  GET  403 "link solto não responde em nome da loja"
+else
+  echo "  --    sessões de cliente, loja ou moderador ausentes; resposta de serviço não verificada"
+fi
+
 # O editor é uma camada por cima da leitura, e a camada inteira — script, nonce,
 # rota — só pode chegar a quem escreve. O nonce no HTML do cliente não abriria
 # a escrita sozinho, porque a capacidade é conferida antes dele; mas é a
@@ -1235,6 +1285,80 @@ FIM
   fi
 else
   echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); escrita no fórum não verificada"
+fi
+
+# A camada de baixo da resposta a serviço: quem passa em `loja_pode()`. Por
+# `ReflectionMethod` porque o método é privado e porque por HTTP o nonce por
+# pedido recusa antes dele (bloco "Resposta a solicitação de serviço por HTTP").
+#
+# O pedido é provisório e sai no `finally`: a carga de demonstração não cria
+# pedido de serviço, e usar um pedido existente amarraria o teste a um id da
+# máquina de desenvolvimento. Sem linha em `wp_dokan_orders` — o pedido não
+# passou pelo checkout —, `dokan_get_seller_id_by_order()` deduz a loja pelos
+# autores dos itens, que é o mesmo dono.
+#
+# `wp_set_current_user()` basta aqui, ao contrário do bloco do fórum: a trava
+# lê `manage_woocommerce` e o id do usuário, nada que o bbPress aplique no
+# `init`. A empresa entra entre os recusados de propósito — quem responde pelo
+# serviço é a loja que o oferece, como no produto.
+echo "Resposta a solicitação de serviço por WP-CLI"
+if banco_alcancavel; then
+  saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
+    $dono  = get_user_by( "login", "demo-atelie-raizes" );
+    $outra = get_user_by( "login", "demo-sabor-da-terra" );
+    $cli   = get_user_by( "login", "demo-cliente-marina" );
+    $mod   = get_user_by( "login", "demo-moderador" );
+    $emp   = get_user_by( "login", "demo-admin-nosso-chao" );
+    $cat   = class_exists( "Reconectar_Servicos" ) ? Reconectar_Servicos::categoria_id() : 0;
+    $ids   = ( $dono && $cat ) ? get_posts( array( "post_type" => "product", "author" => $dono->ID, "numberposts" => 1, "fields" => "ids", "tax_query" => array( array( "taxonomy" => "product_cat", "terms" => $cat ) ) ) ) : array();
+    if ( ! $dono || ! $outra || ! $cli || ! $mod || ! $emp || ! $ids ) { echo "::sem-dados\n"; exit; }
+
+    $pedido = wc_create_order( array( "customer_id" => $cli->ID ) );
+    $pedido->add_product( wc_get_product( $ids[0] ), 1 );
+    $pedido->save();
+    try {
+      $pode = new ReflectionMethod( "Reconectar_Servicos", "loja_pode" );
+      $pode->setAccessible( true );
+      $casos = array(
+        array( $dono->ID, true, "loja-dona-responde" ),
+        array( $outra->ID, false, "outra-loja-nao-responde" ),
+        array( $cli->ID, false, "cliente-nao-responde" ),
+        array( $mod->ID, false, "moderador-nao-responde" ),
+        array( $emp->ID, false, "empresa-nao-responde" ),
+        array( 0, false, "visitante-nao-responde" ),
+      );
+      foreach ( $casos as $caso ) {
+        wp_set_current_user( $caso[0] );
+        printf( "::%s %s\n", $caso[1] === $pode->invoke( null, $pedido ) ? "ok" : "FALHA", $caso[2] );
+      }
+      printf( "::%s pedido-reconhecido-como-servico\n", Reconectar_Servicos::pedido_tem_servico( $pedido ) ? "ok" : "FALHA" );
+    } finally {
+      $pedido->delete( true );
+    }' 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
+
+  if [ "$saida" = "sem-dados" ]; then
+    echo "  --    carga de demonstração ausente; resposta de serviço não verificada"
+  elif [ -z "$saida" ]; then
+    total=$((total + 1))
+    echo "  FALHA não foi possível consultar a trava da resposta de serviço"
+    falhas=$((falhas + 1))
+  else
+    # Heredoc pela mesma razão dos blocos anteriores: um `while` depois de um
+    # pipe roda em subshell e os incrementos de `falhas` morreriam com ela.
+    while IFS=" " read -r estado rotulo; do
+      total=$((total + 1))
+      if [ "$estado" = "ok" ]; then
+        [ "$verboso" = "sim" ] && echo "  ok    $rotulo"
+      else
+        echo "  FALHA $rotulo"
+        falhas=$((falhas + 1))
+      fi
+    done <<FIM
+$saida
+FIM
+  fi
+else
+  echo "  --    banco fora de alcance (sem Docker Compose, ou BASE fora de localhost); resposta de serviço não verificada"
 fi
 
 # O bloco HTTP mede as recusas; o caminho feliz só se exercita por WP-CLI,

@@ -286,16 +286,75 @@ function reconectar_nota_em_estrela( $nota ) {
 }
 
 /**
+ * Markup SVG do ícone de uma categoria, ou string vazia.
+ *
+ * O ícone é escolhido pela meta de termo `_reconectar_categoria_icone`, que o
+ * `scripts/icones-de-categoria.php` grava, e o desenho vem de
+ * `assets/icones/categorias/`, versionado no tema. Não é anexo da biblioteca de
+ * mídia por duas razões já pagas neste repositório: anexo mora em `uploads/`, que
+ * não atravessa o deploy, e SVG enviado por usuário é vetor de XSS. Aqui a meta
+ * guarda só um **nome**, conferido contra os arquivos que existem — nunca um
+ * caminho —, e por isso o arquivo pode ser impresso inline: ele é do tema.
+ *
+ * Inline, e não `<img>`, para o traço herdar `currentColor` do card.
+ *
+ * Subcategoria sem ícone próprio herda o da mãe: uma categoria criada à mão no
+ * painel, depois do provisionamento, ganha um desenho coerente com o grupo em
+ * vez de cair na inicial.
+ *
+ * @param WP_Term $categoria Termo de `product_cat`.
+ * @return string
+ */
+function reconectar_icone_de_categoria( $categoria ) {
+	static $cache = array();
+
+	$termo = $categoria;
+
+	// Dois degraus bastam: a árvore de categorias do projeto tem mãe e filha.
+	for ( $degrau = 0; $degrau < 2 && $termo instanceof WP_Term; $degrau++ ) {
+		$nome = (string) get_term_meta( $termo->term_id, '_reconectar_categoria_icone', true );
+
+		if ( '' !== $nome && preg_match( '/^[a-z0-9-]+$/', $nome ) ) {
+			if ( ! array_key_exists( $nome, $cache ) ) {
+				$arquivo        = get_stylesheet_directory() . '/assets/icones/categorias/' . $nome . '.svg';
+				$cache[ $nome ] = is_readable( $arquivo ) ? trim( (string) file_get_contents( $arquivo ) ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- arquivo local do tema.
+			}
+
+			if ( '' !== $cache[ $nome ] ) {
+				return $cache[ $nome ];
+			}
+		}
+
+		$termo = $termo->parent ? get_term( $termo->parent, 'product_cat' ) : null;
+	}
+
+	return '';
+}
+
+/**
  * Card de categoria do carrossel.
+ *
+ * A figura segue a ordem ícone, miniatura, inicial. O ícone vem antes da
+ * miniatura porque é a escolha deliberada do projeto para a categoria; a
+ * miniatura das instalações de demonstração é um PNG gerado com o nome escrito,
+ * que repetiria o texto logo abaixo do círculo.
  *
  * @param WP_Term $categoria Termo de `product_cat`.
  */
 function reconectar_card_categoria( $categoria ) {
+	$icone     = reconectar_icone_de_categoria( $categoria );
 	$imagem_id = (int) get_term_meta( $categoria->term_id, 'thumbnail_id', true );
 	?>
 	<a class="rc-card-categoria" href="<?php echo esc_url( get_term_link( $categoria ) ); ?>">
-		<span class="rc-card-categoria__figura">
-			<?php if ( $imagem_id ) : ?>
+		<span class="rc-card-categoria__figura<?php echo $icone ? ' rc-card-categoria__figura--icone' : ''; ?>">
+			<?php if ( $icone ) : ?>
+				<?php
+				// Sem escape de propósito: o conteúdo é um arquivo do tema,
+				// escolhido por nome validado contra o diretório, e `wp_kses`
+				// sem uma allowlist de SVG apagaria o desenho inteiro.
+				echo $icone; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				?>
+			<?php elseif ( $imagem_id ) : ?>
 				<?php
 				echo wp_get_attachment_image(
 					$imagem_id,

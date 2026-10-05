@@ -325,6 +325,18 @@ function reconectar_checkout_meios_da_loja( $loja_id ) {
 		return;
 	}
 
+	// Prestador com só serviço no carrinho não recebe nada agora: o valor vem
+	// na resposta dele, e é combinado fora da plataforma. Sem esta linha a loja
+	// sem PIX cairia no alerta de "remova os produtos", que aqui seria falso.
+	if ( class_exists( 'Reconectar_Servicos' ) && in_array( (int) $loja_id, Reconectar_Servicos::lojas_so_de_servico_no_carrinho(), true ) ) {
+		printf(
+			'<p class="rc-checkout__servico">%s</p>',
+			esc_html__( 'Serviço: nada a pagar agora. O prestador recebe sua descrição e responde pela plataforma com o valor ou com um orçamento.', 'reconectar' )
+		);
+
+		return;
+	}
+
 	$meios = Reconectar_Pagamento_Direto::meios_da_loja( $loja_id );
 
 	if ( ! $meios ) {

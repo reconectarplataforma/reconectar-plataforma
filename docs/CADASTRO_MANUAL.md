@@ -180,12 +180,36 @@ pronto assim que a conta é criada.
 | Categoria-mãe | **nenhuma**, para as categorias principais — ver 2.3 |
 | Descrição | aparece no topo da listagem da categoria |
 | Tipo de exibição | padrão |
-| Miniatura | a imagem do card — ver 2.2 |
+| Miniatura | a imagem do card, quando a categoria não tem ícone — ver 2.2 |
 
-## 2.2 A miniatura, e o que acontece sem ela
+## 2.2 Ícone, miniatura, e o que acontece sem os dois
 
-O card de categoria da home usa a miniatura do termo. Quando ela não existe, o
-card desenha um círculo com a **inicial** do nome — não fica quebrado, mas a
+O card de categoria mostra, nesta ordem, o primeiro que existir:
+
+1. **O ícone SVG** da categoria. Os desenhos ficam versionados no tema, em
+   `themes/reconectar/assets/icones/categorias/`, e o termo guarda só o nome
+   do arquivo na meta `_reconectar_categoria_icone`. O `provision.sh` associa
+   pelo slug as categorias do conjunto de partida (2.4) e a Serviços, sem
+   sobrescrever termo que já tenha ícone. Subcategoria sem ícone herda o da
+   mãe.
+2. **A miniatura** do termo.
+3. Um círculo com a **inicial** do nome.
+
+O ícone vence a miniatura de propósito: ele atravessa o deploy junto com o
+tema, e a miniatura não (abaixo). Para que uma categoria use a miniatura, tire
+o ícone dela:
+
+```bash
+wp term meta delete <id> _reconectar_categoria_icone
+```
+
+Para trocar o ícone, use `wp term meta update <id> _reconectar_categoria_icone <nome>`.
+O nome tem de ser o de um arquivo existente naquele diretório, sem `.svg`. Um
+nome sem arquivo é ignorado, e o card cai na miniatura. Categoria nova só ganha
+ícone com um desenho novo no diretório e uma entrada no mapa de
+`scripts/icones-de-categoria.php`, ou pela meta gravada à mão.
+
+Sem ícone e sem miniatura, o card desenha um círculo com a **inicial** do nome — não fica quebrado, mas a
 faixa inteira de categorias sem imagem vira uma fileira de letras.
 
 A imagem é enviada pela própria tela da categoria, no campo Miniatura. É um

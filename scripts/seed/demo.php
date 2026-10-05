@@ -1341,6 +1341,10 @@ function reconectar_demo_criar_produto( $produto, $loja_id, $categorias, $loja )
 
 			if ( $atuais !== $desejadas ) {
 				wp_set_object_terms( (int) $existente->ID, $categorias, 'product_cat' );
+				// O Dokan guarda à parte a categoria escolhida no formulário, e é
+				// ela que o formulário mostra e regrava ao salvar. Apagada, ele a
+				// recalcula dos termos novos na próxima leitura.
+				delete_post_meta( (int) $existente->ID, 'chosen_product_cat' );
 			}
 		}
 
@@ -2381,6 +2385,40 @@ function reconectar_demo_instalar( $dados ) {
 		$produtos_ids = array();
 
 		foreach ( $loja['produtos'] as $produto ) {
+			// O serviço vai para a categoria Serviços, que é do `provision.sh` e
+			// não da carga — por isso não está em `categorias` e não leva a meta
+			// da demonstração: a remoção não pode apagá-la. Sem ela o serviço é
+			// pulado, e não criado como produto comum: um "Bordado sob encomenda"
+			// a R$ 0,00 com "Adicionar ao carrinho" seria pior que nenhum.
+			//
+			// **Só** Serviços, sem a categoria-mãe da loja. O Dokan está em
+			// seleção de categoria única, e `get_saved_products_category()` — um
+			// leitor que grava — reduz na primeira exibição um produto com duas
+			// árvores à primeira delas. Medido: `[artesanato, servicos]` virou
+			// `[artesanato]`, e o pedido do serviço nasceu como compra comum.
+			if ( ! empty( $produto['servico'] ) ) {
+				$servicos_id = class_exists( 'Reconectar_Servicos' ) ? Reconectar_Servicos::categoria_id() : 0;
+
+				if ( ! $servicos_id ) {
+					reconectar_demo_log( '    ! Serviço "' . $produto['nome'] . '" pulado: a categoria Serviços não existe. Rode o provision.sh.' );
+					continue;
+				}
+
+				$produto_id = reconectar_demo_criar_produto(
+					$produto,
+					$loja_id,
+					array( $servicos_id ),
+					$loja
+				);
+
+				if ( $produto_id ) {
+					$produtos_ids[] = $produto_id;
+					$total_produtos++;
+				}
+
+				continue;
+			}
+
 			// Produto sem `categoria` declarada, ou com um slug que não consta das
 			// subcategorias da loja, fica só na categoria-mãe. É o que o comentário
 			// do bloco `lojas` em `dados-demo.php` promete, e evita que um erro de
@@ -2975,4 +3013,11 @@ if ( 'remover' === $reconectar_demo_modo ) {
 } else {
 	reconectar_demo_log( 'Instalando dados de demonstração da Reconectar...' );
 	reconectar_demo_instalar( require __DIR__ . '/dados-demo.php' );
+
+	// O `provision.sh` aplica os ícones antes desta carga existir, então as
+	// categorias que ela acabou de criar ficariam de fora até o próximo
+	// provisionamento. O script é idempotente e só preenche termo sem ícone.
+	reconectar_demo_log( '' );
+	reconectar_demo_log( 'Ícones das categorias:' );
+	require_once dirname( __DIR__ ) . '/icones-de-categoria.php';
 }

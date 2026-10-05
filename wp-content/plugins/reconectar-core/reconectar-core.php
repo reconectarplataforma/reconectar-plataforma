@@ -88,6 +88,10 @@ require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamen
 // confere e confirma o recebimento. Depois de `class-reconectar-pagamento-direto.php`
 // porque lê a constante `STATUS_AGUARDANDO` dele.
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-comprovante.php';
+// Serviços no Mercado: produto da categoria Serviços sai a R$ 0, vira
+// solicitação e a loja responde com o valor. Depois do pagamento direto, que
+// consulta esta classe para dispensar de PIX a loja que só tem serviço.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-servicos.php';
 // A aba de avaliações pendentes também é da dashboard do Dokan e lê os pedidos
 // da loja; fica junto do ciclo do pedido, e não no tema, porque é regra sobre
 // quem pode ver qual pedido.
@@ -126,6 +130,7 @@ function reconectar_core_init() {
 	Reconectar_Pagamento_Pix::init();
 	Reconectar_Pagamento_Direto::init();
 	Reconectar_Comprovante::init();
+	Reconectar_Servicos::init();
 	Reconectar_Avaliacoes_Pendentes::init();
 	Reconectar_Navegacao_Da_Loja::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as

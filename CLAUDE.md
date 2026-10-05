@@ -36,6 +36,9 @@ aconteceu neste repositório, e vários custaram horas.
 | `wp-content/plugins/reconectar-core/` | plugin autoral: RBAC, status, governança |
 | `…/includes/class-reconectar-painel-empresas.php` | painel gerencial, rota própria fora do `/wp-admin` |
 | `…/includes/painel-empresas/` | os templates das telas do painel |
+| `scripts/icones-de-categoria.php` | associa os ícones SVG às categorias; chamado pelo provisionamento e pela carga |
+| `wp-content/themes/reconectar/assets/icones/categorias/` | os ícones de categoria, autorais e versionados |
+| `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
 | `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca, interação (vídeo em destaque, avaliação, comentários) |
 | `…/includes/incubadora/` | os templates da Incubadora |
@@ -79,7 +82,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-345 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+357 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.
@@ -587,6 +590,58 @@ por `post_type` mais a presença daquela meta no `where` já montado. A alternat
 — setar uma flag global em `woocommerce_order_query_args` e consumi-la no
 `posts_orderby` — tem janela de corrida: qualquer outra query que rode no meio
 herda a ordenação. Veja `Reconectar_Comprovante::priorizar_conferencia()`.
+
+### O Dokan escreve rótulo e cor de status num `switch` fechado
+
+`dokan_get_order_status_translated()` e `dokan_get_order_status_class()`
+(`dokan-lite/includes/Order/functions.php`) não leem `wc_order_statuses`:
+conhecem os status nativos e devolvem string **vazia** para o resto. Medido no
+detalhe do pedido do painel da loja: `<label class="dokan-label dokan-label-"></label>`,
+um selo sem texto e sem cor — e não só para os status de serviço, mas para
+`conferencia`, `preparacao` e `enviado`, que estavam assim desde que nasceram.
+
+O `/wp-admin` e a conta do cliente mostram o rótulo certo, porque leem a lista
+do WooCommerce, e é por isso que ninguém viu: quem confere o status confere lá.
+Os dois filtros de mesmo nome devolvem o rótulo e a cor — veja
+`Reconectar_Status_Pedido::rotulo_no_painel_da_loja()`. Status novo entra no
+mapa de cores no mesmo commit.
+
+### `get_saved_products_category()` do Dokan é um leitor que **grava**
+
+O Dokan guarda a categoria escolhida no formulário em `chosen_product_cat`, à
+parte dos termos. Quando a meta falta, `Dokan\ProductCategory\Helper::get_saved_products_category()`
+a deriva dos termos **e chama `set_object_terms_from_chosen_categories()`** — e
+nesta instalação `dokan_selling.product_category_style` é `single`, então só a
+primeira árvore sobrevive. Quem a chama são vários caminhos do próprio Dokan —
+o formulário da loja, os ganchos de salvamento do `/wp-admin`, os controllers
+REST e funções de produto —, então não há um ponto único a vigiar.
+
+Medido: o serviço de demonstração gravado com `[artesanato, servicos]` virou
+`[artesanato]` na primeira exibição, e o pedido dele nasceu como compra comum,
+com PIX — sem erro, com o produto aparentemente intacto na listagem.
+
+Produto criado por código vai numa categoria só. E quem trocar os termos de um
+produto existente apaga `chosen_product_cat` junto, ou o formulário mostra e
+regrava a escolha antiga no próximo salvamento. Veja
+`reconectar_demo_criar_produto()`.
+
+### `get_terms()` com `meta_key` em `product_cat` devolve vazio
+
+`wc_change_pre_get_terms()` reescreve a consulta de termo das taxonomias do
+WooCommerce para ordenar pela meta `order`, e nisso troca o `meta_key` pedido
+pelo dela. A busca por `meta_key => '_reconectar_categoria_chave'` volta **vazia**,
+sem aviso — a mesma forma do `wc_get_orders()`, só que pelo lado do vazio em vez
+do banco inteiro. `meta_query` com `orderby` explícito escapa da troca; veja
+`Reconectar_Servicos::termos()`.
+
+### O e-mail de pedido novo do Dokan não dispara `woocommerce_email_order_details`
+
+`emails/vendor-new-order.php` do Dokan monta a tabela à mão e só dispara
+`woocommerce_email_after_order_table`, `_order_meta` e `_customer_details`. Um
+bloco pendurado em `woocommerce_email_order_details` ou em
+`before_order_table` aparece no e-mail do cliente e do administrador e **some**
+do da loja — que costuma ser o único que importava. O container não envia
+e-mail; para medir, capture com `pre_wp_mail` num `wp eval`.
 
 ### bbPress e BuddyPress estão ativos
 
