@@ -694,6 +694,70 @@ else
   echo "Fórum de cooperação já existe."
 fi
 
+echo "== Categoria Serviços (WooCommerce) =="
+# RF24 (divulgação e busca de serviços): produto nesta categoria, ou numa filha
+# dela, é serviço — sai a R$ 0, com "A combinar" na vitrine, e vira solicitação
+# que a loja responde pela plataforma. Ver `Reconectar_Servicos`.
+#
+# A guarda é a meta de termo `_reconectar_categoria_chave`, pela mesma razão do
+# fórum de cooperação acima: o administrador renomeia a categoria pelo painel.
+# Um termo já existente com o slug `servicos` — criado à mão antes deste bloco —
+# é **adotado**, não duplicado: `wp_insert_term()` recusaria o nome repetido, e
+# o fluxo de serviço nunca reconheceria o termo que a loja está usando.
+#
+# `meta_query`, nunca `meta_key`/`meta_value`: em `product_cat` o WooCommerce
+# reescreve `meta_key` para a meta `order` da ordenação, e a busca devolve vazio
+# em silêncio — medido, este bloco "adotava" a categoria de novo a cada rodada.
+wp eval '
+  $chave = array(
+    "taxonomy"   => "product_cat",
+    "hide_empty" => false,
+    "fields"     => "ids",
+    "orderby"    => "term_id",
+    "meta_query" => array(
+      array(
+        "key"   => "_reconectar_categoria_chave",
+        "value" => "servicos",
+      ),
+    ),
+  );
+  if ( get_terms( $chave ) ) {
+    echo "Categoria Serviços já existe.\n";
+    return;
+  }
+  $termo = get_term_by( "slug", "servicos", "product_cat" );
+  if ( $termo ) {
+    $id = (int) $termo->term_id;
+    WP_CLI::log( "Categoria com slug servicos adotada: ID $id." );
+  } else {
+    $novo = wp_insert_term(
+      "Serviços",
+      "product_cat",
+      array(
+        "slug"        => "servicos",
+        "description" => "Serviços oferecidos pelas lojas da plataforma. O valor é combinado com o prestador: descreva o que precisa ao solicitar, e ele responde pela plataforma.",
+      )
+    );
+    if ( is_wp_error( $novo ) ) {
+      WP_CLI::error( "Falha ao criar a categoria Serviços: " . $novo->get_error_message() );
+    }
+    $id = (int) $novo["term_id"];
+    WP_CLI::success( "Categoria Serviços criada: ID $id." );
+  }
+  update_term_meta( $id, "_reconectar_categoria_chave", "servicos" );
+'
+
+echo "== Ícones das categorias =="
+# Cada categoria conhecida recebe um SVG de `themes/reconectar/assets/icones/`,
+# versionado com o tema e portanto presente nos dois ambientes — ao contrário
+# da miniatura, que é anexo em `uploads/` e não atravessa o deploy. O termo
+# guarda só o nome do ícone; ver o cabeçalho do script para as guardas.
+#
+# Vem depois de "Categoria Serviços", que grava a chave pela qual o script a
+# encontra. As categorias da carga de demonstração ainda não existem aqui numa
+# instalação nova: a carga chama o mesmo script ao terminar.
+wp eval-file /var/www/scripts/icones-de-categoria.php
+
 echo "== Título da listagem de lojas =="
 # A página é criada pelo Dokan com o título "Store List", em inglês, e é ela que
 # o tema usa como vitrine de lojas. O renome só acontece enquanto o título ainda

@@ -46,6 +46,25 @@ class Reconectar_Status_Pedido {
 	const ENVIADO = 'wc-enviado';
 
 	/**
+	 * Solicitação de serviço feita, aguardando a resposta do prestador.
+	 *
+	 * Serviço não tem preço de vitrine: o pedido sai com total zero e o que o
+	 * cliente quer está na observação. Nenhum status nativo diz isso —
+	 * `processing`, que é onde o WooCommerce deixa um pedido de R$ 0, leria
+	 * como "pago, em andamento" para um trabalho que nem tem valor ainda. Ver
+	 * `Reconectar_Servicos`.
+	 */
+	const SOLICITADO = 'wc-solicitado';
+
+	/**
+	 * O prestador respondeu com o valor ou com "farei orçamento".
+	 *
+	 * É o fim do caminho dentro da plataforma: pagamento e execução são
+	 * combinados direto entre as partes, por decisão do projeto.
+	 */
+	const RESPONDIDO = 'wc-respondido';
+
+	/**
 	 * Registra os ganchos.
 	 *
 	 * `init` na prioridade 9 (antes da padrão) garante que os status estejam
@@ -63,6 +82,51 @@ class Reconectar_Status_Pedido {
 		// são registrados — o que não estiver em uso simplesmente nunca dispara.
 		add_filter( 'bulk_actions-edit-shop_order', array( __CLASS__, 'acoes_em_massa' ) );
 		add_filter( 'bulk_actions-woocommerce_page_wc-orders', array( __CLASS__, 'acoes_em_massa' ) );
+
+		// O painel da loja não lê `wc_order_statuses`: o Dokan escreve rótulo e
+		// cor num `switch` fechado e devolve string vazia para o resto. Medido no
+		// detalhe do pedido: `<label class="dokan-label dokan-label-"></label>`,
+		// um selo sem texto, para todo status desta classe.
+		add_filter( 'dokan_get_order_status_translated', array( __CLASS__, 'rotulo_no_painel_da_loja' ), 10, 2 );
+		add_filter( 'dokan_get_order_status_class', array( __CLASS__, 'cor_no_painel_da_loja' ), 10, 2 );
+	}
+
+	/**
+	 * Devolve ao painel do Dokan o rótulo de um status desta classe.
+	 *
+	 * @param string $rotulo Rótulo que o Dokan resolveu, vazio se não conhece.
+	 * @param string $status Status, com ou sem o prefixo `wc-`.
+	 * @return string
+	 */
+	public static function rotulo_no_painel_da_loja( $rotulo, $status ) {
+		$chave   = 0 === strpos( (string) $status, 'wc-' ) ? (string) $status : 'wc-' . $status;
+		$rotulos = self::rotulos();
+
+		return ( '' === (string) $rotulo && isset( $rotulos[ $chave ] ) ) ? $rotulos[ $chave ] : $rotulo;
+	}
+
+	/**
+	 * Escolhe a cor do selo de status no painel do Dokan.
+	 *
+	 * As cores são as do próprio Dokan, pelo mesmo critério dele: amarelo para
+	 * o que espera alguém agir, azul para o que anda sozinho, verde para o fim.
+	 * "Respondido" é verde porque é o fim do caminho dentro da plataforma.
+	 *
+	 * @param string $classe Sufixo de classe que o Dokan resolveu.
+	 * @param string $status Status, com ou sem o prefixo `wc-`.
+	 * @return string
+	 */
+	public static function cor_no_painel_da_loja( $classe, $status ) {
+		$cores = array(
+			'solicitado'  => 'warning',
+			'conferencia' => 'warning',
+			'preparacao'  => 'info',
+			'enviado'     => 'info',
+			'respondido'  => 'success',
+		);
+		$chave = preg_replace( '/^wc-/', '', (string) $status );
+
+		return ( '' === (string) $classe && isset( $cores[ $chave ] ) ) ? $cores[ $chave ] : $classe;
 	}
 
 	/**
@@ -75,10 +139,16 @@ class Reconectar_Status_Pedido {
 	 * `inserir_no_fluxo()` cola este array inteiro logo depois de `wc-processing`,
 	 * preservando a ordem interna.
 	 *
+	 * Os dois de serviço abrem a lista porque são um caminho paralelo, e curto:
+	 * a solicitação nunca passa por conferência, preparação nem envio. Postos no
+	 * meio, "Respondido" pareceria uma etapa entre "Em preparação" e "Enviado".
+	 *
 	 * @return array<string,string>
 	 */
 	public static function rotulos() {
 		return array(
+			self::SOLICITADO  => __( 'Aguardando resposta', 'reconectar-core' ),
+			self::RESPONDIDO  => __( 'Respondido', 'reconectar-core' ),
 			self::CONFERENCIA => __( 'Pagamento em conferência', 'reconectar-core' ),
 			self::PREPARACAO  => __( 'Em preparação', 'reconectar-core' ),
 			self::ENVIADO     => __( 'Enviado', 'reconectar-core' ),
@@ -156,6 +226,11 @@ class Reconectar_Status_Pedido {
 	 * causa disso: naquele status o comprovante chegou, mas ninguém conferiu se o
 	 * dinheiro caiu. Declará-lo pago lançaria receita não verificada nos
 	 * relatórios do WooCommerce.
+	 *
+	 * `solicitado` e `respondido` ficam de fora pela mesma razão, mais forte: o
+	 * pedido de serviço tem total zero e o valor da resposta é combinado fora
+	 * da plataforma. Contá-los como pagos poria nos relatórios vendas que não
+	 * aconteceram aqui.
 	 *
 	 * @param string[] $status Lista de status considerados pagos.
 	 * @return string[]

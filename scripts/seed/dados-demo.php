@@ -432,6 +432,18 @@ return array(
 					'categoria' => 'fibras-naturais',
 					'resumo'    => 'Trançado em palha de ouricuri, com alças reforçadas.',
 				),
+				// Serviço (RF24): vai para a categoria Serviços, que o
+				// `provision.sh` cria, e não para uma subcategoria da loja. O preço
+				// é zero porque é zero que o `Reconectar_Servicos` grava de
+				// qualquer jeito — declarar outro aqui seria um dado que nunca
+				// chega à tela. É a loja **só com PIX**: a solicitação tem de passar
+				// sem pedir meio de pagamento a ela.
+				array(
+					'nome'    => 'Bordado personalizado sob encomenda',
+					'preco'   => '0',
+					'servico' => true,
+					'resumo'  => 'Bordamos nome, data ou desenho em toalha, roupa ou tecido que você enviar. Descreva a peça e o bordado, e a bordadeira responde com o valor.',
+				),
 			),
 		),
 

@@ -124,6 +124,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Criar e editar produtos da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Ver e processar pedidos da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Configurar pagamento e entrega da própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Responder solicitação de serviço feita à própria loja | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Ver produtos ou pedidos de outro vendedor | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Empresas e lojas** | | | | | |
 | Acessar `/painel-empresas/` | ✅ | ✅ | ❌ | ❌ | ❌ |
@@ -175,6 +176,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Esconde o item Incubadora do visitante | `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` | `wp_nav_menu_objects` |
 | Barra a escrita na Incubadora | `Reconectar_Incubadora_Acoes::processar_*()` | `admin_post_reconectar_incubadora_*` |
 | Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
+| Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
 | Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
 
@@ -372,7 +374,7 @@ perde o que estiver em `CAPS_LEGADAS`.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 274 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 357 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -386,6 +388,15 @@ O caminho feliz da Incubadora — criar, salvar, publicar, mover, excluir, envia
 arquivo, restaurar versão — também vai por WP-CLI, em
 `scripts/verificar-incubadora.php`, que o script chama no fim: o nonce que o
 WP-CLI gera não vale no navegador.
+
+A resposta a uma solicitação de serviço tem o mesmo desenho em duas camadas. Por
+HTTP, todo perfil com nonce forjado para no nonce — que leva o id do pedido e só
+é emitido no detalhe que a própria loja abre —, e o visitante recebe 400 sem
+alcançar o handler, porque não há `admin_post_nopriv_` registrado. A trava de
+propriedade, `loja_pode()`, é privada e vai por `ReflectionMethod` sobre um
+pedido provisório, apagado no fim: só a loja dona passa. O Administrador de
+empresas fica entre os recusados de propósito — quem responde pelo serviço é a
+loja que o oferece, como no produto.
 
 Respostas medidas nesta instalação:
 

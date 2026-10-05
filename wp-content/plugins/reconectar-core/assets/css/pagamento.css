@@ -413,3 +413,167 @@
 .rc-comprovante-detalhe .rc-comprovante-coluna__link {
 	display: inline;
 }
+
+/* ==========================================================================
+   Serviços — a solicitação, a resposta do prestador e o que o cliente vê
+
+   Mora aqui, e não num arquivo próprio, porque as três telas em que aparece —
+   o recibo, o pedido na conta e o detalhe no painel da loja — já são as que
+   carregam este CSS. Os tokens se repetem com o mesmo fallback literal de
+   `.rc-pagamento`: o bloco do painel não fica dentro dele, e o plugin não pode
+   exigir o tema.
+   ========================================================================== */
+
+.rc-servico,
+.rc-servico-cliente,
+.rc-servico__aviso {
+	--rc-pg-borda: #dfe3e6;
+	--rc-pg-texto-suave: #717171;
+	--rc-pg-fundo: #f5f7f8;
+
+	--rc-pg-fonte-xs: var( --rc-fonte-xs, 0.8125rem );
+	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-pg-fonte-base: var( --rc-fonte-base, 1rem );
+	--rc-pg-fonte-xl: var( --rc-fonte-xl, 1.5rem );
+
+	box-sizing: border-box;
+}
+
+.rc-servico *,
+.rc-servico-cliente * {
+	box-sizing: border-box;
+}
+
+.rc-servico-cliente {
+	margin: 0 0 2rem;
+}
+
+.rc-servico-cliente__titulo {
+	font-size: var( --rc-pg-fonte-xl );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.5rem;
+}
+
+.rc-servico-cliente__apoio,
+.rc-servico__apoio {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	color: var( --rc-pg-texto-suave );
+	margin: 0 0 1rem;
+}
+
+.rc-servico-cliente__lista {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.rc-servico-cliente__item {
+	background: var( --rc-pg-fundo );
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 8px;
+	padding: 1rem;
+	margin: 0 0 0.75rem;
+}
+
+.rc-servico-cliente__loja,
+.rc-servico-cliente__estado,
+.rc-servico__estado,
+.rc-servico__pedido-titulo {
+	font-size: var( --rc-pg-fonte-base );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.35rem;
+}
+
+.rc-servico-cliente__data {
+	font-size: var( --rc-pg-fonte-xs );
+	color: var( --rc-pg-texto-suave );
+}
+
+/* A mensagem e o pedido do cliente são texto livre: uma URL ou um código sem
+   espaço estourariam a coluna no celular. */
+.rc-servico-cliente__mensagem,
+.rc-servico__pedido-texto {
+	font-size: var( --rc-pg-fonte-sm );
+	overflow-wrap: anywhere;
+}
+
+.rc-servico__pedido-texto {
+	background: var( --rc-pg-fundo );
+	border-left: 3px solid var( --reconectar-cor-primaria, #31BEB1 );
+	padding: 0.5rem 0.75rem;
+	margin: 0 0 1rem;
+}
+
+.rc-servico__pedido-texto p:last-child,
+.rc-servico-cliente__mensagem p:last-child {
+	margin-bottom: 0;
+}
+
+.rc-servico__tipo {
+	border: 0;
+	margin: 0 0 0.75rem;
+	padding: 0;
+}
+
+.rc-servico__tipo legend {
+	font-weight: 600;
+	margin: 0 0 0.35rem;
+}
+
+.rc-servico__tipo label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0 1.25rem 0.35rem 0;
+}
+
+.rc-servico__formulario label {
+	font-size: var( --rc-pg-fonte-sm );
+}
+
+/* Classe repetida: o Storefront veste campo por seletor de atributo, (0,1,1),
+   que venceria uma classe sozinha. */
+.rc-servico__valor.rc-servico__valor,
+.rc-servico__mensagem.rc-servico__mensagem {
+	display: block;
+	width: 100%;
+	font: inherit;
+	font-size: var( --rc-pg-fonte-sm );
+	background: #fff;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 6px;
+	padding: 0.5rem;
+}
+
+.rc-servico__valor.rc-servico__valor {
+	max-width: 12rem;
+}
+
+.rc-servico__valor:focus-visible,
+.rc-servico__mensagem:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+.rc-servico__aviso {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	background: #fff8e6;
+	border-radius: 6px;
+	color: #6b4a00;
+	padding: 0.6rem 0.75rem;
+	margin: 0 0 0.75rem;
+}
+
+/* Mesmos tons do aviso do comprovante, e a mesma razão: o texto diz o que
+   aconteceu, a cor só reforça (WCAG 2.1, 1.4.1). */
+.rc-servico__aviso--ok {
+	background: #eef8f2;
+	color: #1d6b42;
+}
+
+.rc-servico__aviso--erro {
+	background: #fbeeea;
+	color: #9c3a1e;
+}

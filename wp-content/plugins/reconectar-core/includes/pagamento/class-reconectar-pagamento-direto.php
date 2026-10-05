@@ -284,10 +284,25 @@ class Reconectar_Pagamento_Direto {
 	 * lojas estão no pedido — e a lista de quem recebe e a de quem não recebe
 	 * sairiam de fontes diferentes.
 	 *
+	 * A loja que só tem **serviço** no carrinho fica de fora: ela não recebe nada
+	 * agora — o valor é combinado depois, fora da plataforma —, então não escolhe
+	 * meio, não precisa de PIX nem de conta, e não pode barrar o pedido por não
+	 * tê-los. `valores_do_carrinho()` continua com ela, porque é a soma de
+	 * referência do carrinho inteiro (ver a armadilha da soma no `CLAUDE.md`).
+	 *
+	 * A guarda é um `class_exists` sozinho, nunca num `||` com a chamada — a
+	 * armadilha do curto-circuito registrada no `CLAUDE.md`.
+	 *
 	 * @return int[] Identificadores, sem repetição.
 	 */
 	public static function lojas_do_carrinho() {
-		return array_map( 'intval', array_keys( self::valores_do_carrinho() ) );
+		$lojas = array_map( 'intval', array_keys( self::valores_do_carrinho() ) );
+
+		if ( class_exists( 'Reconectar_Servicos' ) ) {
+			$lojas = array_values( array_diff( $lojas, Reconectar_Servicos::lojas_so_de_servico_no_carrinho() ) );
+		}
+
+		return $lojas;
 	}
 
 	/**
@@ -711,6 +726,16 @@ class Reconectar_Pagamento_Direto {
 
 			$loja_id = (int) dokan_get_seller_id_by_order( $sub_id );
 
+			// O Dokan copia o meio do pai a todo sub-pedido. No do prestador de
+			// serviço isso poria "PIX" num pedido de R$ 0 sem nada a pagar, e a
+			// tela de agradecimento e o e-mail imprimiriam a instrução.
+			if ( class_exists( 'Reconectar_Servicos' ) && Reconectar_Servicos::pedido_so_de_servico( $sub ) ) {
+				$sub->set_payment_method( '' );
+				$sub->set_payment_method_title( __( 'Serviço — valor combinado com o prestador', 'reconectar-core' ) );
+				$sub->save();
+				continue;
+			}
+
 			if ( ! isset( $escolhas[ $loja_id ] ) ) {
 				continue;
 			}
@@ -936,7 +961,16 @@ class Reconectar_Pagamento_Direto {
 			return;
 		}
 
-		$blocos = self::lojas_do_pedido( $pedido );
+		// Bloco de valor zero é o do prestador de serviço: não há o que pagar a
+		// ele pela plataforma, e "Valor a pagar: R$ 0,00" com um QR PIX vazio
+		// diria o contrário. Tirá-lo não mexe na soma de referência abaixo,
+		// porque o que ele somaria é zero.
+		$blocos = array_filter(
+			self::lojas_do_pedido( $pedido ),
+			static function ( $bloco ) {
+				return (float) $bloco['total'] >= 0.01;
+			}
+		);
 
 		if ( ! $blocos ) {
 			return;

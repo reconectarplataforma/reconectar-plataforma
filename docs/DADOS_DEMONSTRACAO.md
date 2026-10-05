@@ -144,6 +144,14 @@ Artesanato, Moda e Acessórios, Casa e Decoração, Beleza e Cuidados, e
 Cultura e Educação. A última fica propositalmente **sem produtos**, para
 exercitar o comportamento de `hide_empty` nas consultas da home.
 
+Ao terminar, a carga roda `scripts/icones-de-categoria.php`, o mesmo que o
+`provision.sh` chama, e as categorias e subcategorias recebem o ícone SVG
+delas (meta `_reconectar_categoria_icone`). Ela precisa fazer isso por conta
+própria porque o `demo-completa.sh` provisiona **antes** de popular. Quando
+chega ao provisionamento, as categorias ainda não existem. Os ícones vencem as
+miniaturas geradas descritas em "As imagens". Remover a carga apaga os termos,
+e a meta sai junto.
+
 **2 empresas** (CPT `reconectar_empresa`): Cooperativa Nosso Chão (Maceió, três
 lojas) e Rede Bem Viver (Arapiraca, duas). A distribuição desigual é de
 propósito — sem duas empresas povoadas não há como demonstrar o isolamento, que
@@ -173,7 +181,7 @@ escrito em `demo.php`, no código. Um catálogo de dados com `'papel' => '…'`
 seria uma escalada de privilégio esperando por um descuido de revisão.
 
 **5 lojas** (usuários com papel `seller` do Dokan), todas em municípios de
-Alagoas, cada uma com 3 produtos:
+Alagoas, cada uma com 8 produtos — o Ateliê Raízes com 9, contando o serviço:
 
 | Loja | Categoria | Município | Aceita |
 |---|---|---|---|
@@ -198,7 +206,7 @@ Preencher os dados dela apagaria o único caso de demonstração desse caminho �
 As chaves PIX são fictícias: CNPJ de base zerada, e-mail em `exemplo.invalid`,
 telefone em faixa que não existe.
 
-**15 produtos**, 4 deles com preço promocional, e **16 avaliações**
+**41 produtos**, 9 deles com preço promocional, e **16 avaliações**
 distribuídas entre os produtos de cada loja em rodízio, com notas de 4 e 5
 estrelas e textos genéricos assinados por "Cliente de demonstração". As
 avaliações existem para que a nota da loja apareça nos cards da vitrine —
@@ -209,6 +217,24 @@ Cada loja declara **tempo de entrega, taxa e distância** — `30-45 min`, `0`,
 literais no catálogo, nunca calculados: a plataforma não tem integração de
 logística, e um prazo plausível gerado na hora é uma promessa que ninguém
 assumiu. `taxa` igual a `0` faz a loja entrar no filtro de entrega grátis.
+
+**1 serviço**: "Bordado personalizado sob encomenda", do Ateliê Raízes, na
+categoria **Serviços**. A categoria não é da carga: o `provision.sh` a cria,
+identificada pela meta de termo `_reconectar_categoria_chave = servicos`, e a
+remoção não a toca. Sem ela de pé o serviço é **pulado**, com aviso no log, em
+vez de nascer como produto comum a R$ 0,00.
+
+O serviço fica **só** em Serviços, sem a categoria Artesanato da loja. O Dokan
+está em seleção de categoria única, e `get_saved_products_category()` — um
+leitor que grava — reduz um produto de duas árvores à primeira delas na
+primeira vez que o exibe. Medido: `[artesanato, servicos]` virou `[artesanato]`,
+e a solicitação nasceu como compra comum, com PIX.
+
+A loja é a que **só aceita PIX** de propósito: a solicitação de serviço não pede
+meio de pagamento, e um carrinho que misture o bordado com um produto da Casa
+Viva prova que só a Casa Viva recebe seletor e instrução de pagamento. A carga
+não cria pedido de serviço — o caminho que interessa demonstrar é o do checkout,
+e o roteiro o percorre ao vivo.
 
 **3 clientes** (papel `customer`): Ana Lima (Maceió), João Ferreira (Arapiraca)
 e Marina Costa (Penedo), com telefone e endereço de cobrança preenchidos.
@@ -354,8 +380,8 @@ em [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md).
 
 ## As imagens
 
-Todas as imagens — banners de loja, avatares, ícones de categoria e fotos de
-produto — são **geradas por código** no momento da carga, com a extensão GD
+Todas as imagens — banners de loja, avatares, miniaturas de categoria e fotos
+de produto — são **geradas por código** no momento da carga, com a extensão GD
 do PHP: um gradiente na cor da categoria, o nome do item centralizado em
 Poppins e a palavra "DEMO" no canto.
 
