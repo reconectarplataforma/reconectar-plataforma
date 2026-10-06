@@ -10,7 +10,7 @@ a regra é aplicada**. Implementação em
 | --- | --- | --- |
 | **Super Administrador** | `administrator` | `/wp-admin` |
 | **Administrador** | `company_admin` | `/wp-admin` e `/painel-empresas/` |
-| **Moderador de Conteúdo** | `content_moderator` | `/wp-admin` |
+| **Moderador de Conteúdo** | `content_moderator` | moldura do painel do Dokan (Incubadora, Fórum, Comunidade) e `/wp-admin` |
 | **Vendedor** | `seller` | painel do Dokan, no front-end |
 | **Usuário Comum** | `customer` | loja e "Minha conta" |
 
@@ -38,6 +38,17 @@ mesma chave `company_admin`, competências novas.
 **Moderador de Conteúdo.** Publica e modera post, página e comentário, gere as
 campanhas da home, cria menus e participa do fórum. Não administra empresa, não
 configura conta de usuário e não toca em produto nem em pedido.
+
+A Incubadora, o Fórum e a Comunidade abrem para ele na moldura do painel do
+Dokan, sem cabeçalho nem menu do mercado, com "Moderação" no topo da barra
+lateral. A barra traz Incubadora, Comunidade, Fórum e "Painel do WordPress", a
+saída para campanhas, enquetes, publicações e comentários. No topo, "Ir ao mercado"
+leva de volta ao catálogo. O login dele — por
+"Minha conta" ou por `wp-login.php` — leva à Incubadora, a menos que um destino
+explícito tenha sido pedido, e `/dashboard/` também. A razão é de orientação: na
+casca da vitrine ele não tinha como saber que tinha saído do mercado. Não há
+capacidade nova — a moldura é só a casca; quem decide é
+`Reconectar_Navegacao_Da_Loja::modera_no_painel()`, pelo papel.
 
 **Vendedor.** Uma loja própria e isolada: produtos, estoque, pedidos,
 pagamentos, entrega. Participa dos fóruns, mas não os administra. **Nunca**
@@ -181,7 +192,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
-| Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
+| Esconde a barra administrativa do site, para todos os perfis | `ocultar_barra_administrativa()` | `show_admin_bar` |
 
 **Interface e backend são camadas distintas, e ambas existem.** Esconder o link
 da comunidade no menu é usabilidade — oferecer um link que devolve 403 é defeito
@@ -378,13 +389,25 @@ por esse caminho — remover o papel de quem instalou a plataforma é
 irreversível se algo falhar no meio. Ele recebe por `add_cap()`, e por isso só
 perde o que estiver em `CAPS_LEGADAS`.
 
+**Quem trabalha em mais de um módulo escolhe por onde começar.** Loja,
+Administrador e Moderador entram por `/modulos/` (`Reconectar_Modulos`), uma
+tela de três cartões — Mercado, Incubadora e Praça, os módulos do edital — a
+cada login. O destino de cada cartão depende do perfil: o Mercado é o painel da
+loja para a Loja, o painel de empresas para o Administrador e a vitrine para o
+Moderador. A tela não concede nada: cada botão leva a uma rota que tem as suas
+próprias travas. O desvio só troca o destino **padrão** do login (vazio,
+`/wp-admin`, "Minha conta" ou o painel do Dokan); um `redirect_to` explícito
+vence, para que quem entrou por um link não perca o caminho. Cliente e Super
+Administrador não passam por ela — o primeiro vai à conta, o segundo ao
+`/wp-admin`, e os dois recebem `302` se abrirem a rota à mão.
+
 ## Como verificar
 
 ```bash
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 363 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 388 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -410,14 +433,14 @@ loja que o oferece, como no produto.
 
 Respostas medidas nesta instalação:
 
-| Perfil | `/wp-admin/` | `plugins.php` | `users.php` | `nav-menus.php` | `/painel-empresas/` | `/dashboard/` | `/comunidade/` |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Deslogado | — | — | — | — | `302` → login | — | `302` → login |
-| Cliente | `302` → `/my-account/` | — | — | — | `403` | `302` | `403` |
-| Vendedor | `302` → `/dashboard/` | `403` | — | — | `403` | `200` | `200` |
-| Moderador | `200` | `403` | `403` | `200` | `403` | `302` | `200` |
-| Administrador | `200` | `403` | `200` | `200` | `200` | `302` | `200` |
-| Super Administrador | `200` | `200` | — | — | `200` | — | `200` |
+| Perfil | `/wp-admin/` | `plugins.php` | `users.php` | `nav-menus.php` | `/painel-empresas/` | `/dashboard/` | `/comunidade/` | `/modulos/` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Deslogado | — | — | — | — | `302` → login | — | `302` → login | `302` → login |
+| Cliente | `302` → `/my-account/` | — | — | — | `403` | `302` | `403` | `302` |
+| Vendedor | `302` → `/dashboard/` | `403` | — | — | `403` | `200` | `200` | `200` |
+| Moderador | `200` | `403` | `403` | `200` | `403` | `302` → módulos | `200` | `200` |
+| Administrador | `200` | `403` | `200` | `200` | `200` | `302` | `200` | `200` |
+| Super Administrador | `200` | `200` | — | — | `200` | — | `200` | `302` → `/wp-admin/` |
 
 Cada célula preenchida é um caso do script, e o travessão marca o que ele não
 cobre — não uma permissão indefinida.

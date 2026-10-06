@@ -4320,3 +4320,113 @@ Três pedidos em sequência sobre a navegação do mercado:
 - Nesta instalação, "Produtos" aparece depois de "Minha Conta" no menu. O
   provisionamento só ordena ao criar o menu; reordenar é um arrasto em
   Aparência → Menus.
+
+## 2026-10-06 — O Moderador de Conteúdo trabalha na moldura do painel
+
+Pedido: ao entrar, o Moderador precisa ir para a moldura do painel do Dokan e
+ter só a gestão de conteúdo, para entender que saiu do mercado e está no módulo
+de moderação (a Incubadora). Antes ele via a Incubadora na casca da vitrine, com
+cabeçalho, busca de produto, carrinho e "Entregando em".
+
+**O que mudou**
+
+- `Reconectar_Permissoes::eh_moderador_de_conteudo()`: compara pelo papel, no
+  molde de `eh_vendedor()`. Responde quem a pessoa é, não o que ela pode fazer.
+  O Administrador também tem `CAP_GERIR_INCUBADORA`, e a casa dele é o painel de
+  empresas.
+- `Reconectar_Navegacao_Da_Loja::modera_no_painel()`: `area_corrente()` passa a
+  reconhecer Incubadora, Fórum e Comunidade também para o Moderador. As três
+  abrem na moldura, pelo mesmo arranjo do painel de empresas, sem `dokandar`.
+- Os dois ajustes do topo React (`ajustar_layout_para_quem_nao_e_loja` e
+  `ajustar_vitrine_para_quem_nao_e_loja`) valem para as duas molduras de quem
+  não é loja. No topo, o Moderador lê "Moderação".
+- Barra lateral do Moderador:
+  - a Incubadora vem primeiro (pos 155, permissão `CAP_GERIR_INCUBADORA`);
+  - Comunidade e Fórum vêm em seguida;
+  - "Painel do WordPress" (`CAP_ADMIN_WP`) é a saída para campanhas, enquetes,
+    publicações e comentários.
+- Login: `login_do_moderador()`, em `woocommerce_login_redirect` e
+  `login_redirect` (25), leva à Incubadora. Só substitui o destino padrão —
+  "Minha conta", `/wp-admin` ou vazio —, e um `redirect_to` explícito vence.
+- `/dashboard/`: `levar_moderador_a_incubadora()`, em `template_redirect` (10),
+  roda antes do redirecionamento do Dokan (11), que o mandaria para a home do
+  mercado.
+
+**Decisões**
+
+- **Nenhuma capacidade nova.** A moldura é só casca. O `/wp-admin` segue
+  liberado ao Moderador, porque campanhas, enquetes e menus moram lá.
+- **"Moderação", e não "Moderação de conteúdo".** O rodapé da barra corta em
+  reticências, e o nome longo saía "Moderação de con…".
+- **Fora das três áreas, a vitrine continua a mesma.** O Moderador também
+  navega pelo mercado. A moldura marca onde fica o trabalho dele, e o botão do
+  topo é a volta.
+- **"Ir ao mercado", e não "Visitar loja".** Quem não é loja não tem loja para
+  visitar. O rótulo é um `__( 'Visit Store' )` dentro do bundle React, e só a
+  tradução injetada no script o alcança: `rotular_volta_ao_mercado()`, em
+  `load_script_translations`, vale nas duas molduras de quem não é loja —
+  Moderador e Administrador. A Loja segue com "Visitar loja" → `/store/<login>/`.
+
+**Verificação**
+
+- Medido por HTTP:
+  - login por "Minha conta" → `302 /incubadora/`;
+  - login por `wp-login.php` → `302 /incubadora/`;
+  - `/dashboard/` → `302 /incubadora/`.
+- A Incubadora e o Fórum trazem `rc-no-painel-da-loja`, o contêiner React,
+  "Moderação" no topo e os quatro itens da barra. Conferido em captura no Chrome
+  headless, sem rolagem horizontal (`scrollWidth` = `clientWidth`).
+- `verificar-acessos.sh`: 369 casos, nenhuma falha. Os seis novos são da moldura
+  do Moderador. O caso de `/dashboard/` passou a exigir o destino.
+
+---
+
+## 2026-10-06 — A tela de módulos: Mercado, Incubadora e Praça antes do painel
+
+**O que mudou**
+
+- Rota nova, `/modulos/` (`Reconectar_Modulos`), com regra de reescrita própria
+  (`^modulos/?$` → `rc_modulos=1`) e template próprio em `template_include` 99.
+  Não depende de página criada à mão nem do tema.
+- Três cartões grandes, no molde que a equipe trouxe (iFood): **Mercado**,
+  **Incubadora** e **Praça**, os módulos do edital. Ilustrações em SVG autoral,
+  inline e `aria-hidden`.
+- Destino por perfil: o Mercado leva a Loja ao painel dela ("Abrir minha loja"),
+  o Administrador ao painel de empresas e o Moderador à vitrine ("Ir ao
+  mercado"). Incubadora e Praça vão às mesmas rotas para os três.
+- Login: `depois_do_login()`, em `woocommerce_login_redirect` e `login_redirect`
+  (25), troca só o destino padrão — vazio, `/wp-admin`, "Minha conta" ou o
+  painel do Dokan, onde o próprio Dokan põe a loja na prioridade 1. Um
+  `redirect_to` explícito vence.
+- `login_do_moderador()` saiu: o caso dele está coberto pela tela. O
+  `/dashboard/` do Moderador passa a ir a `/modulos/`.
+- Volta à escolha: item "Módulos" na barra do Dokan (só para quem escolhe) e no
+  menu da conta.
+- A enquete flutuante não aparece na tela: abria por cima do cartão da Praça.
+- Migração 9: flush das regras, em `wp_loaded`.
+
+**Decisões**
+
+- **A cada login, e não só no primeiro.** Pedido da equipe.
+- **Sem Cooperação e sem busca por endereço.** O modelo trazia os dois. O
+  primeiro não é módulo do edital, e a busca não tem o que buscar aqui.
+- **O terracota da marca não serve de fundo.** `#CF6442` mede 3,78:1 com texto
+  branco e reprova o 1.4.3 da WCAG 2.1. O Mercado usa `#B05538` (5,0:1), e a
+  Praça, o verde escurecido `#1E7C73` (5,02:1), pela mesma razão. O roxo
+  institucional mede 8,7:1.
+- **O link é o botão, não o cartão inteiro.** Com o cartão inteiro clicável, o
+  leitor de tela leria título, subtítulo e frase como um nome de link só.
+  `aria-describedby` devolve o nome do módulo.
+
+**Verificação**
+
+- Capturas no Chrome headless dos três perfis, a 1400px e a 375px, sem rolagem
+  horizontal (`scrollWidth` = `clientWidth`).
+- `verificar-acessos.sh`: 388 casos, nenhuma falha. Os 19 novos cobrem:
+  - o `Location` do login nos cinco perfis;
+  - o `redirect_to` explícito vencendo;
+  - a rota para visitante, cliente e Super Administrador;
+  - o botão do Mercado por perfil;
+  - a ausência da enquete;
+  - o item "Módulos" na barra e na conta, presente e ausente.
+

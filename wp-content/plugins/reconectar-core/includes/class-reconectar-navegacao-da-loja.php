@@ -5,10 +5,8 @@
  * Para quem tem papel `seller`, a comunidade e a Incubadora são ferramentas de
  * trabalho, não parte da vitrine: elas passam a morar no menu lateral do painel
  * do Dokan, e saem do menu principal, do rodapé e da home do site, onde
- * disputavam espaço com "Loja" e "Lojas". Moderador e Administrador não têm
- * painel do Dokan — para eles o menu do site é o único caminho, e fica como está.
- * O cliente não muda: a comunidade já lhe é negada, e a Incubadora, que ele lê,
- * continua no menu.
+ * disputavam espaço com "Loja" e "Lojas". O cliente não muda: a comunidade já
+ * lhe é negada, e a Incubadora, que ele lê, continua no menu.
  *
  * E não só o link: para a loja, as três áreas **abrem dentro** da moldura do
  * painel — a barra lateral do Dokan à esquerda, sem o cabeçalho, o rodapé e a
@@ -28,6 +26,14 @@
  * rota continua própria, pelo mesmo motivo das três áreas — e pelo registrado
  * no topo de `class-reconectar-painel-empresas.php`: a capacidade de loja faria
  * dele um vendedor para o plugin inteiro. O que vem do Dokan é só a casca.
+ *
+ * O Moderador de Conteúdo também trabalha na moldura, pelo mesmo arranjo: a
+ * Incubadora, o Fórum e a Comunidade abrem com a barra lateral do Dokan, sem
+ * `dokandar`, e o login dele cai na Incubadora. A razão é de orientação, não de
+ * permissão: na vitrine, com carrinho, busca de produto e "Entregando em", o
+ * Moderador não tinha como saber que tinha saído do mercado. Os menus do site
+ * ficam como estão para ele — a moldura só existe nas três áreas, e fora delas
+ * o menu é o caminho de volta.
  *
  * @package reconectar-core
  */
@@ -63,6 +69,8 @@ class Reconectar_Navegacao_Da_Loja {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_layout_do_painel' ), 20 );
 		add_filter( 'dokan_vendor_dashboard_layout_config', array( __CLASS__, 'ajustar_layout_para_quem_nao_e_loja' ) );
 		add_filter( 'dokan_frontend_localize_script', array( __CLASS__, 'ajustar_vitrine_para_quem_nao_e_loja' ) );
+		add_filter( 'load_script_translations', array( __CLASS__, 'rotular_volta_ao_mercado' ), 10, 4 );
+		add_action( 'template_redirect', array( __CLASS__, 'levar_moderador_aos_modulos' ), 10 );
 	}
 
 	/**
@@ -79,10 +87,24 @@ class Reconectar_Navegacao_Da_Loja {
 	}
 
 	/**
+	 * A Incubadora, o Fórum e a Comunidade abrem na moldura de moderação?
+	 *
+	 * Só o papel `content_moderator`, e só com o Dokan de pé: a moldura é a casca
+	 * dele, e sem o plugin a tela volta à vitrine, que funciona.
+	 *
+	 * @return bool
+	 */
+	public static function modera_no_painel() {
+		return is_user_logged_in()
+			&& function_exists( 'dokan_get_dashboard_nav' )
+			&& Reconectar_Permissoes::eh_moderador_de_conteudo( get_current_user_id() );
+	}
+
+	/**
 	 * Chave do item do painel que corresponde à tela corrente, ou vazio.
 	 *
-	 * Vazio para quem não é loja: Moderador, Administrador e cliente seguem vendo
-	 * as três áreas na moldura da vitrine. O reconhecimento repete o de
+	 * Vazio para Administrador e cliente, que seguem vendo as três áreas na
+	 * moldura da vitrine; a loja e o Moderador as veem na do painel. O reconhecimento repete o de
 	 * `Reconectar_Permissoes::requisicao_e_de_comunidade()` — os post types do
 	 * bbPress, o componente do BuddyPress e a página `comunidade`, que na raiz
 	 * não reporta componente nenhum. O fórum é testado primeiro porque o perfil
@@ -100,7 +122,7 @@ class Reconectar_Navegacao_Da_Loja {
 			return 'rc-' . Reconectar_Painel_Empresas::secao_corrente();
 		}
 
-		if ( ! self::mora_no_painel() ) {
+		if ( ! self::mora_no_painel() && ! self::modera_no_painel() ) {
 			return '';
 		}
 
@@ -146,12 +168,31 @@ class Reconectar_Navegacao_Da_Loja {
 	}
 
 	/**
+	 * A tela corrente está na moldura do painel aberta por quem não é loja?
+	 *
+	 * O painel de empresas, para o Administrador, e as três áreas, para o
+	 * Moderador. É a condição dos dois ajustes do topo React, que o Dokan monta
+	 * para um vendedor.
+	 *
+	 * @return bool
+	 */
+	private static function moldura_de_quem_nao_e_loja() {
+		return self::painel_de_empresas_na_moldura() || ( self::modera_no_painel() && '' !== self::area_corrente() );
+	}
+
+	/**
 	 * Ajusta o topo do painel React para quem o abre sem ser loja.
 	 *
 	 * O Dokan monta a configuração para um vendedor: o nome da loja no topo, e
 	 * "Minha conta" e o lápis do perfil apontando para `/dashboard/edit-account/`.
-	 * Para o Administrador, que não tem loja, o nome sairia vazio e os dois
-	 * links levariam a uma tela que o recusa. A conta dele é a do WooCommerce.
+	 * Para o Administrador e o Moderador, que não têm loja, o nome sairia vazio e
+	 * os dois links levariam a uma tela que os recusa. A conta deles é a do
+	 * WooCommerce.
+	 *
+	 * No lugar do nome da loja vai o nome do módulo. Para o Moderador é "Moderação",
+	 * e é o rótulo que diz a ele que saiu do mercado — a razão de a moldura existir
+	 * para esse perfil. Uma palavra só: o rodapé da barra corta em reticências, e
+	 * "Moderação de conteúdo" saía "Moderação de con…".
 	 *
 	 * Só age sem `dokandar`: o Super Administrador que abrir o painel de empresas
 	 * pelo `/dashboard/` dele é também loja, e o que o Dokan montou é o certo.
@@ -160,13 +201,15 @@ class Reconectar_Navegacao_Da_Loja {
 	 * @return array
 	 */
 	public static function ajustar_layout_para_quem_nao_e_loja( $config ) {
-		if ( ! is_array( $config ) || current_user_can( 'dokandar' ) || ! self::painel_de_empresas_na_moldura() ) {
+		if ( ! is_array( $config ) || current_user_can( 'dokandar' ) || ! self::moldura_de_quem_nao_e_loja() ) {
 			return $config;
 		}
 
 		$conta = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'edit-account' ) : '';
 
-		$config['vendor']['name'] = get_bloginfo( 'name' );
+		$config['vendor']['name'] = self::painel_de_empresas_na_moldura()
+			? get_bloginfo( 'name' )
+			: __( 'Moderação', 'reconectar-core' );
 
 		if ( '' !== $conta ) {
 			$config['editUrl'] = $conta;
@@ -199,7 +242,7 @@ class Reconectar_Navegacao_Da_Loja {
 	 * @return array
 	 */
 	public static function ajustar_vitrine_para_quem_nao_e_loja( $dados ) {
-		if ( ! is_array( $dados ) || current_user_can( 'dokandar' ) || ! self::painel_de_empresas_na_moldura() ) {
+		if ( ! is_array( $dados ) || current_user_can( 'dokandar' ) || ! self::moldura_de_quem_nao_e_loja() ) {
 			return $dados;
 		}
 
@@ -208,6 +251,45 @@ class Reconectar_Navegacao_Da_Loja {
 		$dados['urls']['storeUrl'] = $catalogo;
 
 		return $dados;
+	}
+
+	/**
+	 * Troca "Visitar loja" por "Ir ao mercado" no topo React.
+	 *
+	 * Quem não é loja não tem loja para visitar: o botão leva ao catálogo, por
+	 * `ajustar_vitrine_para_quem_nao_e_loja()`, e para o Moderador ele é a volta
+	 * do módulo de moderação ao mercado. O rótulo é um `__( 'Visit Store' )` dentro
+	 * do bundle, sem filtro nem configuração que o alcance; a única entrada é a
+	 * tradução que o WordPress injeta no script, e é ela que se reescreve.
+	 *
+	 * Sem arquivo de tradução — instalação em inglês, ou pacote ainda não baixado
+	 * — `$traducoes` chega `false`, e se monta o mínimo: do contrário o rótulo
+	 * voltaria a dizer "Visit Store" justamente onde ninguém conferiu. A chave do
+	 * domínio varia com quem gerou o JSON (`messages` no wordpress.org,
+	 * `dokan-lite` no Loco), e o `wp.i18n` aceita as duas.
+	 *
+	 * @param string|false $traducoes JSON das traduções do script, ou `false`.
+	 * @param string       $arquivo   Caminho do JSON.
+	 * @param string       $handle    Handle do script.
+	 * @param string       $dominio   Domínio de texto.
+	 * @return string|false
+	 */
+	public static function rotular_volta_ao_mercado( $traducoes, $arquivo, $handle, $dominio ) {
+		if ( 'dokan-vendor-dashboard' !== $handle || 'dokan-lite' !== $dominio || current_user_can( 'dokandar' ) || ! self::moldura_de_quem_nao_e_loja() ) {
+			return $traducoes;
+		}
+
+		$json = is_string( $traducoes ) ? json_decode( $traducoes, true ) : null;
+		if ( ! is_array( $json ) || empty( $json['locale_data'] ) || ! is_array( $json['locale_data'] ) ) {
+			$json = array( 'locale_data' => array( 'messages' => array( '' => array( 'domain' => 'messages' ) ) ) );
+		}
+
+		$rotulo = __( 'Ir ao mercado', 'reconectar-core' );
+		foreach ( array_keys( $json['locale_data'] ) as $chave ) {
+			$json['locale_data'][ $chave ]['Visit Store'] = array( $rotulo );
+		}
+
+		return wp_json_encode( $json );
 	}
 
 	/**
@@ -355,6 +437,20 @@ class Reconectar_Navegacao_Da_Loja {
 	public static function registrar_menu( $nav ) {
 		$destinos = self::destinos();
 
+		// O caminho de volta à escolha de módulo, no topo da barra. Sem
+		// `permission`, porque nenhuma capacidade descreve "trabalha na
+		// plataforma": o Dokan mostra item sem ela a todos, e o Super
+		// Administrador, que não passa pela tela, não deve vê-lo. Daí o `if`.
+		if ( class_exists( 'Reconectar_Modulos' ) && Reconectar_Modulos::escolhe_modulo() ) {
+			$nav['rc-modulos'] = array(
+				'title'     => __( 'Módulos', 'reconectar-core' ),
+				'icon'      => '<i class="fas fa-th-large"></i>',
+				'icon_name' => 'LayoutGrid',
+				'url'       => Reconectar_Modulos::url(),
+				'pos'       => 5,
+			);
+		}
+
 		// Empresas e Lojas vêm antes das ferramentas da comunidade: para o
 		// Administrador são a razão de o painel existir. A permissão é o portão
 		// do painel de empresas, e não `dokandar` — a loja não as vê, o Super
@@ -414,18 +510,69 @@ class Reconectar_Navegacao_Da_Loja {
 			);
 		}
 
+		// Para o Moderador a Incubadora é a casa, e vem primeiro; a permissão
+		// passa a ser a de geri-la, porque ele não tem `dokandar`. O Administrador
+		// também a tem, e por isso a troca é pelo papel: na barra dele, um item que
+		// abrisse fora da moldura seria uma porta para a vitrine.
+		$moderador = self::modera_no_painel();
+
 		if ( '' !== $destinos['incubadora'] ) {
 			$nav['rc-incubadora'] = array(
 				'title'      => __( 'Incubadora', 'reconectar-core' ),
 				'icon'       => '<i class="fas fa-book-open"></i>',
 				'icon_name'  => 'BookOpen',
 				'url'        => $destinos['incubadora'],
-				'pos'        => 162,
-				'permission' => 'dokandar',
+				'pos'        => $moderador ? 155 : 162,
+				'permission' => $moderador ? Reconectar_Permissoes::CAP_GERIR_INCUBADORA : 'dokandar',
+			);
+		}
+
+		// Campanhas, enquetes, publicações e comentários são moderados no
+		// `/wp-admin`, e o item é a saída explícita para lá. Sai da moldura, e o
+		// rótulo diz isso: um nome de tela ("Comentários") prometeria que ela
+		// abre aqui.
+		if ( $moderador ) {
+			$nav['rc-painel-wp'] = array(
+				'title'      => __( 'Painel do WordPress', 'reconectar-core' ),
+				'icon'       => '<i class="fab fa-wordpress"></i>',
+				'icon_name'  => 'LayoutDashboard',
+				'url'        => admin_url(),
+				'pos'        => 170,
+				'permission' => Reconectar_Permissoes::CAP_ADMIN_WP,
 			);
 		}
 
 		return $nav;
+	}
+
+	/**
+	 * Leva o Moderador do `/dashboard/` à tela de módulos.
+	 *
+	 * O Dokan manda quem não é loja para a home (`dokan_redirect_if_not_seller()`,
+	 * em `template_redirect` 11), e a home é o mercado — justamente o que o
+	 * Moderador precisa entender que deixou. Prioridade 10, antes dele. O link
+	 * "Painel do vendedor" do rodapé e o "Visitar painel" das notificações levam
+	 * para lá, e por isso o caso não é teórico.
+	 *
+	 * Antes da tela de módulos o destino era a Incubadora. Agora é a escolha: o
+	 * `/dashboard/` é o "painel" de quem trabalha na plataforma, e para o
+	 * Moderador o painel não tem uma casa só.
+	 *
+	 * @return void
+	 */
+	public static function levar_moderador_aos_modulos() {
+		if ( ! self::modera_no_painel() || ! function_exists( 'dokan_get_option' ) || ! class_exists( 'Reconectar_Modulos' ) ) {
+			return;
+		}
+
+		$pagina_do_painel = absint( dokan_get_option( 'dashboard', 'dokan_pages' ) );
+
+		if ( ! $pagina_do_painel || ! is_page( $pagina_do_painel ) ) {
+			return;
+		}
+
+		wp_safe_redirect( Reconectar_Modulos::url() );
+		exit;
 	}
 
 	/**
@@ -566,9 +713,13 @@ class Reconectar_Navegacao_Da_Loja {
 	/**
 	 * URLs das três áreas, cada uma vazia se o destino não estiver publicado.
 	 *
+	 * Pública porque a tela de módulos aponta os cartões da Incubadora e da Praça
+	 * para os mesmos destinos da barra lateral: dois lugares decidindo a mesma
+	 * URL acabariam divergindo.
+	 *
 	 * @return array{comunidade: string, forum: string, incubadora: string}
 	 */
-	private static function destinos() {
+	public static function destinos() {
 		$comunidade = get_page_by_path( 'comunidade' );
 		$forum      = function_exists( 'bbp_get_forums_url' ) ? get_post_type_archive_link( 'forum' ) : '';
 
