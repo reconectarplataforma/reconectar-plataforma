@@ -18,8 +18,8 @@
 #
 # Complementa, não substitui, o roteiro manual em docs/ROTEIRO_PERFIS.md: o
 # isolamento entre vendedores (produto de um não abre para o outro) e o
-# isolamento entre empresas dependem de IDs do banco e são verificados à parte,
-# por WP-CLI, no fim deste script.
+# alcance sobre empresa sem vínculo dependem de IDs do banco e são verificados
+# à parte, por WP-CLI, no fim deste script.
 
 set -uo pipefail
 
@@ -390,12 +390,17 @@ if autenticar "demo-sabor-da-terra" "$SENHA_DEMO" "$JAR_VENDEDOR"; then
   # dia em que `/painel-empresas/loja/` deixasse de passar por `proteger()`
   # abriria a relação de todas as lojas a quem só administra a própria.
   conferir "$JAR_VENDEDOR" "/painel-empresas/loja/" "403"              "a listagem de lojas é do painel gerencial"
+  # Os itens Empresas e Lojas da barra lateral levam `permission` com o portão do
+  # painel gerencial, e o Dokan filtra por ela. Se a chave cair, a loja passa a
+  # ver dois itens que respondem 403 — sem vazar dado, e por isso sem nenhum
+  # outro caso que acuse.
+  conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-empresas"' "ausente" "a barra da loja não traz o painel gerencial"
 else
   falhas=$((falhas + 1))
 fi
 
 # Os dois IDs vêm do banco: o painel identifica a empresa por ID na URL, e o
-# caso que interessa — abrir a empresa alheia — não tem como ser escrito sem
+# caso que interessa — abrir a empresa sem vínculo — não tem como ser escrito sem
 # saber qual é. Quando a carga de demonstração não está instalada, ficam vazios
 # e os dois casos correspondentes são pulados com aviso, em vez de falharem por
 # ausência de dado.
@@ -423,7 +428,16 @@ echo "Administrador (demo-admin-nosso-chao)"
 JAR_EMPRESAS=/tmp/reconectar-acessos-empresas.txt
 if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
   conferir "$JAR_EMPRESAS" "/painel-empresas/"      "200" "o painel é dele"
-  conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200" "a listagem das lojas sob sua gestão"
+  conferir "$JAR_EMPRESAS" "/painel-empresas/loja/" "200" "a listagem de todas as lojas"
+  # A moldura do Dokan, sem `dokandar`. Os três casos de corpo cobrem o que um
+  # 200 não distingue: a tela pode responder certo e ter caído na casca da
+  # vitrine (sem o contêiner do React), ou ter caído na moldura carregando a
+  # barra de um vendedor. `"products"` é a chave do item de produtos no
+  # `sidebarNav`; a ausência dela é a prova de que nenhum item de venda vazou.
+  conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/" 'id="dokan-vendor-dashboard-layout-root"' "presente" "abre na moldura do painel do Dokan"
+  conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/" '"rc-lojas"'  "presente" "a barra lateral traz Empresas e Lojas"
+  conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/" '"products"'  "ausente"  "a barra lateral não traz item de venda"
+  conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/" 'rc-painel-empresas__menu' "ausente" "o menu próprio sai, a barra do Dokan o substitui"
   conferir "$JAR_EMPRESAS" "/comunidade/"           "302 /activity/" "participa da comunidade, pelo diretório"
   conferir "$JAR_EMPRESAS" "/activity/"             "200" "participa da comunidade"
   conferir "$JAR_EMPRESAS" "/wp-admin/"             "200" "entra no painel técnico"
@@ -449,9 +463,12 @@ if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
 
   if [ -n "$ID_NOSSO_CHAO" ] && [ -n "$ID_BEM_VIVER" ]; then
     conferir "$JAR_EMPRESAS" "/painel-empresas/empresa/$ID_NOSSO_CHAO/" "200" "abre a empresa que administra"
-    conferir "$JAR_EMPRESAS" "/painel-empresas/empresa/$ID_BEM_VIVER/"  "403" "não abre a empresa alheia"
+    # Era 403 até a versão 8 das capacidades: todo Administrador alcança todas
+    # as empresas desde então (`CAP_TODAS_AS_EMPRESAS` no papel). O vínculo
+    # segue gravado, e é por ele que o caso continua distinguindo as duas.
+    conferir "$JAR_EMPRESAS" "/painel-empresas/empresa/$ID_BEM_VIVER/"  "200" "abre também a empresa a que não está vinculado"
   else
-    echo "  --    carga de demonstração ausente; isolamento entre empresas não verificado por URL"
+    echo "  --    carga de demonstração ausente; alcance sobre empresa sem vínculo não verificado por URL"
   fi
 
   # A escalada de privilégio pela tela, e não só pela capacidade. Confere-se o
@@ -515,6 +532,7 @@ if autenticar "admin" "$SENHA_ADMIN" "$JAR_ADMIN"; then
   conferir "$JAR_ADMIN" "/comunidade/"           "302 /activity/" "administra a comunidade, pelo diretório"
   conferir "$JAR_ADMIN" "/activity/"             "200" "administra a comunidade"
   conferir "$JAR_ADMIN" "/painel-empresas/"     "200" "também administra empresas"
+  conferir_corpo "$JAR_ADMIN" "/dashboard/" '"rc-empresas"' "presente" "o painel do Dokan dele leva ao painel gerencial"
 else
   falhas=$((falhas + 1))
 fi

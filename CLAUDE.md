@@ -82,7 +82,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-357 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+363 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.
@@ -422,6 +422,29 @@ zera mais o coeficiente da vez. O sintoma não toca os dados: o código sai com
 tamanho certo, o texto decodifica corretamente, **só a correção sai inválida** —
 e todo leitor recusa a imagem ao conferir os síndromes. Uma verificação que só
 compare o texto lido com o original dá tudo por certo.
+
+### O topo e a barra React do Dokan decidem por URL, não por papel
+
+Dois defeitos mudos de quem abre a moldura do painel sem ser loja — hoje, o
+painel de empresas.
+
+**Item ativo é prefixo.** A barra lateral acende item sem submenu por
+`location.href.startsWith( item.url )`. Um item cuja URL é prefixo de outro —
+`/painel-empresas/` e `/painel-empresas/loja/` — acende junto nas telas do
+outro, e nada no PHP acusa: o `<li class="active">` da barra **clássica**
+sai certo, e não é ela que aparece com o layout React. Veja o `#content` em
+`Reconectar_Navegacao_Da_Loja::registrar_menu()`.
+
+**"Visitar loja" não está na configuração do layout.** O filtro
+`dokan_vendor_dashboard_layout_config` corrige nome, `editUrl` e "Minha conta",
+e o botão segue apontando para `/store/<login>/` — uma loja que não existe. O
+React lê `window.dokan.urls.storeUrl`, montado em `Assets.php` com
+`dokan_get_store_url()` do usuário corrente; o filtro que o alcança é
+`dokan_frontend_localize_script`.
+
+E o `style.css` do Dokan zera o padding de
+`.dokan-dashboard .dokan-dashboard-content ul li`, com (0,3,2): todo `<ul>`
+autoral dentro da moldura perde o recuo dos itens.
 
 ### Os passos do assistente do Dokan escutam `updated_option`, não `added_option`
 

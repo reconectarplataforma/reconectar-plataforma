@@ -122,14 +122,20 @@ class Reconectar_Permissoes {
 	const CAP_VER_OPERACAO = 'reconectar_ver_operacao_da_empresa';
 
 	/**
-	 * Alcance total: administra todas as empresas, e não apenas as vinculadas.
+	 * Alcance total: administra todas as empresas e lojas, e não apenas as
+	 * vinculadas.
 	 *
-	 * Fica **fora** do papel por padrão. O vínculo normal é N:N e explícito, na
-	 * user meta `_reconectar_empresas_geridas`; esta capacidade é a exceção
-	 * prevista pela especificação ("salvo quando possuir uma permissão específica
-	 * para administrar múltiplas empresas") e precisa ser concedida a dedo, a um
-	 * usuário por vez. Separá-la do papel é o que impede que "administrar uma
-	 * empresa" vire, por descuido, "administrar todas".
+	 * Nasceu fora do papel: o vínculo era N:N e explícito, na user meta
+	 * `_reconectar_empresas_geridas`, e esta capacidade era a exceção concedida a
+	 * dedo. A decisão mudou — todo Administrador passa a operar a incubadora
+	 * inteira, porque quem cadastra e acompanha as lojas é a mesma equipe —, e
+	 * ela entrou em `CAPS_DO_ADMIN_DE_EMPRESAS` na versão 8 das capacidades.
+	 *
+	 * Continua sendo uma capacidade **separada** do portão do painel, e não um
+	 * efeito colateral dele: é a ela que `empresas_no_escopo()` responde, e
+	 * voltar ao isolamento por empresa é tirá-la do papel, sem mexer em consulta
+	 * nenhuma. A meta de vínculo segue gravada por isso — ela é o que restringe
+	 * quem não tiver esta capacidade.
 	 */
 	const CAP_TODAS_AS_EMPRESAS = 'reconectar_gerir_todas_as_empresas';
 
@@ -200,7 +206,8 @@ class Reconectar_Permissoes {
 	 * `user_can( $id, 'dokandar' )`): concedê-la faria este ator herdar em
 	 * silêncio tudo que o plugin liberar por ela daqui em diante.
 	 *
-	 * `CAP_TODAS_AS_EMPRESAS` também está de fora — ver o comentário dela.
+	 * `CAP_TODAS_AS_EMPRESAS` está **dentro** desde a versão 8 — ver o
+	 * comentário dela.
 	 *
 	 * @var string[]
 	 */
@@ -211,6 +218,7 @@ class Reconectar_Permissoes {
 		self::CAP_GERIR_EMPRESAS,
 		self::CAP_GERIR_LOJAS,
 		self::CAP_VER_OPERACAO,
+		self::CAP_TODAS_AS_EMPRESAS,
 	);
 
 	/**
@@ -357,7 +365,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 7;
+	const VERSAO_CAPACIDADES = 8;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
