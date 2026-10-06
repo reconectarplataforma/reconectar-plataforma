@@ -1,5 +1,5 @@
 /**
- * Comportamento dos carrosséis do marketplace.
+ * Comportamento dos carrosséis e da coluna de filtros do marketplace.
  *
  * Progressive enhancement, no sentido estrito: a faixa é um contêiner com
  * `overflow-x` e rola sozinha no toque, no trackpad e pelo teclado. Este arquivo
@@ -99,10 +99,45 @@
 		atualizarSetas();
 	}
 
+	/**
+	 * Mantém a coluna de filtros do catálogo aberta no desktop.
+	 *
+	 * O `<details>` nasce fechado no HTML, que é o certo para o celular: aberto,
+	 * ele poria uma tela inteira de opções antes do primeiro produto. No desktop
+	 * a coluna tem lugar próprio ao lado da grade, e um botão "Filtrar" ali seria
+	 * um clique a mais para nada — por isso abre, e a classe `is-fixo` esconde o
+	 * `<summary>` no CSS. Sem este script, o desktop fica com o botão: pior de
+	 * usar, nunca com filtro escondido.
+	 *
+	 * A largura casa com o `@media` de `.rc-catalogo` em `marketplace.css`.
+	 *
+	 * @param {HTMLDetailsElement} filtros Elemento com `data-rc-catalogo-filtros`.
+	 */
+	function ligarFiltrosDoCatalogo( filtros ) {
+		var largo = window.matchMedia( '(min-width: 768px)' );
+
+		function aplicar() {
+			filtros.open = largo.matches;
+			filtros.classList.toggle( 'is-fixo', largo.matches );
+		}
+
+		// `addListener` para o Safari anterior ao 14, que não tem `addEventListener`
+		// em `MediaQueryList`.
+		if ( largo.addEventListener ) {
+			largo.addEventListener( 'change', aplicar );
+		} else {
+			largo.addListener( aplicar );
+		}
+
+		aplicar();
+	}
+
 	function iniciar() {
 		var carrosseis = document.querySelectorAll( '[data-rc-carrossel]' );
+		var filtros = document.querySelectorAll( '[data-rc-catalogo-filtros]' );
 
 		Array.prototype.forEach.call( carrosseis, ligarCarrossel );
+		Array.prototype.forEach.call( filtros, ligarFiltrosDoCatalogo );
 	}
 
 	if ( 'loading' === document.readyState ) {

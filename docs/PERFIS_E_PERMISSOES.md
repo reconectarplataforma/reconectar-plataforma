@@ -176,6 +176,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Fecha a Incubadora a quem não está logado | `Reconectar_Incubadora::bloquear_leitura()` | `template_redirect` (1) |
 | Dá 404 a página da Incubadora sob mãe em rascunho | `Reconectar_Incubadora_Leitura::exigir_caminho_visivel()` | `template_redirect` (2) |
 | Esconde o item Incubadora do visitante | `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` | `wp_nav_menu_objects` |
+| Mostra o item "Loja" (vitrine própria) só a quem tem loja | `Reconectar_Navegacao_Da_Loja::acrescentar_item_loja_ao_menu()` | `wp_nav_menu_objects` (20) |
 | Barra a escrita na Incubadora | `Reconectar_Incubadora_Acoes::processar_*()` | `admin_post_reconectar_incubadora_*` |
 | Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
@@ -186,6 +187,13 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 da comunidade no menu é usabilidade — oferecer um link que devolve 403 é defeito
 de interface. Quem barra o acesso é o `template_redirect`, e ele barra mesmo que
 a URL seja digitada à mão. O edital exige as duas; nenhuma substitui a outra.
+
+**"Produtos" é de todos; "Loja" é de quem tem loja.** O catálogo inteiro
+(`/shop/`, com a coluna de filtros) aparece no menu como "Produtos", para todo
+perfil e para quem não está logado. O item "Loja" não existe no menu gravado: é
+acrescentado na hora, só para quem mora no painel da loja, e leva à vitrine
+dela (`/store/<loja>/`). Os demais perfis nunca o recebem — não há link que
+precise ser escondido. A vitrine segue pública, como qualquer loja.
 
 **Ler e escrever são travas separadas, e por um motivo medido.** O bbPress
 processa o POST de criação em `template_redirect` **prioridade 8**, antes da

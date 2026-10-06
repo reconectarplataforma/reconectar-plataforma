@@ -80,7 +80,12 @@ function reconectar_ajustar_classes_de_layout( $classes ) {
 		$e_da_incubadora = Reconectar_Incubadora::requisicao_e_da_incubadora();
 	}
 
-	if ( ! is_front_page() && ! $painel_de_empresas && ! $pagina_de_loja && ! $listagem_de_lojas && ! $e_do_forum && ! $e_da_incubadora ) {
+	// A página "Produtos" é o sétimo: a coluna de filtros fica à esquerda, dentro
+	// do conteúdo (veja `inc/marketplace/catalogo.php`), e a reserva de 26% à
+	// direita espremeria a grade entre duas colunas laterais.
+	$catalogo = function_exists( 'is_shop' ) && is_shop();
+
+	if ( ! is_front_page() && ! $painel_de_empresas && ! $pagina_de_loja && ! $listagem_de_lojas && ! $e_do_forum && ! $e_da_incubadora && ! $catalogo ) {
 		return $classes;
 	}
 
@@ -249,6 +254,12 @@ add_action( 'wp', 'reconectar_remover_titulo_da_incubadora' );
  * o caminho óbvio para o catálogo: ele não esconde o título, ele apaga o `<h1>`
  * de `loop/header.php`.
  *
+ * A página de categoria de produto também fica de fora, e por outro motivo: ali o
+ * `<h1>` é o nome da categoria, e a trilha o mostra em 14px, como último elo —
+ * escondido, a página abria numa descrição centralizada solta, sem dizer em que
+ * corredor do mercado a pessoa está. Ele fica visível, compacto e à esquerda
+ * (`.tax-product_cat .woocommerce-products-header` em `marketplace.css`).
+ *
  * A tela de acesso fica de fora porque já é caso da função acima — lá existe o
  * segundo `<h1>` ("Acessar a plataforma") e a remoção é a correta. Daí o
  * `is_user_logged_in()` na condição de `is_account_page()`: dentro do painel,
@@ -263,7 +274,7 @@ add_action( 'wp', 'reconectar_remover_titulo_da_incubadora' );
  */
 function reconectar_marcar_pagina_sem_titulo( $classes ) {
 	$do_woocommerce = function_exists( 'is_shop' )
-		&& ( is_shop() || is_product_taxonomy() || is_cart() || is_checkout() || ( is_account_page() && is_user_logged_in() ) );
+		&& ( is_shop() || ( is_product_taxonomy() && ! is_product_category() ) || is_cart() || is_checkout() || ( is_account_page() && is_user_logged_in() ) );
 
 	$listagem_de_lojas = function_exists( 'dokan_is_store_listing' ) && dokan_is_store_listing();
 

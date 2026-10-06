@@ -122,7 +122,7 @@ function reconectar_completar_lista_do_rodape( $conteudo, $itens ) {
  */
 $colunas = array(
 	'reconectar-rodape-2' => array(
-		reconectar_caminho_de_pagina_do_rodape( wc_get_page_id( 'shop' ) )      => 'Loja',
+		reconectar_caminho_de_pagina_do_rodape( wc_get_page_id( 'shop' ) )      => 'Produtos',
 		reconectar_caminho_por_slug_do_rodape( 'store-listing' )                => 'Lojas parceiras',
 		reconectar_caminho_por_slug_do_rodape( 'comunidade' )                   => 'Comunidade',
 		reconectar_caminho_por_slug_do_rodape( 'transparencia' )                => 'Transparência',
