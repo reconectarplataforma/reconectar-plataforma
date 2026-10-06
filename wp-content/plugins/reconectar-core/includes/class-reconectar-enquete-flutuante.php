@@ -67,7 +67,7 @@ class Reconectar_Enquete_Flutuante {
 	 * @return void
 	 */
 	public static function enfileirar_assets() {
-		if ( is_admin() || empty( self::enquetes() ) ) {
+		if ( is_admin() || self::na_tela_de_modulos() || empty( self::enquetes() ) ) {
 			return;
 		}
 
@@ -91,11 +91,28 @@ class Reconectar_Enquete_Flutuante {
 	}
 
 	/**
+	 * A requisição é a da tela de módulos?
+	 *
+	 * Ali o cartão não aparece. A tela é uma escolha de três cartões, e o da
+	 * enquete abria por cima do terceiro — medido a 1400px, cobria metade da
+	 * Praça. Quem escolhe o módulo encontra a enquete na página seguinte.
+	 *
+	 * @return bool
+	 */
+	private static function na_tela_de_modulos() {
+		return class_exists( 'Reconectar_Modulos' ) && Reconectar_Modulos::eh_a_tela();
+	}
+
+	/**
 	 * Imprime o cartão.
 	 *
 	 * @return void
 	 */
 	public static function imprimir() {
+		if ( self::na_tela_de_modulos() ) {
+			return;
+		}
+
 		$enquetes = self::enquetes();
 
 		if ( empty( $enquetes ) ) {

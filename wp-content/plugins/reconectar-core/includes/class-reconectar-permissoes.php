@@ -905,6 +905,23 @@ class Reconectar_Permissoes {
 	}
 
 	/**
+	 * O usuário tem o papel de Moderador de Conteúdo?
+	 *
+	 * Pelo papel, como `eh_vendedor()`: quem pergunta é a navegação, que decide a
+	 * casca da tela e o destino do login — identidade, não autorização. O
+	 * Administrador também tem `CAP_GERIR_INCUBADORA`, e a casa dele é o painel
+	 * de empresas.
+	 *
+	 * @param int $usuario_id ID do usuário.
+	 * @return bool
+	 */
+	public static function eh_moderador_de_conteudo( $usuario_id ) {
+		$usuario = get_userdata( $usuario_id );
+
+		return $usuario && in_array( self::PAPEL_MODERADOR, (array) $usuario->roles, true );
+	}
+
+	/**
 	 * Impede que um vendedor leia ou altere registro de outro vendedor.
 	 *
 	 * Esta é a trava de backend exigida pela especificação: ela vale para o

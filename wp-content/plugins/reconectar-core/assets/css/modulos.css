@@ -1,0 +1,278 @@
+/**
+ * A tela de módulos (`/modulos/`).
+ *
+ * A tela não exige o tema, como o painel de empresas: cada token tem fallback
+ * literal, e `box-sizing` é declarado aqui porque o reset do Storefront não vale
+ * sem ele.
+ *
+ * As cores dos cartões foram escolhidas pelo contraste do texto branco, não só
+ * pela paleta, e as duas cores da marca que pareciam servir não servem. O
+ * verde-água (#31BEB1) dá 2,30:1 com branco, e o terracota (#CF6442), 3,78:1 —
+ * os dois reprovam o critério 1.4.3 da WCAG 2.1 no texto corrido do cartão. Por
+ * isso Praça e Mercado usam o mesmo matiz escurecido, #1E7C73 (5,02:1) e
+ * #B05538 (5,0:1), e não o token da marca: o token ficaria certo no nome e
+ * errado na tela. O roxo institucional da Incubadora (#663191) mede 8,7:1.
+ *
+ * Sem build e sem CDN, como o resto do projeto.
+ */
+
+.rc-modulos-pagina {
+	--rc-mo-fundo: #f5f7f8;
+	--rc-mo-texto: #1d1d1b;
+	/* 4,54:1 sobre o --rc-mo-fundo: o mesmo cinza do painel de empresas. */
+	--rc-mo-texto-suave: #717171;
+	--rc-mo-mercado: #B05538;
+	--rc-mo-incubadora: var( --reconectar-cor-institucional, #663191 );
+	--rc-mo-praca: #1E7C73;
+	--rc-mo-destaque: var( --reconectar-cor-destaque, #F1BF3D );
+
+	--rc-mo-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-mo-fonte-base: var( --rc-fonte-base, 1rem );
+	--rc-mo-fonte-md: var( --rc-fonte-md, 1.125rem );
+	--rc-mo-fonte-2xl: var( --rc-fonte-2xl, 1.75rem );
+	--rc-mo-fonte-3xl: var( --rc-fonte-3xl, 2.25rem );
+
+	margin: 0;
+	background: #fff;
+	color: var( --rc-mo-texto );
+	font-family: Poppins, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.rc-modulos-pagina *,
+.rc-modulos-pagina *::before,
+.rc-modulos-pagina *::after {
+	box-sizing: border-box;
+}
+
+/* Pular para o conteúdo
+   ------------------------------------------------------------------------- */
+
+.rc-modulos__pular {
+	position: absolute;
+	top: 0.5rem;
+	left: 0.5rem;
+	z-index: 100;
+	padding: 0.5rem 1rem;
+	background: #fff;
+	color: var( --rc-mo-texto );
+	font-size: var( --rc-mo-fonte-sm );
+	transform: translateY( -200% );
+}
+
+.rc-modulos__pular:focus {
+	transform: none;
+}
+
+/* Topo
+   ------------------------------------------------------------------------- */
+
+.rc-modulos__topo {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 1rem 16px;
+}
+
+.rc-modulos__marca img {
+	display: block;
+	width: auto;
+	max-width: 180px;
+	/* `max-height` junto: a logo do tema vem com atributos de tamanho, e o
+	   teto de altura é o que de fato a segura na linha. */
+	max-height: 48px;
+	height: auto;
+}
+
+.rc-modulos__nome-do-site {
+	color: var( --rc-mo-texto );
+	font-size: var( --rc-mo-fonte-md );
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.rc-modulos__sair {
+	color: var( --rc-mo-texto );
+	font-size: var( --rc-mo-fonte-sm );
+	font-weight: 600;
+	text-decoration: underline;
+}
+
+/* Abertura: a faixa cinza sobe por trás da primeira metade dos cartões, como
+   no modelo — o que liga o cabeçalho aos cartões sem uma borda.
+   ------------------------------------------------------------------------- */
+
+.rc-modulos {
+	padding: 0 16px 3rem;
+	background: linear-gradient( var( --rc-mo-fundo ) 0, var( --rc-mo-fundo ) 18rem, #fff 18rem );
+}
+
+.rc-modulos:focus {
+	outline: none;
+}
+
+.rc-modulos__abertura {
+	max-width: 44rem;
+	margin: 0 auto;
+	padding: 2.5rem 0 2rem;
+	text-align: center;
+}
+
+.rc-modulos__titulo {
+	margin: 0 0 0.75rem;
+	font-size: var( --rc-mo-fonte-2xl );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	font-weight: 700;
+}
+
+.rc-modulos__apoio {
+	margin: 0;
+	color: var( --rc-mo-texto-suave );
+	font-size: var( --rc-mo-fonte-base );
+	line-height: 1.5;
+}
+
+/* Cartões
+   ------------------------------------------------------------------------- */
+
+.rc-modulos__lista {
+	display: grid;
+	grid-template-columns: minmax( 0, 1fr );
+	gap: 1.25rem;
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-modulos__cartao {
+	position: relative;
+	display: flex;
+	min-height: 14rem;
+	padding: 1.5rem;
+	overflow: hidden;
+	border-radius: 16px;
+	color: #fff;
+}
+
+.rc-modulos__cartao--mercado {
+	background: var( --rc-mo-mercado );
+}
+
+.rc-modulos__cartao--incubadora {
+	background: var( --rc-mo-incubadora );
+}
+
+.rc-modulos__cartao--praca {
+	background: var( --rc-mo-praca );
+}
+
+/* O texto fica acima da ilustração e com largura limitada, para que a frase
+   nunca corra por baixo do desenho. */
+.rc-modulos__texto {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	max-width: 62%;
+}
+
+.rc-modulos__nome {
+	margin: 0;
+	color: #fff;
+	font-size: var( --rc-mo-fonte-3xl );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	font-weight: 700;
+}
+
+.rc-modulos__subtitulo {
+	margin: 0.25rem 0 0.75rem;
+	font-size: var( --rc-mo-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.rc-modulos__frase {
+	margin: 0 0 1.25rem;
+	font-size: var( --rc-mo-fonte-base );
+	line-height: 1.5;
+}
+
+/* `margin-top: auto` alinha os botões pela base nos três cartões, mesmo com
+   frases de comprimentos diferentes. */
+.rc-modulos__botao {
+	display: inline-block;
+	margin-top: auto;
+	padding: 0.625rem 1.25rem;
+	border-radius: 8px;
+	/* Sombra do próprio fundo: o branco sobre ela só ganha contraste. */
+	background: rgba( 0, 0, 0, 0.22 );
+	color: #fff;
+	font-size: var( --rc-mo-fonte-base );
+	font-weight: 600;
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	text-decoration: none;
+}
+
+.rc-modulos__botao:hover {
+	background: rgba( 0, 0, 0, 0.35 );
+}
+
+.rc-modulos__botao:focus-visible {
+	outline: 3px solid var( --rc-mo-destaque );
+	outline-offset: 3px;
+}
+
+.rc-modulos__indisponivel {
+	margin: auto 0 0;
+	font-size: var( --rc-mo-fonte-sm );
+	font-style: italic;
+}
+
+.rc-modulos__ilustracao {
+	position: absolute;
+	right: 0.5rem;
+	bottom: 0.5rem;
+	width: 42%;
+	max-width: 13rem;
+	height: auto;
+}
+
+/* Três colunas só quando cabe a frase: abaixo disso, a coluna estreita
+   empilharia o título palavra a palavra ao lado do desenho. */
+@media ( min-width: 900px ) {
+	.rc-modulos__lista {
+		grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
+	}
+
+	.rc-modulos__cartao {
+		min-height: 20rem;
+	}
+
+	/* A reserva embaixo é a altura da ilustração (11rem × 160/200) com folga:
+	   sem ela o toldo do Mercado encostava no botão. */
+	.rc-modulos__texto {
+		max-width: 100%;
+		padding-bottom: 9.5rem;
+	}
+
+	.rc-modulos__ilustracao {
+		width: 50%;
+		max-width: 11rem;
+	}
+
+	.rc-modulos__titulo {
+		font-size: var( --rc-mo-fonte-3xl );
+	}
+}
+
+@media ( prefers-reduced-motion: no-preference ) {
+	.rc-modulos__botao {
+		transition: background-color 0.15s ease;
+	}
+}

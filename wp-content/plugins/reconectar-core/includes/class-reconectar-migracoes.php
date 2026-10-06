@@ -42,8 +42,9 @@ class Reconectar_Migracoes {
 	 * 6 — reescreve as regras pelo post type da Incubadora (`incubadora_pagina`).
 	 * 7 — reescreve as regras pela aba de avaliações pendentes do painel.
 	 * 8 — renomeia a página da loja do WooCommerce, e os links dela, para "Produtos".
+	 * 9 — reescreve as regras pela rota da tela de módulos (`/modulos/`).
 	 */
-	const VERSAO = 8;
+	const VERSAO = 9;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -105,8 +106,8 @@ class Reconectar_Migracoes {
 	 * comprovantes, a 5 acompanha a remoção dela em favor de uma coluna na lista
 	 * de pedidos, a 6 acompanha o post type da Incubadora — que traz regra de
 	 * reescrita própria, `/incubadora/<pai>/<filho>/`, e responderia 404 numa
-	 * instalação já de pé pelo mesmo motivo —, e a 7 acompanha a aba de
-	 * avaliações pendentes.
+	 * instalação já de pé pelo mesmo motivo —, a 7 acompanha a aba de
+	 * avaliações pendentes, e a 9, a rota da tela de módulos.
 	 *
 	 * `flush_rewrite_rules()` é caro e por isso mora aqui, no mecanismo que roda
 	 * uma vez por instalação, e não num gancho de carga de página.

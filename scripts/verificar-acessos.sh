@@ -512,7 +512,17 @@ if autenticar "demo-moderador" "$SENHA_DEMO" "$JAR_MODERADOR"; then
   conferir "$JAR_MODERADOR" "/wp-admin/theme-editor.php" "403" "não edita arquivo de tema"
   conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=product" "403" "produto é da loja"
   conferir "$JAR_MODERADOR" "/painel-empresas/"       "403" "moderar não é administrar empresa"
-  conferir "$JAR_MODERADOR" "/dashboard/"             "302" "não é vendedor"
+  conferir "$JAR_MODERADOR" "/dashboard/"             "302 /modulos/" "não é vendedor; vai à escolha de módulo"
+
+  # A moldura de moderação: as três áreas abrem com a barra lateral do Dokan, e
+  # o topo diz o nome do módulo. O nome sai em JSON, com os acentos escapados.
+  conferir_corpo "$JAR_MODERADOR" "/forums/" "rc-no-painel-da-loja" "presente" "fórum na moldura de moderação"
+  conferir_corpo "$JAR_MODERADOR" "/forums/" '"name":"Modera\u00e7\u00e3o"' "presente" "topo diz Moderação"
+  conferir_corpo "$JAR_MODERADOR" "/forums/" '"title":"Painel do WordPress"' "presente" "saída para o /wp-admin na barra"
+  conferir_corpo "$JAR_MODERADOR" "/forums/" "rc-cabecalho" "ausente" "sem o cabeçalho do mercado"
+  conferir_corpo "$JAR_MODERADOR" "/forums/" '"products"' "ausente" "a barra lateral não traz item de venda"
+  # O rótulo sai do bundle React; o que o HTML traz é a tradução que o alimenta.
+  conferir_corpo "$JAR_MODERADOR" "/forums/" '"Visit Store":["Ir ao mercado"]' "presente" "o topo diz Ir ao mercado"
 
   # Pelo corpo, e não pelo status, pela razão registrada no bloco acima: o
   # `wp_die()` de negação sai como 500 e um fatal de PHP sairia igual.
@@ -536,6 +546,81 @@ if autenticar "admin" "$SENHA_ADMIN" "$JAR_ADMIN"; then
 else
   falhas=$((falhas + 1))
 fi
+
+# A tela de módulos: Loja, Administrador e Moderador escolhem por onde começar,
+# a cada login. O login se mede pelo `Location` da resposta do formulário, e não
+# pelo jar já autenticado acima: a tela só existe se o destino for trocado ali.
+#
+# Os dois lados de cada trava. O cliente e o Super Administrador não podem cair
+# na tela — o cliente perderia a conta, o Super Administrador o `/wp-admin` —, e
+# um destino explícito precisa vencer, ou quem entrou por um link do fórum
+# perderia o caminho.
+echo "Tela de módulos"
+
+# Entra com o formulário do `wp-login.php` num jar descartável e devolve
+# "<código> <destino>". `redirect_to` é opcional.
+destino_do_login() {
+  local login="$1" senha="$2" pedido="${3:-}" jar
+  jar="$(mktemp)"
+  curl -s -c "$jar" -o /dev/null "$BASE/wp-login.php"
+  if [ -n "$pedido" ]; then
+    curl -s -c "$jar" -b "$jar" -o /dev/null -w '%{http_code} %{redirect_url}' \
+      --data-urlencode "log=$login" --data-urlencode "pwd=$senha" \
+      --data-urlencode "wp-submit=Acessar" --data-urlencode "testcookie=1" \
+      --data-urlencode "redirect_to=$pedido" "$BASE/wp-login.php"
+  else
+    curl -s -c "$jar" -b "$jar" -o /dev/null -w '%{http_code} %{redirect_url}' \
+      --data-urlencode "log=$login" --data-urlencode "pwd=$senha" \
+      --data-urlencode "wp-submit=Acessar" --data-urlencode "testcookie=1" "$BASE/wp-login.php"
+  fi
+  rm -f "$jar"
+}
+
+# esperado: o código e um trecho do destino, como em `conferir`.
+conferir_login() {
+  local login="$1" senha="$2" pedido="$3" esperado="$4" descricao="$5"
+  local resposta
+  resposta="$(destino_do_login "$login" "$senha" "$pedido")"
+  total=$((total + 1))
+  if [ "${resposta%% *}" = "${esperado%% *}" ] && [[ "${resposta#* }" == *"${esperado#* }"* ]]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "login $login" "$descricao"
+    return 0
+  fi
+  printf '  FALHA %-24s esperado %s, veio %s\n' "login $login" "$esperado" "$resposta"
+  falhas=$((falhas + 1))
+  return 1
+}
+
+conferir_login "demo-sabor-da-terra"   "$SENHA_DEMO"  "" "302 /modulos/" "a loja escolhe o módulo ao entrar"
+conferir_login "demo-admin-nosso-chao" "$SENHA_DEMO"  "" "302 /modulos/" "o Administrador escolhe o módulo ao entrar"
+conferir_login "demo-moderador"        "$SENHA_DEMO"  "" "302 /modulos/" "o Moderador escolhe o módulo ao entrar"
+conferir_login "demo-moderador"        "$SENHA_DEMO"  "$BASE/forums/" "302 /forums/" "destino explícito vence a escolha"
+conferir_login "demo-sabor-da-terra"   "$SENHA_DEMO"  "$BASE/forums/" "302 /forums/" "destino explícito vence o painel da loja"
+total=$((total + 2))
+for login_fora in "demo-cliente-marina:$SENHA_DEMO" "admin:$SENHA_ADMIN"; do
+  resposta="$(destino_do_login "${login_fora%%:*}" "${login_fora#*:}")"
+  if [[ "$resposta" == *"/modulos/"* ]]; then
+    printf '  FALHA %-24s não escolhe módulo, e foi levado à tela: %s\n' "login ${login_fora%%:*}" "$resposta"
+    falhas=$((falhas + 1))
+  else
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "login ${login_fora%%:*}" "não passa pela tela de módulos"
+  fi
+done
+
+conferir "" "/modulos/" "302 wp-login.php" "visitante vai ao login, com retorno"
+[ -f "$JAR_CLIENTE" ]  && conferir "$JAR_CLIENTE" "/modulos/" "302" "o cliente não escolhe módulo"
+[ -f "$JAR_ADMIN" ]    && conferir "$JAR_ADMIN"   "/modulos/" "302 /wp-admin/" "o Super Administrador volta ao /wp-admin"
+if [ -f "$JAR_VENDEDOR" ]; then
+  conferir_corpo "$JAR_VENDEDOR" "/modulos/" ">Abrir minha loja<" "presente" "o Mercado da loja é o painel dela"
+  conferir_corpo "$JAR_VENDEDOR" "/modulos/" "rc-modulos__cartao--praca" "presente" "a Praça está na tela"
+  conferir_corpo "$JAR_VENDEDOR" "/modulos/" 'class="rc-enquete"' "ausente" "a enquete não cobre os cartões"
+  conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-modulos"' "presente" "volta à escolha pela barra do painel"
+  conferir_corpo "$JAR_VENDEDOR" "$MINHA_CONTA" "navigation-link--rc-modulos" "presente" "volta à escolha pelo menu da conta"
+fi
+[ -f "$JAR_EMPRESAS" ]  && conferir_corpo "$JAR_EMPRESAS"  "/modulos/" ">Abrir painel de empresas<" "presente" "o Mercado do Administrador é o painel de empresas"
+[ -f "$JAR_MODERADOR" ] && conferir_corpo "$JAR_MODERADOR" "/modulos/" ">Ir ao mercado<" "presente" "o Mercado do Moderador é a vitrine"
+[ -f "$JAR_CLIENTE" ]   && conferir_corpo "$JAR_CLIENTE"   "$MINHA_CONTA" "navigation-link--rc-modulos" "ausente" "o cliente não vê o item Módulos"
+[ -f "$JAR_ADMIN" ]     && conferir_corpo "$JAR_ADMIN"     "/dashboard/" '"rc-modulos"' "ausente" "a barra do Super Administrador não leva à tela"
 
 # O endpoint de voto não tem URL de leitura: só responde a POST, e por isso não
 # cabe em `conferir`. O caso abaixo prova a primeira das duas travas — o nonce.
