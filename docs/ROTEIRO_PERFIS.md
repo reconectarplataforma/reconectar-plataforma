@@ -120,7 +120,7 @@ compartilhável e sobrevive ao recarregamento.
 ### 1.3 Entrar e comprar
 
 Entre como `demo-cliente-ana`. Note que **a barra administrativa do WordPress
-não aparece** — está oculta para quem não entra no painel.
+não aparece** — ela está oculta no site para todos os perfis.
 
 Adicione ao carrinho **produtos de duas lojas diferentes**. Abra o carrinho:
 está tudo junto, num carrinho só.

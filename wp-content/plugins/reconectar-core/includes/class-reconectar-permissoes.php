@@ -1631,9 +1631,9 @@ class Reconectar_Permissoes {
 	/**
 	 * O usuário passa pela porta do `/wp-admin`?
 	 *
-	 * Uma resposta só para as três decisões que dependem dela — o bloqueio, a
-	 * barra administrativa e o link do painel em "Minha conta". Se divergissem, a
-	 * tela ofereceria um link que o bloqueio devolve com um redirecionamento.
+	 * Uma resposta só para as decisões que dependem dela — o bloqueio e o link do
+	 * painel em "Minha conta". Se divergissem, a tela ofereceria um link que o
+	 * bloqueio devolve com um redirecionamento.
 	 *
 	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
 	 * @return bool
@@ -1676,23 +1676,19 @@ class Reconectar_Permissoes {
 	}
 
 	/**
-	 * Esconde a barra administrativa de quem não entra no painel.
+	 * Esconde a barra administrativa do site para todos os perfis.
 	 *
-	 * A condição é a mesma de `bloquear_area_administrativa()` de propósito: uma
-	 * barra com o link "Painel" que leva a um redirecionamento é pior que barra
-	 * nenhuma.
+	 * Antes ela ficava para quem entra no painel, e foi tirada também desses: no
+	 * site, a barra punha "Personalizar", "Novo" e o menu do BuddyPress por cima da
+	 * moldura do painel e da tela de módulos, que já levam cada perfil aonde ele
+	 * trabalha. O `/wp-admin` não é afetado — lá o núcleo ignora este filtro e
+	 * desenha a barra de qualquer jeito.
 	 *
 	 * @param bool $exibir Decisão anterior.
 	 * @return bool
 	 */
 	public static function ocultar_barra_administrativa( $exibir ) {
-		if ( ! is_user_logged_in() ) {
-			return $exibir;
-		}
-
-		if ( self::entra_no_painel_wp() ) {
-			return $exibir;
-		}
+		unset( $exibir );
 
 		return false;
 	}

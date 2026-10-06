@@ -192,7 +192,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
-| Esconde a barra administrativa | `ocultar_barra_administrativa()` | `show_admin_bar` |
+| Esconde a barra administrativa do site, para todos os perfis | `ocultar_barra_administrativa()` | `show_admin_bar` |
 
 **Interface e backend são camadas distintas, e ambas existem.** Esconder o link
 da comunidade no menu é usabilidade — oferecer um link que devolve 403 é defeito

@@ -4,8 +4,8 @@
  *
  * Documento inteiro, e não um shortcode dentro do tema: ver o topo de
  * `class-reconectar-modulos.php`. `wp_head()` e `wp_footer()` continuam aqui —
- * sem eles não sairiam o estilo da tela, a barra administrativa nem o aviso de
- * demonstração, que é de `wp_body_open`.
+ * sem eles não sairiam o estilo da tela nem o aviso de demonstração, que é de
+ * `wp_body_open`.
  *
  * @package reconectar-core
  */
