@@ -4195,3 +4195,128 @@ Registradas no `CLAUDE.md`:
 | `storeUrl` para o Administrador | `/shop/` (era `/store/demo-admin-nosso-chao/`) |
 | 375px, listagem de lojas | `scrollX` 0, sem transbordo |
 | `verificar-acessos.sh` | 363 casos, nenhuma falha (6 novos; empresa sem vínculo de 403 para 200) |
+
+## 2026-10-06 — A página de produto diz qual loja vende
+
+A página de detalhe de produto não identificava a loja em lugar nenhum: título,
+preço, descrição, botão e categoria. Num marketplace em que o pedido se divide
+por loja, e o meio de pagamento e a entrega são de cada uma, o comprador punha
+no carrinho sem saber de quem comprava.
+
+**O que mudou**
+
+- `inc/marketplace/produto.php` (novo): `reconectar_produto_loja_vendedora()`,
+  em `woocommerce_single_product_summary` prioridade 6 — logo abaixo do título,
+  antes do preço. Imprime um cartão "Vendido por <Loja>" com logo (ou inicial),
+  nota e cidade, e o cartão inteiro leva à página da loja.
+- `assets/css/marketplace.css`: seção "Loja na página de produto", com os
+  tokens de fonte da escala.
+
+**Decisões**
+
+- **Autoral, e não a opção do Dokan.** `dokan_general.show_vendor_info` imprime
+  a informação em `woocommerce_product_meta_end`, abaixo do botão de compra, e
+  com o vocabulário "Vendor". O cartão reaproveita `reconectar_normalizar_loja()`:
+  nome, nota e link são os mesmos dos cards da vitrine.
+- **Produto sem loja identificável não imprime nada.** Um "Vendido por" vazio
+  seria pior que a ausência.
+- **O link tem `position: relative`.** A nota traz `.screen-reader-text`, que é
+  absoluto; sem ancestral posicionado ele subiria até o viewport — a armadilha
+  do carrossel.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| Ordem no HTML | título → cartão da loja → preço, em dois produtos de lojas diferentes |
+| Link | `/store/demo-atelie-raizes/` e `/store/demo-bem-viver/`, as lojas donas |
+| 375px | `scrollX` 0, `scrollWidth` 375; cartão com 181px a partir de x=16 |
+| Cor do nome | `rgb(39, 39, 42)` sobre branco; rótulo e meta em `#717171` (4,8:1) |
+
+## 2026-10-06 — Página "Produtos" com filtros, e "Loja" só para quem tem loja
+
+Três pedidos em sequência sobre a navegação do mercado:
+
+1. o cabeçalho da categoria de produto estava fora de proporção;
+2. o item "Loja" do menu aparecia para quem não estava logado e levava ao
+   catálogo inteiro;
+3. faltava uma página "Produtos" com o catálogo inteiro e uma coluna lateral de
+   filtros, que fosse o destino do "Ver mais" de "Produtos em destaque" na home.
+
+**O que mudou**
+
+- **Cabeçalho da categoria.** `reconectar_marcar_pagina_sem_titulo()` deixa de
+  esconder o `<h1>` em `is_product_category()`. O cabeçalho ficou compacto e
+  alinhado à esquerda (`.tax-product_cat .woocommerce-products-header`). A
+  contagem "Mostrando resultados" ficou na linha do select de ordenação.
+- **Página "Produtos".** É a própria `/shop/` do WooCommerce, e não uma página
+  nova: a paginação, a ordenação do WooCommerce e o `reconectar_url_loja()` do
+  "Ver mais" da home já apontavam para ela. `inc/marketplace/catalogo.php`
+  (novo) monta a coluna:
+  - destaques: mais vendidos, mais bem avaliados, novidades e em oferta;
+  - categorias: as subcategorias aparecem sob a mãe aberta;
+  - lojas: só as que têm produto publicado;
+  - faixa de preço e "Limpar filtros".
+- **Como o filtro é aplicado.** Pelos parâmetros `categoria`, `loja` e `oferta`,
+  em `woocommerce_product_query`. Valor inválido na URL é ignorado, e não
+  devolve lista vazia.
+- **Layout.** `reconectar_ajustar_classes_de_layout()` tira a reserva lateral do
+  Storefront em `is_shop()`, e a barra do tema pai sai em `template_redirect`.
+- **Item "Loja".** `Reconectar_Navegacao_Da_Loja::acrescentar_item_loja_ao_menu()`,
+  em `wp_nav_menu_objects` (20), acrescenta um item sintético "Loja" que leva à
+  vitrine própria (`dokan_get_store_url()`). Só quem mora no painel da loja o
+  vê. O item da página da loja do WooCommerce passou a se chamar "Produtos" e
+  é visível para todos.
+- **Migração 8.** `Reconectar_Migracoes::renomear_loja_para_produtos()` troca
+  "Loja"/"Shop" por "Produtos" em três lugares: no título da página, no item de
+  menu (pelo `object_id`) e no link do rodapé (pelo caminho do `href`). Em
+  instalação nova, quem cobre é o `provision.sh` — um bloco próprio antes do
+  menu, com os rótulos de menu e de rodapé — e o `reparar-rodape.php`.
+
+**Decisões**
+
+- **Filtro é link, não formulário com JavaScript.** O estado mora na URL: dá
+  para compartilhar e voltar no navegador, e a página funciona sem script.
+  `reconectar_catalogo_url()` preserva os outros filtros a cada troca. A
+  exceção é a faixa de preço, que é um formulário GET com os demais filtros em
+  campos ocultos.
+- **Sem contagem por opção.** O número de produtos por categoria do WooCommerce
+  ignora os outros filtros ligados. Ao lado de uma loja selecionada, ele
+  mostraria uma quantidade que não é a que o clique entrega.
+- **`<details>` fechado no HTML.** No celular ele abriria uma tela inteira de
+  opções antes do primeiro produto. No desktop, o `marketplace.js` o abre e
+  esconde o `<summary>` (`is-fixo`); sem script, o desktop fica com o botão
+  "Filtrar" — pior de usar, nunca com filtro escondido. O `matchMedia` e o
+  `@media` do CSS usam a mesma largura, 768px.
+- **Sem `position: sticky` na coluna.** O `overflow-x: hidden` do `.site` do
+  Storefront a anularia (armadilha registrada no `CLAUDE.md`).
+- **O `<h1>` "Produtos" segue no documento.** O padding de 95,95px do
+  `<header>` que o envolve, porém, foi zerado: ele abria um vão entre o topo da
+  coluna de filtros e a ordenação.
+- **A renomeação só troca rótulo de fábrica.** Um nome que o administrador
+  tenha escolhido fica, e o slug `/shop/` não muda: está em links já
+  compartilhados.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| Sem filtro | 41 resultados, página de 12 |
+| `oferta=1` | 9, igual a `wc_get_product_ids_on_sale()` |
+| `loja=demo-sabor-da-terra` | 8, igual a `count_user_posts()` da loja |
+| Preço de 10 a 30 | 9 |
+| `categoria` e `loja` inexistentes | ignoradas: 12 na página |
+| Artesanato + Sabor da Terra | 0, com a coluna presente para desfazer |
+| Paginação e ordenação | preservam os filtros ligados |
+| 1920px | coluna de 240px em x=40, grade em x=312; ordenação e filtros no mesmo y (302) |
+| 375px | coluna recolhida em "Filtrar · 1 filtro"; `scrollX` 0, `scrollWidth` 375 |
+| Menu, visitante e cliente | "Produtos" → `/shop/`, sem "Loja" |
+| Menu, `demo-sabor-da-terra` | "Produtos" e "Loja" → `/store/demo-sabor-da-terra/` |
+| Migração 8 | versão 8; página, item 466 e rodapé com "Produtos" |
+| `verificar-acessos.sh` | 363 casos, nenhuma falha |
+
+**Pendência**
+
+- Nesta instalação, "Produtos" aparece depois de "Minha Conta" no menu. O
+  provisionamento só ordena ao criar o menu; reordenar é um arrasto em
+  Aparência → Menus.

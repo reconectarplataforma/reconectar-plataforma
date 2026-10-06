@@ -56,6 +56,7 @@ class Reconectar_Navegacao_Da_Loja {
 	public static function init() {
 		add_filter( 'dokan_get_dashboard_nav', array( __CLASS__, 'registrar_menu' ) );
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_itens_do_menu' ), 20 );
+		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'acrescentar_item_loja_ao_menu' ), 20 );
 		add_filter( 'widget_custom_html_content', array( __CLASS__, 'ocultar_links_do_widget' ), 20 );
 		add_filter( 'dokan_dashboard_nav_active', array( __CLASS__, 'marcar_item_ativo' ) );
 		add_filter( 'body_class', array( __CLASS__, 'classes_do_corpo' ), 30 );
@@ -455,6 +456,97 @@ class Reconectar_Navegacao_Da_Loja {
 		}
 
 		return $itens;
+	}
+
+	/**
+	 * Acrescenta o item "Loja", a vitrine da própria loja, para quem tem uma.
+	 *
+	 * O item da página de produtos do WooCommerce ("Produtos", o catálogo inteiro
+	 * com filtros) é de todos e fica como veio. Logo depois dele, só para a loja,
+	 * entra "Loja", que leva a `dokan_get_store_url()` do usuário corrente — a
+	 * vitrine com os produtos dela. Quem não é loja não o recebe, inclusive o
+	 * Administrador, que tem `dokandar` e nenhuma vitrine: a dele seria
+	 * `/store/<login>/`, uma loja que não existe (a armadilha do "Visitar loja"
+	 * no CLAUDE.md).
+	 *
+	 * O item é sintético, montado aqui, e não gravado no menu: gravado, seria um
+	 * `custom` com a URL de **uma** loja, visível a todos; e o painel de menus não
+	 * sabe exibir item por papel. A âncora é o item da página de produtos,
+	 * reconhecido pelo ID da página — nunca pelo rótulo, que o administrador
+	 * renomeia, nem pelo slug, que difere entre os ambientes (`/shop/` aqui,
+	 * `/loja/` em produção). Sem essa âncora no menu, o item vai para o fim.
+	 *
+	 * O destaque de item corrente é calculado aqui porque o núcleo o calcula
+	 * antes deste filtro, e um item que ainda não existia não foi avaliado.
+	 *
+	 * @param WP_Post[] $itens Itens do menu, já decorados pelo núcleo.
+	 * @return WP_Post[]
+	 */
+	public static function acrescentar_item_loja_ao_menu( $itens ) {
+		if ( ! $itens || ! self::mora_no_painel() || ! function_exists( 'dokan_get_store_url' ) ) {
+			return $itens;
+		}
+
+		$vitrine            = dokan_get_store_url( get_current_user_id() );
+		$caminho_da_vitrine = Reconectar_Permissoes::caminho_de_url( $vitrine );
+
+		if ( '' === $caminho_da_vitrine ) {
+			return $itens;
+		}
+
+		$caminho_corrente = Reconectar_Permissoes::caminho_de_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- só o caminho é extraído, para comparação.
+
+		// Prefixo com a barra, para que `/store/ana` não acenda em `/store/ana-maria/`.
+		$na_vitrine     = 0 === strpos( $caminho_corrente . '/', $caminho_da_vitrine . '/' );
+		$pagina_produto = function_exists( 'wc_get_page_id' ) ? (int) wc_get_page_id( 'shop' ) : 0;
+		$ancora         = null;
+
+		foreach ( $itens as $item ) {
+			if ( $pagina_produto > 0 && 'post_type' === $item->type && (int) $item->object_id === $pagina_produto ) {
+				$ancora = $item;
+				break;
+			}
+		}
+
+		// Clone de um item real, e não `new stdClass`: o walker e os filtros de
+		// terceiros leem uma dúzia de propriedades de `WP_Post` decorado, e as que
+		// faltassem sairiam como aviso de propriedade indefinida.
+		$loja                   = clone ( $ancora ? $ancora : end( $itens ) );
+		$loja->ID               = 0;
+		$loja->db_id            = 0;
+		$loja->title            = __( 'Loja', 'reconectar-core' );
+		$loja->url              = $vitrine;
+		$loja->type             = 'custom';
+		$loja->object           = 'custom';
+		$loja->object_id        = 0;
+		$loja->attr_title       = '';
+		$loja->target           = '';
+		$loja->xfn              = '';
+		$loja->menu_item_parent = $ancora ? $ancora->menu_item_parent : 0;
+		$loja->current          = $na_vitrine;
+		$loja->classes          = array( 'menu-item', 'menu-item-type-custom', 'menu-item-object-custom', 'rc-menu-item-loja' );
+
+		if ( $na_vitrine ) {
+			$loja->classes[] = 'current-menu-item';
+		}
+
+		$resultado = array();
+
+		foreach ( $itens as $item ) {
+			$resultado[] = $item;
+
+			if ( $item === $ancora ) {
+				$resultado[] = $loja;
+			}
+		}
+
+		if ( ! $ancora ) {
+			$resultado[] = $loja;
+		}
+
+		// O walker imprime na ordem do array, e não por `menu_order`: inserir na
+		// posição basta.
+		return $resultado;
 	}
 
 	/**

@@ -804,6 +804,24 @@ reconectar_id_de_pagina_do_woo() {
   fi
 }
 
+echo "== Título da página de produtos =="
+# A página da loja do WooCommerce é o catálogo inteiro, com filtros, e se chama
+# "Produtos": "Loja" passou a ser o atalho de cada loja para a própria vitrine,
+# um item que o plugin acrescenta ao menu só para ela. O título nasce "Shop" ou
+# "Loja", conforme o idioma no instante da ativação, e só é trocado enquanto for
+# um desses — a mesma promessa do bloco da listagem de lojas logo acima. O slug
+# fica: está em links já compartilhados.
+#
+# A migração 8 de `Reconectar_Migracoes` faz o mesmo nas instalações já de pé.
+# Este bloco existe porque, numa instalação nova, ela pode rodar antes de o
+# WooCommerce criar a página, e se marcar como aplicada sem ter o que renomear.
+produtos_id="$(reconectar_id_de_pagina_do_woo shop)"
+if [ -n "$produtos_id" ] && printf '%s\n' "Shop" "Loja" | grep -qxF "$(wp post get "$produtos_id" --field=post_title)"; then
+  wp post update "$produtos_id" --post_title="Produtos"
+else
+  echo "Título da página de produtos já foi definido."
+fi
+
 echo "== Menu principal (navegação) =="
 if wp menu list --fields=locations --format=csv | grep -q "primary"; then
   echo "Já existe um menu atribuído ao local 'primary', pulando."
@@ -820,7 +838,7 @@ else
   wp menu item add-custom "menu-principal" "Início" "/" --position=1
 
   loja_id="$(reconectar_id_de_pagina_do_woo shop)"
-  [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Loja" --position=2
+  [ -n "$loja_id" ] && wp menu item add-post "menu-principal" "$loja_id" --title="Produtos" --position=2
 
   # A listagem de lojas é o destino do breadcrumb do Dokan e do "Ver todos" dos
   # carrosséis da home. Sem item no menu, o único caminho até ela era o rodapé —
@@ -906,7 +924,7 @@ reconectar_reparar_item_de_menu() {
 reconectar_menus_existentes="$(wp menu list --fields=slug --format=csv 2>/dev/null || true)"
 
 if printf '%s\n' "$reconectar_menus_existentes" | grep -qx "menu-principal"; then
-  reconectar_reparar_item_de_menu "$(reconectar_id_de_pagina_do_woo shop)" "Loja"
+  reconectar_reparar_item_de_menu "$(reconectar_id_de_pagina_do_woo shop)" "Produtos"
 
   transparencia_reparo_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   reconectar_reparar_item_de_menu "$transparencia_reparo_id" "Transparência"
@@ -1000,7 +1018,7 @@ fi
 if [ -n "$(wp widget list reconectar-rodape-2 --format=ids)" ]; then
   echo "Coluna 2 do rodapé já tem conteúdo."
 else
-  navegacao="$(reconectar_item_de_rodape_do_woo shop 'Loja')"
+  navegacao="$(reconectar_item_de_rodape_do_woo shop 'Produtos')"
   navegacao+="$(reconectar_item_de_rodape store-listing 'Lojas parceiras')"
   navegacao+="$(reconectar_item_de_rodape comunidade 'Comunidade')"
   navegacao+="$(reconectar_item_de_rodape transparencia 'Transparência')"

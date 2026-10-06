@@ -41,8 +41,9 @@ class Reconectar_Migracoes {
 	 * 5 — reescreve as regras outra vez, pela remoção daquela aba.
 	 * 6 — reescreve as regras pelo post type da Incubadora (`incubadora_pagina`).
 	 * 7 — reescreve as regras pela aba de avaliações pendentes do painel.
+	 * 8 — renomeia a página da loja do WooCommerce, e os links dela, para "Produtos".
 	 */
-	const VERSAO = 7;
+	const VERSAO = 8;
 
 	/**
 	 * Opção que guarda a versão já aplicada.
@@ -85,6 +86,7 @@ class Reconectar_Migracoes {
 		self::promover_moderadores_no_forum();
 		self::descartar_contagem_binaria_das_enquetes();
 		self::reescrever_permalinks();
+		self::renomear_loja_para_produtos();
 
 		update_option( self::OPCAO_VERSAO, self::VERSAO );
 	}
@@ -119,6 +121,109 @@ class Reconectar_Migracoes {
 	 */
 	private static function reescrever_permalinks() {
 		add_action( 'wp_loaded', 'flush_rewrite_rules' );
+	}
+
+	/**
+	 * Renomeia a página da loja do WooCommerce, e o que aponta para ela, para "Produtos".
+	 *
+	 * A página passou a ser o catálogo inteiro, com filtros, e "Loja" passou a
+	 * ser o atalho da loja do usuário para a própria vitrine
+	 * (`Reconectar_Navegacao_Da_Loja::acrescentar_item_loja_ao_menu()`). Dois itens
+	 * "Loja" lado a lado, para destinos diferentes, seria o pior dos rótulos.
+	 *
+	 * Só o **texto** muda, e só quando ainda é o de fábrica — "Loja", ou "Shop"
+	 * para a página nascida em inglês (armadilha do slug das páginas do
+	 * WooCommerce no CLAUDE.md). Um rótulo que o administrador trocou pelo painel
+	 * é escolha dele e fica. O slug não muda: `/shop/` e `/loja/` estão em links
+	 * já compartilhados.
+	 *
+	 * A página é achada pela opção que guarda o ID, o item de menu pelo
+	 * `object_id`, e o link do rodapé pelo caminho do `href` — nunca pelo rótulo
+	 * sozinho, que é justamente o que se está trocando. Numa instalação nova a
+	 * migração pode rodar antes de o WooCommerce criar a página; o
+	 * `provision.sh` já nasce com o rótulo novo e cobre esse caso.
+	 *
+	 * @return void
+	 */
+	public static function renomear_loja_para_produtos() {
+		$pagina = (int) get_option( 'woocommerce_shop_page_id' );
+
+		if ( $pagina <= 0 || ! get_post( $pagina ) ) {
+			return;
+		}
+
+		$rotulos_de_fabrica = array( 'Loja', 'Shop' );
+
+		if ( in_array( get_post_field( 'post_title', $pagina ), $rotulos_de_fabrica, true ) ) {
+			wp_update_post(
+				array(
+					'ID'         => $pagina,
+					'post_title' => 'Produtos',
+				)
+			);
+		}
+
+		$itens = get_posts(
+			array(
+				'post_type'      => 'nav_menu_item',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- roda uma vez por instalação.
+					array(
+						'key'   => '_menu_item_object_id',
+						'value' => (string) $pagina,
+					),
+					array(
+						'key'   => '_menu_item_type',
+						'value' => 'post_type',
+					),
+				),
+			)
+		);
+
+		foreach ( $itens as $item ) {
+			if ( in_array( $item->post_title, $rotulos_de_fabrica, true ) ) {
+				wp_update_post(
+					array(
+						'ID'         => $item->ID,
+						'post_title' => 'Produtos',
+					)
+				);
+			}
+		}
+
+		$caminho  = Reconectar_Permissoes::caminho_de_url( get_permalink( $pagina ) );
+		$widgets  = get_option( 'widget_custom_html' );
+		$alterado = false;
+
+		if ( '' === $caminho || ! is_array( $widgets ) ) {
+			return;
+		}
+
+		foreach ( $widgets as $chave => $widget ) {
+			if ( ! is_array( $widget ) || empty( $widget['content'] ) ) {
+				continue;
+			}
+
+			$novo = preg_replace_callback(
+				'#(<a\s[^>]*href="([^"]*)"[^>]*>)\s*(Loja|Shop)\s*(</a>)#',
+				static function ( $casamento ) use ( $caminho ) {
+					return Reconectar_Permissoes::caminho_de_url( $casamento[2] ) === $caminho
+						? $casamento[1] . 'Produtos' . $casamento[4]
+						: $casamento[0];
+				},
+				$widget['content']
+			);
+
+			if ( is_string( $novo ) && $novo !== $widget['content'] ) {
+				$widgets[ $chave ]['content'] = $novo;
+				$alterado                     = true;
+			}
+		}
+
+		if ( $alterado ) {
+			update_option( 'widget_custom_html', $widgets );
+		}
 	}
 
 	/**

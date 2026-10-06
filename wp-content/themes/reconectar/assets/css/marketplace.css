@@ -1474,6 +1474,96 @@
   margin: 0;
 }
 
+/* Loja na página de produto
+   -------------------------------------------------------------------------- */
+
+/* O bloco inteiro é o `<a>` — não há `.rc-produto-loja__link a` a escrever.
+   `inline-flex` para o alvo de toque acompanhar o conteúdo, e não esticar até a
+   borda da coluna do resumo, onde um clique no vazio levaria à loja. */
+.rc-produto-loja {
+  margin: 0 0 var(--rc-espaco);
+}
+
+.rc-produto-loja__link {
+  align-items: center;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  color: var(--rc-texto);
+  display: inline-flex;
+  gap: 12px;
+  max-width: 100%;
+  padding: 8px 14px 8px 8px;
+  /* A nota traz `.screen-reader-text`, que é `position: absolute`: sem
+     ancestral posicionado ele sobe até o viewport — a armadilha do carrossel. */
+  position: relative;
+  text-decoration: none;
+}
+
+.rc-produto-loja__link:hover,
+.rc-produto-loja__link:focus-visible {
+  border-color: var(--reconectar-cor-institucional);
+}
+
+.rc-produto-loja__logo,
+.rc-produto-loja__inicial {
+  align-items: center;
+  border-radius: 50%;
+  display: flex;
+  flex: 0 0 auto;
+  height: 44px;
+  justify-content: center;
+  overflow: hidden;
+  width: 44px;
+}
+
+.rc-produto-loja__logo img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rc-produto-loja__inicial {
+  background: var(--reconectar-cor-institucional);
+  color: #ffffff;
+  font-size: var(--rc-fonte-lg);
+  font-weight: 600;
+}
+
+.rc-produto-loja__conteudo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rc-produto-loja__rotulo {
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-justa);
+}
+
+/* O nome é o que se lê; a cor escura o separa do rótulo e da meta, que ficam no
+   cinza do corpo. O sublinhado aparece no foco e no passar do mouse, para o
+   bloco não parecer texto solto — critério 1.4.1 da WCAG 2.1. */
+.rc-produto-loja__nome {
+  color: var(--rc-texto-sobre-destaque);
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  overflow-wrap: anywhere;
+}
+
+.rc-produto-loja__link:hover .rc-produto-loja__nome,
+.rc-produto-loja__link:focus-visible .rc-produto-loja__nome {
+  text-decoration: underline;
+}
+
+.rc-produto-loja__meta {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--rc-fonte-sm);
+  gap: 6px;
+  line-height: var(--rc-entrelinha-compacta);
+}
+
 /* Nota
    -------------------------------------------------------------------------- */
 
@@ -3373,6 +3463,43 @@
 }
 
 /* ==========================================================================
+   Cabeçalho da categoria de produto
+   ========================================================================== */
+
+/* A categoria é a exceção de `reconectar_marcar_pagina_sem_titulo()`: o `<h1>`
+   fica, porque é o nome do corredor e a trilha só o diz em 14px. O Storefront
+   veste esse cabeçalho como o do carrinho — centralizado, `<h1>` de 41,89px e
+   95,95px de padding embaixo, medidos —, o que abria a página num vazio de quase
+   150px entre a trilha e a barra de ordenação.
+
+   A especificidade (0,3,0) é para passar pela regra do pai, que alcança o
+   cabeçalho com (0,2,0) por `.storefront-full-width-content`. */
+.tax-product_cat.woocommerce .woocommerce-products-header {
+  margin: 0 0 24px;
+  padding: 0;
+  text-align: left;
+}
+
+.tax-product_cat.woocommerce .woocommerce-products-header__title {
+  font-size: var(--rc-fonte-xl);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0;
+}
+
+.tax-product_cat.woocommerce .woocommerce-products-header .term-description {
+  color: var(--rc-texto-suave);
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 4px 0 0;
+  max-width: 70ch;
+}
+
+.tax-product_cat.woocommerce .woocommerce-products-header .term-description p:last-child {
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
    Link de edição no conteúdo
    ========================================================================== */
 
@@ -3551,6 +3678,197 @@
 }
 
 /* ==========================================================================
+   Página "Produtos": coluna de filtros
+   ========================================================================== */
+
+/* Duas colunas a partir de 768px, a mesma largura do `matchMedia` de
+   `marketplace.js` — se as duas divergirem, há uma faixa em que a coluna fica
+   aberta e empilhada sobre a grade, ou fechada ao lado dela.
+
+   `minmax(0, 1fr)` e não `1fr`: o mínimo de `1fr` é o conteúdo, e o laço de
+   produtos com `auto-fill` de 260px empurraria a coluna além da tela em vez de
+   reduzir o número de cartões por linha.
+
+   Sem `position: sticky` na coluna, de propósito: o `.site` do Storefront tem
+   `overflow-x: hidden`, que mata a aderência (armadilha registrada no
+   `CLAUDE.md`), e trocá-lo aqui reabriria o transbordo no celular. */
+.rc-catalogo {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .rc-catalogo {
+    align-items: start;
+    gap: 32px;
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+/* O `<h1>` "Produtos" sai da tela por `.rc-sem-titulo-de-pagina`, mas o
+   `<header>` que o envolve fica com os 95,95px de padding do Storefront —
+   medido: um vão vazio entre o topo da coluna de filtros e a ordenação, que
+   desalinhava as duas colunas. O título segue no documento, para o leitor de
+   tela; só a caixa vazia deixa de ocupar lugar. */
+.rc-catalogo__principal > .woocommerce-products-header {
+  margin: 0;
+  padding: 0;
+}
+
+.rc-catalogo__lateral {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  box-sizing: border-box;
+}
+
+.rc-catalogo__alternar {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  gap: 8px;
+  line-height: var(--rc-entrelinha-justa);
+  min-height: 44px;
+  padding: 0 var(--rc-espaco);
+}
+
+.rc-catalogo__alternar:focus-visible,
+.rc-catalogo__opcao:focus-visible,
+.rc-catalogo__limpar:focus-visible {
+  outline: 2px solid var(--reconectar-cor-institucional);
+  outline-offset: 2px;
+}
+
+.rc-catalogo__contagem {
+  background: var(--reconectar-cor-institucional);
+  border-radius: 999px;
+  color: #fff;
+  font-size: var(--rc-fonte-2xs);
+  line-height: var(--rc-entrelinha-justa);
+  padding: 2px 8px;
+}
+
+/* No desktop o painel fica sempre aberto (`marketplace.js`), e o `<summary>`
+   seria um botão que só fecha a coluna. Some só com a classe, nunca por
+   `@media`: sem o script o `<details>` segue fechado, e esconder o único jeito
+   de abri-lo apagaria os filtros. */
+.rc-catalogo__lateral.is-fixo > .rc-catalogo__alternar {
+  display: none;
+}
+
+.rc-catalogo__filtros {
+  display: grid;
+  gap: 20px;
+  padding: 4px var(--rc-espaco) var(--rc-espaco);
+}
+
+.rc-catalogo__lateral.is-fixo .rc-catalogo__filtros {
+  padding-top: var(--rc-espaco);
+}
+
+.rc-catalogo__titulo {
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: var(--rc-entrelinha-justa);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.rc-catalogo__opcoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rc-catalogo__opcoes--filhas {
+  border-left: 2px solid var(--rc-borda);
+  margin-left: 12px;
+  padding-left: 8px;
+}
+
+/* 44px de alvo de toque (WCAG 2.5.5), num link que no desktop parece só uma
+   linha de texto. */
+.rc-catalogo__opcao {
+  align-items: center;
+  border-radius: 6px;
+  color: inherit;
+  display: flex;
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+  min-height: 44px;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.rc-catalogo__opcao:hover {
+  background: var(--rc-fundo);
+  color: inherit;
+}
+
+/* Institucional, e não a primária: #31BEB1 mede 2,30:1 sobre branco. O
+   `#663191` passa folgado tanto como texto sobre o fundo claro quanto como
+   fundo do selo de contagem. O peso acompanha a cor para que o estado não
+   dependa só dela (WCAG 1.4.1); o leitor de tela ouve o texto oculto. */
+.rc-catalogo__opcao--ativa,
+.rc-catalogo__opcao--ativa:hover {
+  background: rgba(102, 49, 145, 0.08);
+  color: var(--reconectar-cor-institucional);
+  font-weight: 600;
+}
+
+.rc-catalogo__limpar {
+  align-items: center;
+  color: var(--reconectar-cor-institucional);
+  display: inline-flex;
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.rc-catalogo__preco {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.rc-catalogo__campo {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.rc-catalogo__campo label {
+  font-size: var(--rc-fonte-xs);
+}
+
+/* Classe repetida para (0,2,0): o Storefront veste `input[type="number"]` com
+   (0,1,1), e uma classe sozinha perderia o fundo e a borda. `box-sizing`
+   explícito porque o reset do tema não alcança todo contexto, e `min-width: 0`
+   porque um campo numérico tem largura intrínseca que estoura meia coluna de
+   240px. */
+.rc-catalogo__numero.rc-catalogo__numero {
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm);
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.rc-catalogo__aplicar {
+  font-size: var(--rc-fonte-sm);
+  grid-column: 1 / -1;
+  min-height: 44px;
+}
+
+/* ==========================================================================
    Paginação do catálogo
    ========================================================================== */
 
@@ -3717,6 +4035,40 @@
 .woocommerce .woocommerce-ordering,
 .woocommerce-page .woocommerce-ordering {
   margin: 0 0 8px;
+}
+
+/* Lado a lado, o Storefront põe o select e a contagem em `float: left`, e float
+   alinha pelo topo: medido, o texto ficava 10px acima do centro do select, que
+   ainda carrega os 8px de margem da regra acima. Flex ignora o float dos filhos.
+   O `.woocommerce-notices-wrapper` vem primeiro e vazio, por isso ocupa a
+   própria linha e o espaçamento é só de coluna — com `gap` inteiro, a linha
+   vazia empurraria a barra para baixo.
+
+   O clearfix do pai (`::before`/`::after` com `content: ""`) vira item flex, e
+   item recebe `column-gap`: hoje ele cai em linha própria por sorte da ordem.
+   `content: none` apaga a caixa, como em `ul.products`. */
+@media (min-width: 768px) {
+  .storefront-sorting {
+    align-items: center;
+    column-gap: 16px;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .storefront-sorting::before,
+  .storefront-sorting::after {
+    content: none;
+  }
+
+  .storefront-sorting > .woocommerce-notices-wrapper {
+    flex-basis: 100%;
+  }
+
+  .woocommerce .storefront-sorting .woocommerce-ordering,
+  .woocommerce-page .storefront-sorting .woocommerce-ordering,
+  .storefront-sorting .woocommerce-result-count {
+    margin: 0;
+  }
 }
 
 /* Responsivo -------------------------------------------------------------- */

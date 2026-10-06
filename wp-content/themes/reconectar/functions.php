@@ -31,6 +31,9 @@ $reconectar_modulos = array(
 	'inc/marketplace/vitrine.php',
 	'inc/marketplace/busca-sugestoes.php',
 	'inc/marketplace/loja.php',
+	'inc/marketplace/produto.php',
+	// Depois de `consultas.php`: a coluna de lojas lê `reconectar_obter_lojas()`.
+	'inc/marketplace/catalogo.php',
 	'inc/marketplace/checkout.php',
 	'inc/marketplace/so-com-login.php',
 	'inc/marketplace/conta.php',
