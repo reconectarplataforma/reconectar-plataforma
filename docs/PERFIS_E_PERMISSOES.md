@@ -85,9 +85,11 @@ especificação proíbe.
 
 `manage_woocommerce` abriria a porta sem quebrar a trava de plugin, mas tem
 outro preço: os menus de WooCommerce e Dokan aparecem, e **as listagens do
-`/wp-admin` não têm escopo por empresa**. O Administrador só é limitado às
-empresas dele dentro do `/painel-empresas/`; no painel técnico veria produtos e
-pedidos de todas as lojas, desfazendo o isolamento em silêncio.
+`/wp-admin` não têm escopo por empresa**. O Administrador alcança todas as
+empresas e lojas no `/painel-empresas/`, mas lá vê cadastro e situação — não
+produto nem pedido. No painel técnico veria produtos e pedidos de todas as
+lojas, com edição, desfazendo em silêncio a regra de que quem administra o
+produto é a loja dona dele.
 
 A porta é uma capacidade própria, `CAP_ADMIN_WP`
 (`reconectar_acessar_wp_admin`), consultada **só** em
@@ -129,7 +131,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | **Empresas e lojas** | | | | | |
 | Acessar `/painel-empresas/` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Cadastrar empresa e loja | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Ver a operação de empresa alheia | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Ver todas as empresas e lojas, com ou sem vínculo | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **Conteúdo** | | | | | |
 | Publicar e editar post e página | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Moderar comentários | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -374,7 +376,7 @@ perde o que estiver em `CAPS_LEGADAS`.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 357 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 363 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 

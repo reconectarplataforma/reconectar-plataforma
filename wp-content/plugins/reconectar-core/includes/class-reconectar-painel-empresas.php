@@ -19,8 +19,14 @@
  *     o que o Dokan liberar a vendedores hoje e em cada atualização futura.
  *
  * Daí a rota própria: página do WordPress com shortcode, endpoints de reescrita
- * para as subtelas, visual do tema, e nenhuma dependência do Dokan além da
- * leitura de dados — sempre sob `function_exists()`.
+ * para as subtelas, e nenhuma dependência do Dokan além da leitura de dados —
+ * sempre sob `function_exists()`.
+ *
+ * Com o Dokan de pé, a rota abre na **moldura** do painel dele — a barra lateral
+ * e o topo React —, decidida por `Reconectar_Navegacao_Da_Loja::area_corrente()`.
+ * É só a casca: a rota, as capacidades e as ações continuam sendo daqui, e o
+ * Administrador segue sem `dokandar`. Sem o Dokan, o painel volta ao menu
+ * próprio de `menu()`.
  *
  * @package reconectar-core
  */
@@ -186,8 +192,8 @@ class Reconectar_Painel_Empresas {
 	/**
 	 * Tranca a rota e processa o formulário, nesta ordem.
 	 *
-	 * A checagem vem antes de qualquer consulta ao banco: um ID de empresa alheia
-	 * na barra de endereços tem de ser recusado sem que a existência dela chegue a
+	 * A checagem vem antes de qualquer consulta ao banco: um ID de empresa fora
+	 * do alcance do usuário, na barra de endereços, tem de ser recusado sem que a existência dela chegue a
 	 * ser confirmada por um tempo de resposta diferente.
 	 *
 	 * @return void
@@ -761,10 +767,22 @@ class Reconectar_Painel_Empresas {
 			return '';
 		}
 
+		// Na moldura do Dokan, a barra lateral e o "Sair" do topo React fazem o
+		// papel do menu próprio; imprimir os dois daria duas navegações com os
+		// mesmos destinos, uma ao lado da outra.
+		$na_moldura = class_exists( 'Reconectar_Navegacao_Da_Loja' )
+			&& Reconectar_Navegacao_Da_Loja::painel_de_empresas_na_moldura();
+
 		ob_start();
 
-		echo '<div class="rc-painel-empresas rc-painel-empresas--dashboard">';
-		self::menu();
+		printf(
+			'<div class="rc-painel-empresas rc-painel-empresas--dashboard%s">',
+			$na_moldura ? ' rc-painel-empresas--moldura' : ''
+		);
+
+		if ( ! $na_moldura ) {
+			self::menu();
+		}
 
 		echo '<div class="rc-painel-empresas__area">';
 		self::aviso();
@@ -775,6 +793,18 @@ class Reconectar_Painel_Empresas {
 		echo '</div>';
 
 		return ob_get_clean();
+	}
+
+	/**
+	 * Seção do menu da tela corrente.
+	 *
+	 * Pública porque a moldura do Dokan marca o item ativo da barra lateral por
+	 * ela — ver `Reconectar_Navegacao_Da_Loja::area_corrente()`.
+	 *
+	 * @return string `empresas` ou `lojas`.
+	 */
+	public static function secao_corrente() {
+		return self::secao_da_tela( self::contexto()['tela'] );
 	}
 
 	/**

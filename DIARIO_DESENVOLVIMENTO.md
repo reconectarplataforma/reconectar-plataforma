@@ -4145,3 +4145,53 @@ Registradas no `CLAUDE.md`:
 | Home | 6 cards, 6 com ícone |
 | `/categorias/` | 16 cards, 16 com ícone, conferidos em captura de tela a 1300px e a 375px |
 | Contraste do traço `#1c6f68` | 5,32:1 sobre `#e3f6f4`, 4,81:1 sobre `#cbeeea` (hover) |
+
+## 2026-10-06 — O painel de empresas dentro do Dokan, com alcance total para o Administrador
+
+**O que foi feito**
+- `/painel-empresas/` passa a abrir na moldura do painel do Dokan: a barra
+  lateral e o topo React, como Fórum, Comunidade e Incubadora já abriam para a
+  loja. A rota continua nossa; o que vem do Dokan é só a casca. Sem o Dokan
+  ativo, o painel volta ao menu próprio.
+- A barra lateral ganha **Empresas** e **Lojas**, com `permission` no portão do
+  painel gerencial. O Administrador vê Empresas, Lojas, Comunidade e Fórum; o
+  Super Administrador vê os dois itens também no `/dashboard/` dele; a loja não
+  os vê.
+- Todo Administrador (`company_admin`) alcança todas as empresas e lojas:
+  `reconectar_gerir_todas_as_empresas` entrou no papel (`VERSAO_CAPACIDADES` 8).
+  `lojas_no_escopo()` passa a trazer também loja sem empresa, exibida como
+  "Sem empresa".
+- No topo React, para quem não é loja: o nome é o do site, "Minha conta" leva
+  à conta do WooCommerce e "Visitar loja" leva ao catálogo.
+
+**Decisões técnicas**
+- **Moldura, não `dokandar`.** A capacidade define quem é vendedor para o
+  Dokan; concedê-la faria o Administrador herdar em silêncio tudo o que o
+  plugin liberar. `/dashboard/` continua 302 para ele.
+- **O vínculo continua gravado.** Deixou de restringir, mas é o registro de
+  quem responde por cada empresa, e a carga mantém as três contas de
+  Administrador.
+- **"Visitar loja" por `dokan_frontend_localize_script`.** O link não está na
+  configuração do layout: o React lê `dokan.urls.storeUrl`, montado com o
+  usuário corrente, e saía `/store/<login>/`, uma loja inexistente.
+- **Item ativo por prefixo.** O React acende item sem submenu por
+  `location.href.startsWith( item.url )`, e `/painel-empresas/` é prefixo de
+  `/painel-empresas/loja/`: Empresas e Lojas saíam acesos juntos. Nas telas de
+  lojas, o link de Empresas ganha `#content`, que tira o prefixo sem mudar o
+  destino.
+- **Recuo dos cartões.** O `style.css` do Dokan zera o padding de
+  `.dokan-dashboard .dokan-dashboard-content ul li` (0,3,2); a regra da
+  moldura repete a classe do cartão para vencer sem depender de seletor dele.
+
+**Verificação**
+
+| Medida | Resultado |
+| --- | --- |
+| Barra lateral do Administrador | Empresas (ativo), Lojas, Comunidade, Fórum — nenhum item de venda |
+| Lojas no escopo do Administrador | 5 de 5 contas `seller` |
+| Padding do cartão de resumo na moldura | `16px 20px` (era `0px`) |
+| Item aceso: listagem, ficha, edição de empresa / lojas, nova loja | Empresas / Lojas, um só por tela |
+| Salvar empresa sem vínculo, pela moldura | 302 `?aviso=empresa-salva`, `post_modified` atualizado |
+| `storeUrl` para o Administrador | `/shop/` (era `/store/demo-admin-nosso-chao/`) |
+| 375px, listagem de lojas | `scrollX` 0, sem transbordo |
+| `verificar-acessos.sh` | 363 casos, nenhuma falha (6 novos; empresa sem vínculo de 403 para 200) |

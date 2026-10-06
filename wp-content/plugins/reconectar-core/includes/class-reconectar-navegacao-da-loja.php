@@ -22,6 +22,13 @@
  * Nenhuma permissão é tocada: a loja segue abrindo as três áreas pelos mesmos
  * portões de antes.
  *
+ * O painel de empresas (`/painel-empresas/`) usa a mesma moldura, para quem
+ * tem o portão dele: Empresas e Lojas viram itens da barra lateral, e o
+ * Administrador opera dentro do painel do Dokan **sem** receber `dokandar`. A
+ * rota continua própria, pelo mesmo motivo das três áreas — e pelo registrado
+ * no topo de `class-reconectar-painel-empresas.php`: a capacidade de loja faria
+ * dele um vendedor para o plugin inteiro. O que vem do Dokan é só a casca.
+ *
  * @package reconectar-core
  */
 
@@ -53,6 +60,8 @@ class Reconectar_Navegacao_Da_Loja {
 		add_filter( 'dokan_dashboard_nav_active', array( __CLASS__, 'marcar_item_ativo' ) );
 		add_filter( 'body_class', array( __CLASS__, 'classes_do_corpo' ), 30 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_layout_do_painel' ), 20 );
+		add_filter( 'dokan_vendor_dashboard_layout_config', array( __CLASS__, 'ajustar_layout_para_quem_nao_e_loja' ) );
+		add_filter( 'dokan_frontend_localize_script', array( __CLASS__, 'ajustar_vitrine_para_quem_nao_e_loja' ) );
 	}
 
 	/**
@@ -78,9 +87,18 @@ class Reconectar_Navegacao_Da_Loja {
 	 * não reporta componente nenhum. O fórum é testado primeiro porque o perfil
 	 * de usuário do bbPress também é do BuddyPress quando os dois estão ligados.
 	 *
-	 * @return string `rc-forum`, `rc-comunidade`, `rc-incubadora` ou vazio.
+	 * O painel de empresas vem antes do teste de papel porque o ator dele não é
+	 * loja. A guarda por `dokan_get_dashboard_nav` mantém a promessa do painel de
+	 * não depender do Dokan: sem o plugin, ele volta à casca própria.
+	 *
+	 * @return string `rc-empresas`, `rc-lojas`, `rc-forum`, `rc-comunidade`,
+	 *                `rc-incubadora` ou vazio.
 	 */
 	public static function area_corrente() {
+		if ( self::painel_de_empresas_na_moldura() ) {
+			return 'rc-' . Reconectar_Painel_Empresas::secao_corrente();
+		}
+
 		if ( ! self::mora_no_painel() ) {
 			return '';
 		}
@@ -102,6 +120,93 @@ class Reconectar_Navegacao_Da_Loja {
 		}
 
 		return '';
+	}
+
+	/**
+	 * O painel de empresas abre na moldura do Dokan para o usuário corrente?
+	 *
+	 * A capacidade é conferida aqui, e não só em `Reconectar_Painel_Empresas::proteger()`,
+	 * porque a casca é decidida em `header.php`: quem não passa no portão recebe o
+	 * 403 dentro do cabeçalho da vitrine, e não dentro de um painel cuja barra
+	 * lateral não teria item nenhum para ele.
+	 *
+	 * @return bool
+	 */
+	public static function painel_de_empresas_na_moldura() {
+		if ( ! function_exists( 'dokan_get_dashboard_nav' ) || ! is_user_logged_in() ) {
+			return false;
+		}
+
+		if ( ! current_user_can( Reconectar_Permissoes::CAP_PAINEL_EMPRESAS ) ) {
+			return false;
+		}
+
+		return Reconectar_Painel_Empresas::eh_a_pagina();
+	}
+
+	/**
+	 * Ajusta o topo do painel React para quem o abre sem ser loja.
+	 *
+	 * O Dokan monta a configuração para um vendedor: o nome da loja no topo, e
+	 * "Minha conta" e o lápis do perfil apontando para `/dashboard/edit-account/`.
+	 * Para o Administrador, que não tem loja, o nome sairia vazio e os dois
+	 * links levariam a uma tela que o recusa. A conta dele é a do WooCommerce.
+	 *
+	 * Só age sem `dokandar`: o Super Administrador que abrir o painel de empresas
+	 * pelo `/dashboard/` dele é também loja, e o que o Dokan montou é o certo.
+	 *
+	 * @param array $config Configuração do layout, como o Dokan a montou.
+	 * @return array
+	 */
+	public static function ajustar_layout_para_quem_nao_e_loja( $config ) {
+		if ( ! is_array( $config ) || current_user_can( 'dokandar' ) || ! self::painel_de_empresas_na_moldura() ) {
+			return $config;
+		}
+
+		$conta = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'edit-account' ) : '';
+
+		$config['vendor']['name'] = get_bloginfo( 'name' );
+
+		if ( '' !== $conta ) {
+			$config['editUrl'] = $conta;
+		}
+
+		if ( isset( $config['headerNav'] ) && is_array( $config['headerNav'] ) ) {
+			$painel_da_loja = function_exists( 'dokan_get_navigation_url' ) ? dokan_get_navigation_url( 'edit-account' ) : '';
+
+			foreach ( $config['headerNav'] as $indice => $item ) {
+				if ( '' !== $conta && isset( $item['url'] ) && $painel_da_loja === $item['url'] ) {
+					$config['headerNav'][ $indice ]['url'] = $conta;
+				}
+			}
+		}
+
+		return $config;
+	}
+
+	/**
+	 * Aponta o "Visitar loja" do topo React para o catálogo da plataforma.
+	 *
+	 * O link não está na configuração do layout: o React o lê de
+	 * `dokan.urls.storeUrl`, que o Dokan monta com `dokan_get_store_url()` do
+	 * usuário corrente. Para o Administrador isso dava `/store/<login>/` — a
+	 * vitrine de uma loja que não existe. O botão não pode ser tirado sem mexer
+	 * no React; o catálogo é o destino que o rótulo promete, e é o item "Loja"
+	 * do menu do site.
+	 *
+	 * @param array $dados Dados que o Dokan entrega ao JavaScript do painel.
+	 * @return array
+	 */
+	public static function ajustar_vitrine_para_quem_nao_e_loja( $dados ) {
+		if ( ! is_array( $dados ) || current_user_can( 'dokandar' ) || ! self::painel_de_empresas_na_moldura() ) {
+			return $dados;
+		}
+
+		$catalogo = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/' );
+
+		$dados['urls']['storeUrl'] = $catalogo;
+
+		return $dados;
 	}
 
 	/**
@@ -248,6 +353,43 @@ class Reconectar_Navegacao_Da_Loja {
 	 */
 	public static function registrar_menu( $nav ) {
 		$destinos = self::destinos();
+
+		// Empresas e Lojas vêm antes das ferramentas da comunidade: para o
+		// Administrador são a razão de o painel existir. A permissão é o portão
+		// do painel de empresas, e não `dokandar` — a loja não as vê, o Super
+		// Administrador as vê no `/dashboard/` dele.
+		if ( class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
+			$url_empresas = Reconectar_Painel_Empresas::url();
+
+			// O React do Dokan acende item sem submenu por
+			// `location.href.startsWith( item.url )`, e `/painel-empresas/` é
+			// prefixo de `/painel-empresas/loja/`: nas telas de lojas os dois
+			// itens saíam marcados. A listagem de empresas não tem outra URL, e
+			// o fragmento `#content` — o alvo do "Pular para o conteúdo" da
+			// moldura — tira o prefixo sem mudar o destino. Só nessas telas: nas
+			// de empresas é justamente o prefixo que acende o item.
+			if ( self::painel_de_empresas_na_moldura() && 'lojas' === Reconectar_Painel_Empresas::secao_corrente() ) {
+				$url_empresas .= '#content';
+			}
+
+			$nav['rc-empresas'] = array(
+				'title'      => __( 'Empresas', 'reconectar-core' ),
+				'icon'       => '<i class="fas fa-building"></i>',
+				'icon_name'  => 'Building2',
+				'url'        => $url_empresas,
+				'pos'        => 150,
+				'permission' => Reconectar_Permissoes::CAP_PAINEL_EMPRESAS,
+			);
+
+			$nav['rc-lojas'] = array(
+				'title'      => __( 'Lojas', 'reconectar-core' ),
+				'icon'       => '<i class="fas fa-store"></i>',
+				'icon_name'  => 'Store',
+				'url'        => Reconectar_Painel_Empresas::url( Reconectar_Painel_Empresas::ENDPOINT_LOJA ),
+				'pos'        => 151,
+				'permission' => Reconectar_Permissoes::CAP_PAINEL_EMPRESAS,
+			);
+		}
 
 		if ( '' !== $destinos['comunidade'] ) {
 			$nav['rc-comunidade'] = array(

@@ -1,6 +1,7 @@
 <?php
 /**
- * Todas as lojas no escopo do usuário, de todas as empresas que ele administra.
+ * Todas as lojas no escopo do usuário — para o Administrador, todas as da
+ * plataforma, inclusive as que não pertencem a empresa nenhuma.
  *
  * Incluída por `Reconectar_Painel_Empresas::renderizar()`, com `$contexto` no
  * escopo.
@@ -27,14 +28,14 @@ $lojas = Reconectar_Empresa::lojas_no_escopo();
 <?php if ( empty( $lojas ) ) : ?>
 
 	<p class="rc-painel-empresas__vazio">
-		<?php esc_html_e( 'Nenhuma loja cadastrada nas empresas sob sua gestão.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Nenhuma loja cadastrada.', 'reconectar-core' ); ?>
 	</p>
 
 <?php else : ?>
 
 	<table class="rc-tabela">
 		<caption class="rc-tabela__legenda">
-			<?php esc_html_e( 'Lojas das empresas que você administra, com produtos publicados, ganhos já liberados e situação de cada uma.', 'reconectar-core' ); ?>
+			<?php esc_html_e( 'Lojas da plataforma, com empresa, produtos publicados, ganhos já liberados e situação de cada uma.', 'reconectar-core' ); ?>
 		</caption>
 		<thead>
 			<tr>
@@ -66,7 +67,7 @@ $lojas = Reconectar_Empresa::lojas_no_escopo();
 								<?php echo esc_html( get_the_title( $empresa_id ) ); ?>
 							</a>
 						<?php else : ?>
-							<?php echo esc_html( '—' ); ?>
+							<?php esc_html_e( 'Sem empresa', 'reconectar-core' ); ?>
 						<?php endif; ?>
 					</td>
 					<td><?php echo esc_html( number_format_i18n( (int) $produtos ) ); ?></td>

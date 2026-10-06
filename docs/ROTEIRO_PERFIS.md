@@ -44,9 +44,9 @@ numa demonstração.
 | Perfil | Login | Senha |
 | --- | --- | --- |
 | Super Administrador | `admin` | `reconectar-admin` |
-| Administrador — Nosso Chão | `demo-admin-nosso-chao` | `reconectar-demo` |
-| Administrador — Bem Viver | `demo-admin-bem-viver` | `reconectar-demo` |
-| Administrador — as duas | `demo-admin-rede` | `reconectar-demo` |
+| Administrador (vinculado à Nosso Chão) | `demo-admin-nosso-chao` | `reconectar-demo` |
+| Administrador (vinculado à Bem Viver) | `demo-admin-bem-viver` | `reconectar-demo` |
+| Administrador (sem vínculo próprio) | `demo-admin-rede` | `reconectar-demo` |
 | Moderador de Conteúdo | `demo-moderador` | `reconectar-demo` |
 | Loja — Sabor da Terra | `demo-sabor-da-terra` | `reconectar-demo` |
 | Loja — Ateliê Raízes | `demo-atelie-raizes` | `reconectar-demo` |
@@ -334,20 +334,22 @@ Entre e vá para http://localhost:8090/painel-empresas/. O atalho **Painel de
 Empresas** também aparece no cabeçalho do site, no lugar onde o vendedor vê o
 link para o painel dele.
 
-Não é o Dokan. É uma rota própria da aplicação, no visual do tema Reconectar,
-com as mesmas cores e a mesma tipografia do resto da plataforma. O painel do
-Dokan é intransponível sem a capacidade `dokandar`, que para o plugin **define**
-quem é vendedor: concedê-la ao Administrador o transformaria em
-lojista aos olhos do Dokan e o faria herdar em silêncio tudo que o plugin
-liberar no futuro. Por isso a rota é nossa.
+A tela abre **na moldura do painel do Dokan**: a barra lateral à esquerda e a
+barra do topo, as mesmas que a loja vê. A barra lateral traz **Empresas**,
+**Lojas**, **Comunidade** e **Fórum** — nenhum item de venda —, e marca a seção
+corrente. No topo, "Minha conta" leva à conta dela no site, e "Visitar loja",
+que para quem não é loja não teria destino, leva ao catálogo.
 
-À esquerda há um **menu de duas seções** — Empresas e Lojas —, com o "Sair" no
-rodapé dele. O menu marca a seção corrente com `aria-current="page"`, e em tela
-estreita vira faixa horizontal rolável acima do conteúdo: não é um `<details>`
-que abriria sozinho no celular.
+A rota, porém, continua nossa: o que vem do Dokan é só a casca. O painel dele é
+intransponível sem a capacidade `dokandar`, que para o plugin **define** quem é
+vendedor; concedê-la ao Administrador o transformaria em lojista aos olhos do
+Dokan e o faria herdar em silêncio tudo que o plugin liberar no futuro. Teresa
+não tem `dokandar` — `/dashboard/` continua respondendo 302 para ela. Sem o
+Dokan ativo, o painel volta ao menu próprio de duas seções.
 
-Na listagem, Teresa vê **uma empresa**: a Cooperativa Nosso Chão. A Rede Bem
-Viver existe, tem lojas e pedidos, e não aparece.
+Na listagem, Teresa vê **as duas empresas**: todo Administrador alcança todas
+as empresas e todas as lojas da plataforma, inclusive loja sem empresa. O
+vínculo dela à Nosso Chão continua gravado, mas não restringe mais nada.
 
 No topo, três contagens: **Empresas**, **Lojas** e **Lojas em operação**. As
 três saem de consulta ao escopo dela, no carregamento. Não há faturamento
@@ -357,8 +359,9 @@ que espaço nenhum.
 
 ### 3.1.1 A listagem de lojas
 
-**Menu → Lojas**, ou `/painel-empresas/loja/`. Todas as lojas no escopo, de
-todas as empresas que Teresa administra, com a empresa de cada uma, os produtos
+**Barra lateral → Lojas**, ou `/painel-empresas/loja/`. Todas as lojas da
+plataforma — inclusive as que não pertencem a empresa nenhuma, que aparecem
+como "Sem empresa" —, com a empresa de cada uma, os produtos
 publicados, os ganhos liberados e a situação. É o mesmo recorte da ficha da
 empresa, visto pelo outro eixo: por loja em vez de por empresa.
 
@@ -400,9 +403,9 @@ loja é ela mesma, pelo painel do Dokan.
 **Empresas → Nova empresa.** Preencha nome, CNPJ, razão social, contato,
 município e responsável. Salve.
 
-A empresa nova aparece na listagem **dele** — quem cria entra no próprio
-escopo. Sem isso, o administrador cadastraria uma empresa e perderia o acesso a
-ela no mesmo clique.
+A empresa nova aparece na listagem, e quem a cria fica vinculado a ela. O
+vínculo não restringe mais o alcance — todo Administrador vê todas as empresas
+—, mas continua gravado: é o registro de quem responde por cada uma.
 
 ### 3.5 Cadastrar uma loja
 
@@ -447,21 +450,21 @@ Reativar a empresa **não liga todo mundo**: cada loja volta ao estado que
 era dela. O estado individual e o estado da empresa são duas informações
 distintas, e o que vale na loja é a conjunção das duas.
 
-### 3.7 O isolamento entre empresas
+### 3.7 O alcance sobre todas as empresas
 
-Na barra de endereços, troque o ID da empresa pelo da Rede Bem Viver:
+Na barra de endereços, troque o ID da empresa pelo da Rede Bem Viver — a que
+Teresa **não** tem vinculada:
 
 ```bash
 docker compose run --rm wpcli wp eval '$p=get_page_by_path("bem-viver",OBJECT,"reconectar_empresa"); echo home_url("/painel-empresas/empresa/{$p->ID}/"), "\n";'
 ```
 
-**403 — "Você não tem permissão para acessar esta área."** A verificação vem
-antes de qualquer consulta ao banco: não há listagem parcial, nem contagem
-vazando pelo título da página.
-
-Agora saia e entre como `demo-admin-rede` (Clara). A mesma URL abre
-normalmente, e a listagem mostra **as duas empresas**. A diferença entre as duas
-sessões é uma capacidade, não uma tela.
+A ficha abre normalmente. Até a versão 8 das capacidades a resposta era **403**:
+o Administrador só enxergava as empresas a que estava vinculado, e o alcance
+total era uma capacidade dada a dedo (`reconectar_gerir_todas_as_empresas`, a da
+Clara). Hoje ela faz parte do papel `company_admin`, e as três contas de
+Administrador veem a mesma tela. A capacidade segue separada do portão do
+painel: o Moderador não a tem e continua recebendo 403 em `/painel-empresas/`.
 
 ### 3.8 Os limites — o que Teresa **não** consegue
 
@@ -470,7 +473,7 @@ sessões é uma capacidade, não uma tela.
 | `/painel-empresas/` | `200` |
 | `/painel-empresas/loja/` | `200` |
 | `/painel-empresas/empresa/<Nosso Chão>/` | `200` |
-| `/painel-empresas/empresa/<Bem Viver>/` | `403` |
+| `/painel-empresas/empresa/<Bem Viver>/` | `200` — alcança todas, veja 3.7 |
 | `/comunidade/` | `200` |
 | `/wp-admin/` | `200` — mas veja 3.9 |
 | `/wp-admin/users.php` | `200` |
@@ -812,7 +815,7 @@ Entre em http://localhost:8090/wp-admin/.
 | **Usuários** | admin, 3 Administradores, 1 Moderador, 5 contas de loja, 3 clientes |
 
 O contraste com os roteiros 2 e 3 é o ponto: o vendedor via 3 produtos, Teresa
-via as 3 lojas de uma empresa, o Super Administrador vê os 15 produtos e as duas
+via as empresas e as lojas sem ver produto nem pedido, o Super Administrador vê os 15 produtos e as duas
 empresas. E só ele chega a **estas** telas — o Administrador e o Moderador entram
 no painel, mas nenhum dos dois abre Produtos, Pedidos ou Dokan.
 
@@ -1070,9 +1073,9 @@ abaixo. O restante é visual e precisa de olho humano:
 | 11 | Super Admin vê tudo | 15 produtos, todos os pedidos, 5 lojas |
 | 12 | Só o Super Admin gere plugins | tela de Plugins |
 | 13 | Carrinho multi-vendedor com split | pedido de R$ 157,70 e seus 3 filhos |
-| 14 | Administrador opera fora do `/wp-admin` | `/painel-empresas/` no visual do tema |
-| 15 | Administrador isolado por empresa | 403 na empresa alheia |
-| 16 | Alcance múltiplo é capacidade, não papel | `demo-admin-rede` vê as duas |
+| 14 | Administrador opera fora do `/wp-admin` | `/painel-empresas/` na moldura do Dokan, sem `dokandar` |
+| 15 | Administrador alcança todas as empresas | 200 na empresa sem vínculo |
+| 16 | A barra lateral não traz venda ao Administrador | Empresas, Lojas, Comunidade e Fórum |
 | 17 | Vendedor e cliente fora do painel de empresas | 403 em `/painel-empresas/` e em `/painel-empresas/loja/` |
 | 18 | Cadastro de loja com link de senha | link exibido uma única vez |
 | 19 | Cascata de desativação preserva o individual | seção 3.6 |

@@ -488,7 +488,9 @@ class Reconectar_Empresa {
 	 * Os três retornos são estados distintos, e a diferença entre os dois últimos
 	 * é o isolamento inteiro:
 	 *
-	 *   `null`     — todas, sem restrição (tem `CAP_TODAS_AS_EMPRESAS`);
+	 *   `null`     — todas, sem restrição (tem `CAP_TODAS_AS_EMPRESAS`, que
+	 *                todo Administrador recebe desde a versão 8 das
+	 *                capacidades; a meta de vínculo, então, não restringe);
 	 *   `array()`  — nenhuma: o painel abre vazio e nada é acessível;
 	 *   `array(…)` — exatamente estas.
 	 *
@@ -667,12 +669,32 @@ class Reconectar_Empresa {
 	}
 
 	/**
-	 * Todas as lojas das empresas que o usuário administra.
+	 * Todas as lojas que o usuário administra.
+	 *
+	 * Com alcance total a resposta não passa pelas empresas: percorrê-las
+	 * deixaria de fora toda loja sem vínculo — as que existiam antes deste
+	 * módulo, as criadas pelo `/wp-admin` —, e "todas as lojas" sairia com
+	 * menos lojas do que a plataforma tem, sem aviso. `pode_gerir_loja()` já as
+	 * dava por administráveis; só a listagem não as alcançava.
 	 *
 	 * @param int $usuario_id Usuário; 0 usa o atual.
 	 * @return int[] IDs das lojas.
 	 */
 	public static function lojas_no_escopo( $usuario_id = 0 ) {
+		if ( null === self::empresas_no_escopo( $usuario_id ) ) {
+			// `'seller'` é o papel do Dokan — ver `lojas_da_empresa()`.
+			$todas = get_users(
+				array(
+					'role'    => 'seller',
+					'fields'  => 'ID',
+					'orderby' => 'display_name',
+					'order'   => 'ASC',
+				)
+			);
+
+			return array_map( 'intval', $todas );
+		}
+
 		$lojas = array();
 
 		foreach ( self::listar( $usuario_id ) as $empresa ) {

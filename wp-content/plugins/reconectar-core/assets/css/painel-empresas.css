@@ -58,6 +58,14 @@
 	min-width: 0;
 }
 
+/* Na moldura do Dokan não há menu próprio — a barra lateral dele faz esse papel
+   —, e a coluna de 15rem ficaria reservada para nada, empurrando a área para a
+   direita. O `max-width` também sai: quem limita a largura ali é o painel. */
+.rc-painel-empresas--moldura {
+	grid-template-columns: minmax( 0, 1fr );
+	max-width: none;
+}
+
 .rc-painel-empresas__menu {
 	display: flex;
 	flex-direction: column;
@@ -161,6 +169,14 @@
 	border: 1px solid var( --rc-pe-borda );
 	border-left: 4px solid var( --rc-pe-primaria );
 	border-radius: 0.5rem;
+}
+
+/* Na moldura, o `style.css` do Dokan declara
+   `.dokan-dashboard .dokan-dashboard-content ul li { padding: 0 }` — (0,3,2),
+   contra o (0,1,0) acima —, e os números encostavam na borda do cartão. A
+   classe repetida chega a (0,4,0) sem depender de seletor do Dokan. */
+.rc-painel-empresas--moldura .rc-painel-empresas__cartao.rc-painel-empresas__cartao.rc-painel-empresas__cartao {
+	padding: 1rem 1.25rem;
 }
 
 .rc-painel-empresas__cartao-numero {

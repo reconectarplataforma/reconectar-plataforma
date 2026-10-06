@@ -154,8 +154,8 @@ e a meta sai junto.
 
 **2 empresas** (CPT `reconectar_empresa`): Cooperativa Nosso Chão (Maceió, três
 lojas) e Rede Bem Viver (Arapiraca, duas). A distribuição desigual é de
-propósito — sem duas empresas povoadas não há como demonstrar o isolamento, que
-é a regra de negócio central desse ator. Os CNPJ são fictícios com base zerada e
+propósito — com duas empresas povoadas, a listagem do painel mostra lojas de
+empresas diferentes lado a lado, e a ficha de cada uma tem o que agregar. Os CNPJ são fictícios com base zerada e
 passam nos dígitos verificadores, porque `Reconectar_Empresa::normalizar_campo()`
 os confere: um CNPJ que o formulário recusaria, gravado por baixo pela carga,
 seria um dado que só existe na demonstração.
@@ -163,16 +163,18 @@ seria um dado que só existe na demonstração.
 **3 Administradores** (papel `company_admin`) e **1 Moderador de Conteúdo**
 (papel `content_moderator`):
 
-| Login | Nome | Alcance |
+| Login | Nome | Vínculo gravado |
 |---|---|---|
 | `demo-admin-nosso-chao` | Teresa Nogueira | Cooperativa Nosso Chão |
 | `demo-admin-bem-viver` | Otávio Meireles | Rede Bem Viver |
-| `demo-admin-rede` | Clara Viana | todas, por `reconectar_gerir_todas_as_empresas` |
+| `demo-admin-rede` | Clara Viana | nenhum — `reconectar_gerir_todas_as_empresas` dada à conta |
 | `demo-moderador` | Rita Albuquerque | sem escopo — conteúdo, comunidade e campanha |
 
-São três administradores e não dois porque o terceiro é o caso de alcance
-global previsto na especificação: sem ele a capacidade existiria no código sem
-ninguém para exercê-la, e uma regressão nela passaria despercebida. O Moderador
+O alcance é o mesmo para os três: desde a versão 8 das capacidades, todo
+Administrador vê todas as empresas e lojas, porque
+`reconectar_gerir_todas_as_empresas` faz parte do papel. Os três continuam
+porque o vínculo segue gravado e é exibido na ficha da empresa — e a conta sem
+vínculo prova que o alcance não depende dele. O Moderador
 é um só pelo motivo oposto — o perfil **não tem escopo**, então uma segunda
 conta mostraria exatamente a mesma tela.
 

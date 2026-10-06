@@ -1,6 +1,7 @@
 <?php
 /**
- * Tela inicial do painel: as empresas sob gestão do usuário.
+ * Tela inicial do painel: as empresas no escopo do usuário — para o
+ * Administrador, todas as da plataforma.
  *
  * Incluída por `Reconectar_Painel_Empresas::renderizar()`, com `$contexto` no
  * escopo.
@@ -65,14 +66,14 @@ $resumo = array(
 <?php if ( empty( $empresas ) ) : ?>
 
 	<p class="rc-painel-empresas__vazio">
-		<?php esc_html_e( 'Nenhuma empresa sob sua gestão ainda.', 'reconectar-core' ); ?>
+		<?php esc_html_e( 'Nenhuma empresa cadastrada ainda.', 'reconectar-core' ); ?>
 	</p>
 
 <?php else : ?>
 
 	<table class="rc-tabela">
 		<caption class="rc-tabela__legenda">
-			<?php esc_html_e( 'Empresas que você administra, com o número de lojas e a situação de cada uma.', 'reconectar-core' ); ?>
+			<?php esc_html_e( 'Empresas da plataforma, com o número de lojas e a situação de cada uma.', 'reconectar-core' ); ?>
 		</caption>
 		<thead>
 			<tr>

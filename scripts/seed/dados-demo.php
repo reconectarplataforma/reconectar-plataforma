@@ -70,9 +70,9 @@ return array(
 	 *
 	 * Cada empresa agrupa lojas. A distribuição reproduz de propósito o
 	 * exemplo da especificação — uma empresa com três lojas e outra com
-	 * duas —, porque é dela que o roteiro de demonstração precisa: sem duas
-	 * empresas povoadas não há como mostrar o isolamento, que é a regra de
-	 * negócio central deste ator.
+	 * duas —, porque é dela que o roteiro de demonstração precisa: com duas
+	 * empresas povoadas, a listagem de lojas mostra empresas diferentes lado a
+	 * lado, e a ficha de cada uma tem o que agregar.
 	 *
 	 * `slug` não é campo da entidade: é a chave que amarra este catálogo. As
 	 * lojas e os administradores abaixo se referem à empresa por ele, e
@@ -113,12 +113,14 @@ return array(
 	/*
 	 * Administradores de Empresas (papel `company_admin`).
 	 *
-	 * São três de propósito, e não dois: os dois primeiros administram uma
-	 * empresa cada — é entrando com eles que a demonstração mostra que o da
-	 * Nosso Chão não enxerga a Bem Viver —, e o terceiro tem
-	 * `reconectar_gerir_todas_as_empresas`, o caso de alcance múltiplo previsto
-	 * na especificação. Sem o terceiro, a capacidade existiria no código sem
-	 * ninguém para exercê-la, e uma regressão nela passaria despercebida.
+	 * Todo Administrador alcança todas as empresas desde a versão 8 das
+	 * capacidades: `reconectar_gerir_todas_as_empresas` faz parte do papel.
+	 * Os três continuam porque o vínculo segue gravado — é o registro de quem
+	 * responde por cada empresa —, e o terceiro, sem vínculo nenhum, é o que
+	 * prova que o alcance não depende dele: se a capacidade sair do papel, é
+	 * ele que passa a ver uma listagem vazia. O `add_cap` da conta é
+	 * redundante hoje e fica, porque não custa nada e mantém a conta com o
+	 * mesmo alcance se o papel voltar a ser restrito.
 	 *
 	 * `empresas` lista slugs do catálogo acima. `todas` substitui a lista pela
 	 * capacidade de escopo global; quando é `true`, `empresas` é ignorado.
