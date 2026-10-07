@@ -128,6 +128,22 @@ function reconectar_enqueue_assets() {
 	}
 
 	/*
+	 * Só nas telas do fórum, onde mora o formulário de pergunta. Sem jQuery, ao
+	 * contrário do `bootstrap-tagsinput` que inspirou o `data-role`: o tema não
+	 * carrega jQuery fora do checkout, e um plugin de Bootstrap 3 traria a
+	 * biblioteca inteira para desenhar etiquetas.
+	 */
+	if ( function_exists( 'is_bbpress' ) && is_bbpress() ) {
+		wp_enqueue_script(
+			'reconectar-forum',
+			$theme_uri . '/assets/js/forum.js',
+			array(),
+			reconectar_versao_asset( 'assets/js/forum.js' ),
+			true
+		);
+	}
+
+	/*
 	 * Só no checkout, e não na tela de agradecimento — que é um endpoint da mesma
 	 * página, onde não há formulário de cobrança para recolher.
 	 *
