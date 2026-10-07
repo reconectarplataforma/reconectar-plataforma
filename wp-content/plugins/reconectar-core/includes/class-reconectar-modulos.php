@@ -304,10 +304,11 @@ class Reconectar_Modulos {
 	/**
 	 * Os cartões da tela, na ordem do edital, com o destino de cada perfil.
 	 *
-	 * O Mercado é o único que muda de destino: para o Administrador é o painel de
-	 * empresas, e para a Loja e o Moderador, a vitrine. A Loja já apontou para o
-	 * próprio `/dashboard/`, e quem escolhia "Mercado" esperava o mercado — o
-	 * painel da loja fica a um clique, no ícone da conta da vitrine e no item
+	 * O Mercado é o único que muda de destino: para a Loja é a vitrine dela no
+	 * mercado (`/store/<loja>/`), para o Administrador o painel de empresas, e
+	 * para o Moderador — que não vende nem administra loja — a vitrine geral. A
+	 * Loja já apontou para o próprio `/dashboard/`, e quem escolhia "Mercado"
+	 * esperava o mercado; o painel fica a um clique, no ícone da conta e no item
 	 * "Painel" da barra lateral. A Incubadora e a Praça são as mesmas para os
 	 * três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
 	 *
@@ -321,7 +322,13 @@ class Reconectar_Modulos {
 		$usuario_id = get_current_user_id();
 		$destinos   = Reconectar_Navegacao_Da_Loja::destinos();
 
-		if ( Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id ) && class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
+		if ( Reconectar_Permissoes::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_store_url' ) ) {
+			$mercado = array(
+				'frase' => __( 'Seus produtos e serviços como o comprador os vê no mercado.', 'reconectar-core' ),
+				'botao' => __( 'Ver minha loja', 'reconectar-core' ),
+				'url'   => dokan_get_store_url( $usuario_id ),
+			);
+		} elseif ( Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id ) && class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
 			$mercado = array(
 				'frase' => __( 'As empresas e as lojas que você acompanha, com a operação de cada uma.', 'reconectar-core' ),
 				'botao' => __( 'Abrir painel de empresas', 'reconectar-core' ),

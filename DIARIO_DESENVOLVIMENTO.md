@@ -4431,19 +4431,21 @@ cabeçalho, busca de produto, carrinho e "Entregando em".
   - o item "Módulos" na barra e na conta, presente e ausente.
 
 
-## 2026-10-07 — O Mercado da Loja é a vitrine, não o painel dela
+## 2026-10-07 — O Mercado da Loja é a vitrine dela, não o painel
 
 Na tela de módulos, o cartão Mercado levava a Loja ao `/dashboard/`. Quem
 escolhia "Mercado" esperava o mercado e caía no painel — a mesma tela em que o
 login antigo já a deixava, o que fazia a escolha parecer não ter efeito.
 
-- O botão passa a ser "Ir ao mercado", para a vitrine, como o do Moderador. O
-  Administrador segue no painel de empresas.
+- O botão passa a ser "Ver minha loja", para a vitrine da própria loja
+  (`/store/<loja>/`, por `dokan_get_store_url()`): os produtos dela como o
+  comprador os vê. O Moderador segue na vitrine geral, e o Administrador no
+  painel de empresas.
 - O painel da loja continua a um clique: no ícone da conta da vitrine e no item
   "Painel" da barra lateral.
 
 **Verificação**
 
-- `verificar-acessos.sh`: 389 casos, nenhuma falha. O caso da Loja passou a
-  conferir "Ir ao mercado", e um novo garante que o botão do Mercado não aponta
-  para o `/dashboard/`.
+- `verificar-acessos.sh`: 390 casos, nenhuma falha. Os casos da Loja conferem o
+  botão novo, o destino `/store/demo-sabor-da-terra/` e que ele não aponta para
+  o `/dashboard/`.
