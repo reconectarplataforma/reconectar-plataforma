@@ -4430,3 +4430,61 @@ cabeçalho, busca de produto, carrinho e "Entregando em".
   - a ausência da enquete;
   - o item "Módulos" na barra e na conta, presente e ausente.
 
+
+---
+
+## 2026-10-07 — O filtro de município sai do cabeçalho e passa a filtrar a home
+
+**O que foi feito**
+
+- O seletor `.rc-municipio` saiu do cabeçalho e virou uma seção da home
+  (`inc/home/secao-municipio.php`, prioridade 15). Fica entre as categorias e
+  as seções que ele filtra.
+- Ele passa a filtrar as três faixas da home que mostram lojas ou produtos:
+  - **Lojas em destaque**: `reconectar_obter_lojas()` recebe a cidade.
+  - **Produtos em destaque**: `reconectar_obter_produtos_destaque()` ganhou o
+    parâmetro `$cidade`. O recorte usa `author__in` com as lojas daquele
+    município.
+  - **Lojas**: a vitrine já lia `?cidade=`. Na home ela deixa de imprimir as
+    pílulas de município (novo argumento `cidades`), e o "Limpar filtros"
+    preserva o município (`reconectar_url_sem_filtros()`).
+- Os links para `/store-listing/` levam o município junto, e a vitrine de lá o
+  lê.
+- O rótulo mudou de "Entregando em" para "Lojas e produtos de". Cada opção
+  carrega a âncora `#rc-municipio`.
+
+**Decisões**
+
+- **"Entregando em" era falso.** O filtro compara o município **da loja**, não
+  a área que ela atende. No cabeçalho, o seletor também aparecia em telas que
+  ignoravam o parâmetro: catálogo, carrinho e página de loja.
+- **Produto filtrado pelo município da loja.** O produto não tem endereço
+  próprio. Usar a mesma lista de lojas mantém as faixas de produtos e de lojas
+  de acordo. Medido, `author__in` chega à consulta: 17, 8, 8 e 8 produtos por
+  município, os mesmos números de uma `WP_Query`. Sem loja no município, a
+  função devolve vazio de propósito: com `author__in` vazio, a consulta não
+  filtraria nada.
+- **"Lojas em destaque" segue exigindo quatro lojas.** Na demonstração nenhum
+  município chega a quatro, então a faixa some ao filtrar. As lojas continuam
+  na vitrine logo abaixo.
+- **O "Ver todos" de produtos segue para o catálogo inteiro.** O catálogo do
+  WooCommerce não lê `?cidade=`, e levar o parâmetro faria parecer filtrada uma
+  lista que não é.
+- `/store-listing/` mantém as pílulas de município: ali não existe outro
+  controle para a cidade.
+
+**Verificação**
+
+- Por HTTP:
+
+  | Filtro | Lojas | Produtos | Faixa "Lojas em destaque" |
+  | --- | --- | --- | --- |
+  | Todos | 5 | 10 | presente |
+  | Maceió | 2 | 10 | ausente |
+  | Penedo | 1 | 8 | ausente |
+
+  O cabeçalho não traz mais nenhum `rc-municipio`.
+- Capturas a 1400px e a 375px com a lista aberta: a lista abre dentro da tela e
+  não há rolagem horizontal (`scrollX` = 0). O cabeçalho do celular segue numa
+  linha só.
+- `verificar-acessos.sh`: 388 casos, nenhuma falha.

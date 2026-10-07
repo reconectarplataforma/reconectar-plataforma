@@ -63,14 +63,19 @@ function reconectar_url_loja() {
  * chamar a API do Dokan sem ela derruba a home com erro fatal caso o plugin
  * seja desativado, e é justamente aí que a home precisa continuar de pé.
  *
+ * O município só acompanha a URL da vitrine. O fallback é o catálogo do
+ * WooCommerce, que não lê `?cidade=`, e o parâmetro ali faria parecer filtrada
+ * uma lista que não é.
+ *
+ * @param string $cidade Município a manter filtrado na vitrine. Opcional.
  * @return string
  */
-function reconectar_url_das_lojas() {
+function reconectar_url_das_lojas( $cidade = '' ) {
 	if ( function_exists( 'dokan_get_page_url' ) ) {
 		$url = dokan_get_page_url( 'store_listing' );
 
 		if ( $url ) {
-			return $url;
+			return '' !== $cidade ? add_query_arg( 'cidade', rawurlencode( $cidade ), $url ) : $url;
 		}
 	}
 

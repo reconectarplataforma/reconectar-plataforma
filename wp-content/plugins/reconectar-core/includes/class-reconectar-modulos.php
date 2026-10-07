@@ -19,8 +19,8 @@
  * reescrita do próprio plugin — existe onde o plugin existir. O flush que ela
  * exige numa instalação já de pé é o da migração 9.
  *
- * **Template próprio, sem o tema.** A tela não é a vitrine: com carrinho, busca
- * e "Entregando em" ela repetiria o defeito que levou o Moderador à moldura do
+ * **Template próprio, sem o tema.** A tela não é a vitrine: com carrinho e
+ * busca no cabeçalho ela repetiria o defeito que levou o Moderador à moldura do
  * painel. E, como o painel de empresas, ela não pode exigir tema nenhum — os
  * tokens do CSS trazem fallback literal.
  *

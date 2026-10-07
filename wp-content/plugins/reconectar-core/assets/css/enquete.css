@@ -25,9 +25,10 @@
 .rc-enquete {
 	/*
 	 * 20 parecia o valor certo — é o patamar dos painéis flutuantes do projeto,
-	 * sugestões da busca e seletor de município — e está errado. Aqueles dois
-	 * vivem **dentro** do cabeçalho e só competem entre irmãos; este aqui é fixo
-	 * no documento e compete com o cabeçalho inteiro.
+	 * sugestões da busca e filtro de município — e está errado. Aqueles dois
+	 * só competem com o que está logo abaixo deles — a busca dentro do
+	 * cabeçalho, o filtro dentro da home —; este aqui é fixo no documento e
+	 * compete com o cabeçalho inteiro.
 	 *
 	 * Varrido o documento, estes são todos os patamares que existem acima de 5:
 	 *

@@ -165,8 +165,8 @@ function reconectar_nome_casa_com_busca( $nome, $termo ) {
 /**
  * Municípios distintos em que há lojas cadastradas.
  *
- * Alimenta o seletor de localização do cabeçalho. A lista sai do que existe no
- * banco em vez de uma relação fixa de municípios: assim o seletor nunca oferece
+ * Alimenta o filtro de município da home. A lista sai do que existe no
+ * banco em vez de uma relação fixa de municípios: assim o filtro nunca oferece
  * uma cidade que devolveria vitrine vazia.
  *
  * @return string[] Nomes de municípios, em ordem alfabética.
@@ -402,22 +402,59 @@ function reconectar_obter_categorias( $numero = 14 ) {
  * os mais recentes quando não houver destaques suficientes — assim a faixa
  * nunca aparece pela metade em uma loja que ainda não configurou destaques.
  *
- * @param int $numero Quantidade desejada.
+ * O município é o **da loja**, o mesmo que a vitrine compara: o produto não
+ * tem endereço próprio, e o recorte sai dos autores que
+ * `reconectar_obter_lojas()` devolve para aquela cidade. Assim a faixa de
+ * produtos e a de lojas nunca discordam sobre quem está em qual município.
+ *
+ * @param int    $numero Quantidade desejada.
+ * @param string $cidade Nome do município das lojas. Vazio não filtra.
  * @return WC_Product[]
  */
-function reconectar_obter_produtos_destaque( $numero = 8 ) {
+function reconectar_obter_produtos_destaque( $numero = 8, $cidade = '' ) {
 	if ( ! function_exists( 'wc_get_products' ) ) {
 		return array();
 	}
 
 	$numero = (int) $numero;
+	$filtro = array();
+
+	if ( '' !== $cidade ) {
+		$autores = array_map(
+			static function ( $loja ) {
+				return $loja['id'];
+			},
+			reconectar_obter_lojas(
+				array(
+					'numero' => 200,
+					'cidade' => $cidade,
+				)
+			)
+		);
+
+		/*
+		 * Sem loja no município, nada a listar — e a guarda não é opcional:
+		 * `author__in` vazio é ignorado pela `WP_Query`, e a faixa sairia com os
+		 * produtos de todas as cidades sob um filtro que diz o contrário.
+		 *
+		 * `author__in` não está na lista de argumentos documentados do
+		 * `wc_get_products()`, e a armadilha do `wc_get_orders()` manda
+		 * desconfiar. Medido: chega à consulta — 17, 8, 8 e 8 produtos por
+		 * município, os mesmos números de uma `WP_Query` com o mesmo argumento.
+		 */
+		if ( ! $autores ) {
+			return array();
+		}
+
+		$filtro['author__in'] = $autores;
+	}
 
 	$destaques = wc_get_products(
 		array(
 			'status'   => 'publish',
 			'limit'    => $numero,
 			'featured' => true,
-		)
+		) + $filtro
 	);
 
 	if ( count( $destaques ) >= $numero ) {
@@ -443,7 +480,7 @@ function reconectar_obter_produtos_destaque( $numero = 8 ) {
 			'orderby' => 'date',
 			'order'   => 'DESC',
 			'exclude' => $ja_listados,
-		)
+		) + $filtro
 	);
 
 	return array_merge( $destaques, $complemento );

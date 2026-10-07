@@ -19,12 +19,18 @@ defined( 'ABSPATH' ) || exit;
  * A seção só é impressa a partir de quatro lojas. Abaixo disso, a vitrine
  * completa logo adiante já mostra todas elas, e o destaque viraria uma
  * repetição do que o cliente verá dois blocos depois.
+ *
+ * A regra vale também sob o filtro de município, e é por ela que a faixa some
+ * ao escolher uma cidade com menos de quatro lojas: as que existem continuam
+ * na vitrine logo abaixo, filtradas igual.
  */
 function reconectar_home_lojas_destaque() {
-	$lojas = reconectar_obter_lojas(
+	$ativos = reconectar_filtros_ativos();
+	$lojas  = reconectar_obter_lojas(
 		array(
 			'numero'  => 8,
 			'ordenar' => 'avaliacao',
+			'cidade'  => $ativos['cidade'],
 		)
 	);
 
@@ -39,7 +45,7 @@ function reconectar_home_lojas_destaque() {
 			// `reconectar_url_base_da_vitrine()` estava aqui e devolvia a própria
 			// home: o "Ver todos" existia, era clicável e recarregava a mesma
 			// página. O destino certo é a listagem completa de lojas.
-			'link'   => reconectar_url_das_lojas(),
+			'link'   => reconectar_url_das_lojas( $ativos['cidade'] ),
 			'classe' => 'rc-carrossel__faixa--destaque',
 		)
 	);

@@ -22,9 +22,10 @@ defined( 'ABSPATH' ) || exit;
 function reconectar_home_lojas() {
 	reconectar_vitrine_de_lojas(
 		array(
-			'titulo' => __( 'Lojas', 'reconectar' ),
-			'busca'  => false,
-			'mais'   => 'pagina',
+			'titulo'  => __( 'Lojas', 'reconectar' ),
+			'busca'   => false,
+			'mais'    => 'pagina',
+			'cidades' => false,
 		)
 	);
 }

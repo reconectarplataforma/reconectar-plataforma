@@ -128,12 +128,36 @@ function reconectar_url_base_da_vitrine() {
 }
 
 /**
+ * URL do "Limpar filtros" de uma lista.
+ *
+ * Quando o município não é filtro da lista — na home, ele tem seletor próprio
+ * acima de todas as seções —, limpar os filtros da vitrine o preserva. Do
+ * contrário o botão desfaria em silêncio uma escolha feita em outro controle,
+ * e as faixas de destaque acima mudariam junto com uma lista que só dizia
+ * respeito a si.
+ *
+ * @param array $ativos      Filtros ativos, de `reconectar_filtros_ativos()`.
+ * @param bool  $com_cidades Se o município é filtro desta lista.
+ * @return string
+ */
+function reconectar_url_sem_filtros( $ativos, $com_cidades = true ) {
+	$base = reconectar_url_base_da_vitrine();
+
+	if ( $com_cidades || '' === $ativos['cidade'] ) {
+		return $base;
+	}
+
+	return add_query_arg( 'cidade', rawurlencode( $ativos['cidade'] ), $base );
+}
+
+/**
  * Imprime a barra de filtros em pílulas.
  *
- * @param array $ativos Filtros ativos, de `reconectar_filtros_ativos()`.
+ * @param array $ativos      Filtros ativos, de `reconectar_filtros_ativos()`.
+ * @param bool  $com_cidades Se imprime as pílulas de município.
  */
-function reconectar_barra_de_filtros( $ativos ) {
-	$tem_filtro = $ativos['categoria'] || $ativos['cidade'] || $ativos['busca'] || $ativos['so_gratis'] || 'avaliacao' !== $ativos['ordenar'];
+function reconectar_barra_de_filtros( $ativos, $com_cidades = true ) {
+	$tem_filtro = $ativos['categoria'] || ( $com_cidades && $ativos['cidade'] ) || $ativos['busca'] || $ativos['so_gratis'] || 'avaliacao' !== $ativos['ordenar'];
 	?>
 	<nav class="rc-filtros" aria-label="<?php esc_attr_e( 'Filtros da vitrine de lojas', 'reconectar' ); ?>">
 		<ul class="rc-filtros__lista">
@@ -187,7 +211,7 @@ function reconectar_barra_de_filtros( $ativos ) {
 				</li>
 			<?php endif; ?>
 
-			<?php foreach ( reconectar_obter_cidades() as $cidade ) : ?>
+			<?php foreach ( $com_cidades ? reconectar_obter_cidades() : array() as $cidade ) : ?>
 				<?php $marcada = sanitize_title( $cidade ) === sanitize_title( $ativos['cidade'] ); ?>
 				<li>
 					<?php
@@ -204,7 +228,7 @@ function reconectar_barra_de_filtros( $ativos ) {
 
 			<?php if ( $tem_filtro ) : ?>
 				<li>
-					<a class="rc-filtros__limpar" href="<?php echo esc_url( reconectar_url_base_da_vitrine() ); ?>">
+					<a class="rc-filtros__limpar" href="<?php echo esc_url( reconectar_url_sem_filtros( $ativos, $com_cidades ) ); ?>">
 						<?php esc_html_e( 'Limpar filtros', 'reconectar' ); ?>
 					</a>
 				</li>
