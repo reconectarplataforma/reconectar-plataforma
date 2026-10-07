@@ -83,7 +83,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-388 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+389 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.

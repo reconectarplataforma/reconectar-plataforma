@@ -392,9 +392,9 @@ perde o que estiver em `CAPS_LEGADAS`.
 **Quem trabalha em mais de um módulo escolhe por onde começar.** Loja,
 Administrador e Moderador entram por `/modulos/` (`Reconectar_Modulos`), uma
 tela de três cartões — Mercado, Incubadora e Praça, os módulos do edital — a
-cada login. O destino de cada cartão depende do perfil: o Mercado é o painel da
-loja para a Loja, o painel de empresas para o Administrador e a vitrine para o
-Moderador. A tela não concede nada: cada botão leva a uma rota que tem as suas
+cada login. O destino de cada cartão depende do perfil: o Mercado é o painel de
+empresas para o Administrador e a vitrine para a Loja e o Moderador — o painel
+da loja fica no ícone da conta e no item "Painel" da barra lateral. A tela não concede nada: cada botão leva a uma rota que tem as suas
 próprias travas. O desvio só troca o destino **padrão** do login (vazio,
 `/wp-admin`, "Minha conta" ou o painel do Dokan); um `redirect_to` explícito
 vence, para que quem entrou por um link não perca o caminho. Cliente e Super
@@ -407,7 +407,7 @@ Administrador não passam por ela — o primeiro vai à conta, o segundo ao
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 388 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 389 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 

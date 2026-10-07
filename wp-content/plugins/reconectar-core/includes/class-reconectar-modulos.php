@@ -304,10 +304,12 @@ class Reconectar_Modulos {
 	/**
 	 * Os cartões da tela, na ordem do edital, com o destino de cada perfil.
 	 *
-	 * O Mercado é o único que muda de destino: para a loja é o painel dela, para
-	 * o Administrador o painel de empresas, e para o Moderador — que não vende
-	 * nem administra loja — a vitrine. A Incubadora e a Praça são as mesmas para
-	 * os três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
+	 * O Mercado é o único que muda de destino: para o Administrador é o painel de
+	 * empresas, e para a Loja e o Moderador, a vitrine. A Loja já apontou para o
+	 * próprio `/dashboard/`, e quem escolhia "Mercado" esperava o mercado — o
+	 * painel da loja fica a um clique, no ícone da conta da vitrine e no item
+	 * "Painel" da barra lateral. A Incubadora e a Praça são as mesmas para os
+	 * três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
 	 *
 	 * Um destino vazio **não** some com o cartão: ele sai sem link e dizendo por
 	 * quê. Esconder um módulo inteiro em silêncio é o defeito que a Transparência
@@ -319,13 +321,7 @@ class Reconectar_Modulos {
 		$usuario_id = get_current_user_id();
 		$destinos   = Reconectar_Navegacao_Da_Loja::destinos();
 
-		if ( Reconectar_Permissoes::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_navigation_url' ) ) {
-			$mercado = array(
-				'frase' => __( 'Sua loja: pedidos, produtos, serviços e vendas.', 'reconectar-core' ),
-				'botao' => __( 'Abrir minha loja', 'reconectar-core' ),
-				'url'   => dokan_get_navigation_url(),
-			);
-		} elseif ( Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id ) && class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
+		if ( Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id ) && class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
 			$mercado = array(
 				'frase' => __( 'As empresas e as lojas que você acompanha, com a operação de cada uma.', 'reconectar-core' ),
 				'botao' => __( 'Abrir painel de empresas', 'reconectar-core' ),
