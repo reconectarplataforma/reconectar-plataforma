@@ -304,10 +304,13 @@ class Reconectar_Modulos {
 	/**
 	 * Os cartões da tela, na ordem do edital, com o destino de cada perfil.
 	 *
-	 * O Mercado é o único que muda de destino: para a loja é o painel dela, para
-	 * o Administrador o painel de empresas, e para o Moderador — que não vende
-	 * nem administra loja — a vitrine. A Incubadora e a Praça são as mesmas para
-	 * os três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
+	 * O Mercado é o único que muda de destino: para a Loja é a vitrine dela no
+	 * mercado (`/store/<loja>/`), para o Administrador o painel de empresas, e
+	 * para o Moderador — que não vende nem administra loja — a vitrine geral. A
+	 * Loja já apontou para o próprio `/dashboard/`, e quem escolhia "Mercado"
+	 * esperava o mercado; o painel fica a um clique, no ícone da conta e no item
+	 * "Painel" da barra lateral. A Incubadora e a Praça são as mesmas para os
+	 * três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
 	 *
 	 * Um destino vazio **não** some com o cartão: ele sai sem link e dizendo por
 	 * quê. Esconder um módulo inteiro em silêncio é o defeito que a Transparência
@@ -319,11 +322,11 @@ class Reconectar_Modulos {
 		$usuario_id = get_current_user_id();
 		$destinos   = Reconectar_Navegacao_Da_Loja::destinos();
 
-		if ( Reconectar_Permissoes::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_navigation_url' ) ) {
+		if ( Reconectar_Permissoes::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_store_url' ) ) {
 			$mercado = array(
-				'frase' => __( 'Sua loja: pedidos, produtos, serviços e vendas.', 'reconectar-core' ),
-				'botao' => __( 'Abrir minha loja', 'reconectar-core' ),
-				'url'   => dokan_get_navigation_url(),
+				'frase' => __( 'Seus produtos e serviços como o comprador os vê no mercado.', 'reconectar-core' ),
+				'botao' => __( 'Ver minha loja', 'reconectar-core' ),
+				'url'   => dokan_get_store_url( $usuario_id ),
 			);
 		} elseif ( Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id ) && class_exists( 'Reconectar_Painel_Empresas' ) && '' !== Reconectar_Painel_Empresas::url() ) {
 			$mercado = array(
