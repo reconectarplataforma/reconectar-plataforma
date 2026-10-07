@@ -29,16 +29,22 @@ defined( 'ABSPATH' ) || exit;
  *     @type string $mais   `'expandir'` aumenta a lista na própria página pelo
  *                          `?lojas=N`; `'pagina'` manda para a vitrine completa.
  *     @type int    $limite Quantas lojas exibir antes do rodapé da lista.
+ *     @type bool   $cidades Se a barra traz as pílulas de município. Falso na
+ *                           home, onde o município tem filtro próprio acima de
+ *                           todas as seções: duas escolhas do mesmo parâmetro na
+ *                           mesma tela, uma delas valendo só para esta lista,
+ *                           fariam parecer que são filtros diferentes.
  * }
  */
 function reconectar_vitrine_de_lojas( $args = array() ) {
 	$args = wp_parse_args(
 		$args,
 		array(
-			'titulo' => '',
-			'busca'  => false,
-			'mais'   => 'expandir',
-			'limite' => 0,
+			'titulo'  => '',
+			'busca'   => false,
+			'mais'    => 'expandir',
+			'limite'  => 0,
+			'cidades' => true,
 		)
 	);
 
@@ -86,7 +92,7 @@ function reconectar_vitrine_de_lojas( $args = array() ) {
 		}
 		?>
 
-		<?php reconectar_barra_de_filtros( $ativos ); ?>
+		<?php reconectar_barra_de_filtros( $ativos, $args['cidades'] ); ?>
 
 		<?php if ( $lojas ) : ?>
 			<div class="rc-vitrine__grade">
@@ -98,7 +104,7 @@ function reconectar_vitrine_de_lojas( $args = array() ) {
 			<?php if ( $tem_mais ) : ?>
 				<p class="rc-vitrine__mais">
 					<?php if ( 'pagina' === $args['mais'] ) : ?>
-						<a class="rc-botao rc-botao--largo" href="<?php echo esc_url( reconectar_url_das_lojas() ); ?>">
+						<a class="rc-botao rc-botao--largo" href="<?php echo esc_url( reconectar_url_das_lojas( $ativos['cidade'] ) ); ?>">
 							<?php esc_html_e( 'Ver todas as lojas', 'reconectar' ); ?>
 						</a>
 					<?php else : ?>
@@ -112,7 +118,7 @@ function reconectar_vitrine_de_lojas( $args = array() ) {
 				</p>
 			<?php endif; ?>
 		<?php else : ?>
-			<?php reconectar_vitrine_vazia( $ativos ); ?>
+			<?php reconectar_vitrine_vazia( $ativos, $args['cidades'] ); ?>
 		<?php endif; ?>
 	</section>
 	<?php
@@ -180,10 +186,12 @@ function reconectar_busca_de_lojas( $ativos ) {
  * o que foi procurado para corrigir. Com filtro, a saída existe e precisa estar
  * à mão, daí o link para limpar.
  *
- * @param array $ativos Filtros ativos, de `reconectar_filtros_ativos()`.
+ * @param array $ativos      Filtros ativos, de `reconectar_filtros_ativos()`.
+ * @param bool  $com_cidades Se o município é filtro desta lista. Veja
+ *                           `reconectar_url_sem_filtros()`.
  */
-function reconectar_vitrine_vazia( $ativos ) {
-	$tem_filtro = $ativos['categoria'] || $ativos['cidade'] || $ativos['busca'] || $ativos['so_gratis'];
+function reconectar_vitrine_vazia( $ativos, $com_cidades = true ) {
+	$tem_filtro = $ativos['categoria'] || ( $com_cidades && $ativos['cidade'] ) || $ativos['busca'] || $ativos['so_gratis'];
 	?>
 	<div class="rc-vitrine__vazia">
 		<?php if ( $ativos['busca'] ) : ?>
@@ -204,7 +212,7 @@ function reconectar_vitrine_vazia( $ativos ) {
 
 		<?php if ( $tem_filtro ) : ?>
 			<p>
-				<a class="rc-botao" href="<?php echo esc_url( reconectar_url_base_da_vitrine() ); ?>">
+				<a class="rc-botao" href="<?php echo esc_url( reconectar_url_sem_filtros( $ativos, $com_cidades ) ); ?>">
 					<?php esc_html_e( 'Limpar filtros', 'reconectar' ); ?>
 				</a>
 			</p>

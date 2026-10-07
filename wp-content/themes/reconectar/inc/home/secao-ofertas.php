@@ -15,9 +15,18 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Renderiza a faixa de produtos em destaque.
+ *
+ * Segue o filtro de município da home. Sem produto no município escolhido a
+ * faixa não sai, como já não saía sem produto nenhum: completar com produtos de
+ * outra cidade encheria a tela desmentindo o filtro que está logo acima dela.
+ *
+ * O "Ver todos" segue para o catálogo inteiro, sem o município: o catálogo do
+ * WooCommerce não lê `?cidade=`, e levar o parâmetro até lá faria parecer
+ * filtrada uma lista que não é.
  */
 function reconectar_home_ofertas() {
-	$produtos = reconectar_obter_produtos_destaque( 10 );
+	$ativos   = reconectar_filtros_ativos();
+	$produtos = reconectar_obter_produtos_destaque( 10, $ativos['cidade'] );
 
 	if ( ! $produtos ) {
 		return;

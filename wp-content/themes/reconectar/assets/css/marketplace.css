@@ -232,9 +232,9 @@
 }
 
 /* `flex: 0 1 auto` — e não `0 0 auto` — porque o bloco de ações é o item mais
-   largo do cabeçalho: município, conta e carrinho somam 370px. Proibido de
-   encolher, ele empurrava a busca para 219px no tablet e vazava 66px pela
-   direita do viewport em 320px. O `min-width: 0` é o que torna o encolhimento
+   largo do cabeçalho. Quando ainda trazia o seletor de município, ao lado de
+   conta e carrinho, somava 370px; proibido de encolher, empurrava a busca para
+   219px no tablet e vazava 66px pela direita do viewport em 320px. O `min-width: 0` é o que torna o encolhimento
    efetivo: sem ele o mínimo automático de um item flex é o próprio conteúdo, e
    o `flex-shrink` não passa desse piso. */
 .rc-cabecalho__acoes {
@@ -246,9 +246,8 @@
   min-width: 0;
 }
 
-/* Conta e carrinho ficam fixos: quando falta espaço quem cede é o município,
-   que tem texto variável e degrada bem com reticências. Encolher o total do
-   carrinho esconderia um número que o usuário precisa ler. */
+/* Conta e carrinho ficam fixos: encolher o total do carrinho esconderia um
+   número que o usuário precisa ler. Quando falta espaço, quem cede é a busca. */
 .rc-conta,
 .rc-carrinho {
   flex: 0 0 auto;
@@ -341,7 +340,7 @@
 /* Painel de sugestões
    -------------------------------------------------------------------------- */
 
-/* Mesmo mecanismo do seletor de município: painel absoluto ancorado no elemento
+/* Mesmo mecanismo do filtro de município da home: painel absoluto ancorado no elemento
    posicionado logo acima, acima do conteúdo pelo `z-index` e com rolagem quando
    a lista não couber. */
 .rc-busca__sugestoes {
@@ -385,7 +384,7 @@
 }
 
 /* Fundo e barra lateral juntos: cor sozinha não indica estado para quem não a
-   distingue (WCAG 2.1, 1.4.1). O mesmo par já é usado no seletor de município. */
+   distingue (WCAG 2.1, 1.4.1). O mesmo par já é usado no filtro de município. */
 .rc-busca__opcao:hover,
 .rc-busca__opcao[aria-selected="true"] {
   background: var(--rc-fundo);
@@ -457,26 +456,36 @@
   padding: 12px 14px;
 }
 
-/* Seletor de município e atalho de conta
-   -------------------------------------------------------------------------- */
+/* Filtro de município da home
+   --------------------------------------------------------------------------
+   Morava no cabeçalho, como item que encolhia para dar lugar à conta e ao
+   carrinho. Na home ele tem a largura da página, e o que antes era economia —
+   reticências, rótulo escondido no celular — virou só legibilidade. */
 
-/* `min-width: 0` repetido em toda a cadeia até o texto: o mínimo automático não
-   se herda, e basta um elo mantê-lo para o nome da cidade travar a largura do
-   cabeçalho inteiro. É este item que absorve a falta de espaço — ver a
-   observação em `.rc-cabecalho__acoes`. */
+.rc-home-municipio {
+  margin: 24px 0 0;
+}
+
+/* `position: relative` ancora a lista suspensa. E `inline-block`, não bloco: um
+   `<details>` em bloco ocupa a linha inteira, e o clique no espaço vazio à
+   direita do gatilho abriria a lista sem que nada ali parecesse clicável. */
 .rc-municipio {
-  min-width: 0;
+  display: inline-block;
+  max-width: 100%;
   position: relative;
 }
 
 .rc-municipio__gatilho {
   align-items: center;
+  background: var(--rc-superficie);
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
   cursor: pointer;
   display: flex;
-  gap: 6px;
+  gap: 8px;
   list-style: none;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 8px 14px;
 }
 
 /* O marcador padrão do `<summary>` precisa ser removido nos dois formatos: o
@@ -487,6 +496,7 @@
 
 .rc-municipio__icone {
   color: var(--reconectar-cor-secundaria);
+  flex: 0 0 auto;
   height: 18px;
   width: 18px;
 }
@@ -495,46 +505,60 @@
   min-width: 0;
 }
 
-/* "Entregando em" é frase fixa e curta; sem `nowrap` ela quebrava em duas linhas
-   no celular e o cabeçalho inteiro ganhava altura por causa de duas palavras. */
 .rc-municipio__rotulo {
+  color: var(--rc-texto-suave);
   display: block;
   font-size: var(--rc-fonte-xs);
-  color: var(--rc-texto-suave);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--rc-entrelinha-justa);
 }
 
-/* Reticências em vez de quebra: o nome da cidade é uma linha só, e deixá-lo
-   quebrar em duas mudaria a altura do cabeçalho conforme o município escolhido.
-   Em desktop nada é cortado — o gatilho só encolhe quando o espaço acaba. */
+/* Reticências só como rede de segurança: com a largura da página, o nome de um
+   município de Alagoas cabe inteiro de 320px para cima. */
 .rc-municipio__valor {
   display: block;
-  font-size: var(--rc-fonte-sm);
+  font-size: var(--rc-fonte-base);
   font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* O `max-width` é rede de segurança para telas abaixo das que o edital exige:
-   não tem efeito de 320px para cima, onde os 220px do `min-width` sempre cabem
-   entre as bordas. */
+/* A seta diz que o gatilho abre alguma coisa. No cabeçalho o contexto bastava;
+   no meio da página, sem ela, o gatilho se lê como um rótulo informativo. */
+.rc-municipio__seta {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  flex: 0 0 auto;
+  height: 8px;
+  margin: 0 2px 4px 4px;
+  transform: rotate(45deg);
+  width: 8px;
+}
+
+.rc-municipio[open] .rc-municipio__seta {
+  margin-bottom: 0;
+  margin-top: 4px;
+  transform: rotate(225deg);
+}
+
+/* Abre para a direita, alinhada à esquerda do gatilho: o filtro fica no começo
+   da linha, e `right: 0` jogaria a lista para fora da tela pela esquerda. O
+   `max-width` é rede de segurança para telas abaixo das que o edital exige. */
 .rc-municipio__lista {
   background: var(--rc-superficie);
   border: 1px solid var(--rc-borda);
   border-radius: var(--rc-raio);
   box-shadow: var(--rc-sombra);
+  left: 0;
   list-style: none;
-  margin: 0;
+  margin: 4px 0 0;
   max-height: 320px;
   max-width: calc(100vw - 2 * var(--rc-espaco));
   min-width: 220px;
   overflow-y: auto;
   padding: 8px 0;
   position: absolute;
-  right: 0;
   top: 100%;
   z-index: 20;
 }
@@ -558,6 +582,9 @@
   font-weight: 600;
   padding-left: 13px;
 }
+
+/* Atalho de conta
+   -------------------------------------------------------------------------- */
 
 .rc-conta,
 .rc-carrinho__link {
@@ -697,9 +724,7 @@
      contêiner `flex-wrap: wrap` a quebra é decidida pelas **bases**, antes de
      qualquer flexão: com base `auto`, as ações mediam 285px de conteúdo, os
      145px da marca somavam 446 contra 343 de largura útil, e a marca era
-     empurrada para uma linha só dela. Zerada a base, a linha nunca transborda e
-     o encolhimento volta a acontecer onde já estava previsto — no município, que
-     tem `min-width: 0` e reticências.
+     empurrada para uma linha só dela. Zerada a base, a linha nunca transborda.
 
      `justify-content: flex-end` porque o item agora ocupa toda a sobra da linha:
      o `margin-left: auto` da regra geral deixa de ter espaço livre para empurrar
@@ -734,7 +759,7 @@
 
   /* O carrinho perde o texto de duas linhas e vira ícone com contagem ao lado:
      empilhados, os 12px da contagem sozinha deixavam a linha de base torta em
-     relação ao município. */
+     relação ao ícone. */
   .rc-carrinho__texto {
     display: flex;
     align-items: center;
@@ -744,33 +769,16 @@
     font-size: var(--rc-fonte-sm);
   }
 
-  /* Duas palavras saem do olho e ficam no leitor de tela, porque o que elas
-     custam é largura de uma linha disputada por três itens: "itens" vale 34px e
-     "Entregando em" vale 101px, e são esses 135px que separam o nome do
-     município de ser legível ou virar "Todos…".
+  /* "itens" sai do olho e fica no leitor de tela: sem a unidade, o nome do link
+     do carrinho seria "3". É diferente do `.rc-carrinho__total` logo acima, que
+     sumiu para todo mundo porque o valor continua a um toque, no carrinho.
 
-     Sair do olho, aqui, é diferente do que se fez com `.rc-carrinho__total`
-     logo acima — aquele sumiu para todo mundo porque o valor continua a um
-     toque, num link que leva ao carrinho. Estes dois não têm para onde levar:
-     sem a unidade, o nome do link do carrinho seria "3"; sem o rótulo, o pin
-     seria a única pista de que aquele nome é um município. É o caso em que a
-     assimetria se paga.
-
-     As duas saem por técnicas diferentes, e a diferença não é estilo:
-
-     A unidade do carrinho fica **no fluxo**, com 1px recortado. A técnica padrão
-     do WordPress usa `position: absolute`, e um absoluto dentro de contêiner
+     A unidade fica **no fluxo**, com 1px recortado. A técnica padrão do
+     WordPress usa `position: absolute`, e um absoluto dentro de contêiner
      estático sobe até o viewport, onde passa a esticar a área de rolagem do
      documento — foi exatamente assim que a barra inferior sumiu na home. O
      carrinho não tem ancestral posicionado, então 1px de caixa no fluxo custa
-     menos que a armadilha: dentro de uma linha flex ele não gera linha nenhuma.
-
-     O rótulo do município sai do fluxo **porque precisa**: no fluxo, o 1px é um
-     inline-block, e um inline-block gera line box com a altura do strut do
-     bloco — medido, o gatilho continuava com 61px de altura para exibir uma
-     linha de texto. Aqui o absoluto é seguro porque o ancestral posicionado
-     existe: `.rc-municipio` é `position: relative` desde que ganhou a lista
-     suspensa. */
+     menos que a armadilha: dentro de uma linha flex ele não gera linha nenhuma. */
   .rc-carrinho__unidade {
     clip-path: inset(50%);
     display: inline-block;
@@ -778,23 +786,6 @@
     overflow: hidden;
     white-space: nowrap;
     width: 1px;
-  }
-
-  .rc-municipio__rotulo {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-
-  /* Com o rótulo fora, o gatilho vira uma linha só e o padding lateral deixa de
-     ser folga para virar desconto no texto: os 16px que ele tomava são metade do
-     que a cidade ganha aqui. */
-  .rc-municipio__gatilho {
-    padding-left: 0;
-    padding-right: 0;
   }
 }
 
@@ -833,7 +824,7 @@
     padding-bottom: var(--rc-barra-refugio);
     position: fixed;
     right: 0;
-    /* Acima dos 20 do seletor de município e do painel de sugestões, que são o
+    /* Acima dos 20 do filtro de município e do painel de sugestões, que são o
        teto atual deste arquivo. A barra é moldura do aplicativo: nada da página
        deveria passar por cima dela. */
     z-index: 30;

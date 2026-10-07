@@ -47,6 +47,7 @@ $reconectar_modulos = array(
 	'inc/home/secao-hero.php',
 	'inc/home/secao-campanhas.php',
 	'inc/home/secao-categorias.php',
+	'inc/home/secao-municipio.php',
 	'inc/home/secao-lojas-destaque.php',
 	'inc/home/secao-ofertas.php',
 	'inc/home/secao-lojas.php',

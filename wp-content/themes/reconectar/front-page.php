@@ -27,6 +27,7 @@ get_header(); ?>
 			 *
 			 * @hooked reconectar_home_campanhas               - 5
 			 * @hooked reconectar_home_categorias               - 10
+			 * @hooked reconectar_home_municipio                - 15
 			 * @hooked reconectar_home_lojas_destaque           - 20
 			 * @hooked reconectar_home_ofertas                  - 30
 			 * @hooked reconectar_home_lojas                    - 40

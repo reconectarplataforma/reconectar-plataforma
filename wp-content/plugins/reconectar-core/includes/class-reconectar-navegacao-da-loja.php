@@ -30,7 +30,7 @@
  * O Moderador de Conteúdo também trabalha na moldura, pelo mesmo arranjo: a
  * Incubadora, o Fórum e a Comunidade abrem com a barra lateral do Dokan, sem
  * `dokandar`, e o login dele cai na Incubadora. A razão é de orientação, não de
- * permissão: na vitrine, com carrinho, busca de produto e "Entregando em", o
+ * permissão: na vitrine, com carrinho e busca de produto no cabeçalho, o
  * Moderador não tinha como saber que tinha saído do mercado. Os menus do site
  * ficam como estão para ele — a moldura só existe nas três áreas, e fora delas
  * o menu é o caminho de volta.

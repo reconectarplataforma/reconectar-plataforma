@@ -189,64 +189,6 @@ function reconectar_campo_de_busca() {
 }
 
 /**
- * Imprime o seletor de município.
- *
- * É um `<details>` com uma lista de links, e não um `<select>` com JavaScript:
- * abre, fecha e navega sem script nenhum, e cada opção é uma URL de verdade.
- *
- * A lista vem dos municípios que **têm loja cadastrada**
- * (`reconectar_obter_cidades()`), então escolher uma opção nunca leva a uma
- * vitrine vazia. Quando não há loja alguma, o seletor não é impresso.
- */
-function reconectar_seletor_de_municipio() {
-	$cidades = reconectar_obter_cidades();
-
-	if ( ! $cidades ) {
-		return;
-	}
-
-	$ativos = reconectar_filtros_ativos();
-	$atual  = $ativos['cidade'] ? $ativos['cidade'] : __( 'Todos os municípios', 'reconectar' );
-	?>
-	<details class="rc-municipio">
-		<summary class="rc-municipio__gatilho">
-			<span class="rc-municipio__icone" aria-hidden="true">
-				<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-					<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"></path>
-					<circle cx="12" cy="10" r="2.5"></circle>
-				</svg>
-			</span>
-
-			<span class="rc-municipio__texto">
-				<span class="rc-municipio__rotulo"><?php esc_html_e( 'Entregando em', 'reconectar' ); ?></span>
-				<span class="rc-municipio__valor"><?php echo esc_html( $atual ); ?></span>
-			</span>
-		</summary>
-
-		<ul class="rc-municipio__lista">
-			<li>
-				<a class="rc-municipio__opcao" href="<?php echo esc_url( reconectar_url_de_filtro( 'cidade', null ) ); ?>">
-					<?php esc_html_e( 'Todos os municípios', 'reconectar' ); ?>
-				</a>
-			</li>
-
-			<?php foreach ( $cidades as $cidade ) : ?>
-				<li>
-					<a
-						class="rc-municipio__opcao"
-						href="<?php echo esc_url( reconectar_url_de_filtro( 'cidade', $cidade ) ); ?>"
-						<?php echo sanitize_title( $cidade ) === sanitize_title( $ativos['cidade'] ) ? ' aria-current="true"' : ''; ?>
-					>
-						<?php echo esc_html( $cidade ); ?>
-					</a>
-				</li>
-			<?php endforeach; ?>
-		</ul>
-	</details>
-	<?php
-}
-
-/**
  * Imprime o atalho de conta do cabeçalho.
  *
  * O destino depende de quem está olhando, porque "minha conta" significa coisas

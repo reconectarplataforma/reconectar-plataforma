@@ -68,7 +68,6 @@ else :
 
 				<div class="rc-cabecalho__acoes">
 					<?php
-					reconectar_seletor_de_municipio();
 					reconectar_atalho_de_conta();
 					reconectar_resumo_do_carrinho();
 					?>
