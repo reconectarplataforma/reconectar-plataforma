@@ -4431,6 +4431,25 @@ cabeçalho, busca de produto, carrinho e "Entregando em".
   - o item "Módulos" na barra e na conta, presente e ausente.
 
 
+## 2026-10-07 — O Mercado da Loja é a vitrine dela, não o painel
+
+Na tela de módulos, o cartão Mercado levava a Loja ao `/dashboard/`. Quem
+escolhia "Mercado" esperava o mercado e caía no painel — a mesma tela em que o
+login antigo já a deixava, o que fazia a escolha parecer não ter efeito.
+
+- O botão passa a ser "Ver minha loja", para a vitrine da própria loja
+  (`/store/<loja>/`, por `dokan_get_store_url()`): os produtos dela como o
+  comprador os vê. O Moderador segue na vitrine geral, e o Administrador no
+  painel de empresas.
+- O painel da loja continua a um clique: no ícone da conta da vitrine e no item
+  "Painel" da barra lateral.
+
+**Verificação**
+
+- `verificar-acessos.sh`: 390 casos, nenhuma falha. Os casos da Loja conferem o
+  botão novo, o destino `/store/demo-sabor-da-terra/` e que ele não aponta para
+  o `/dashboard/`.
+
 ---
 
 ## 2026-10-07 — O filtro de município sai do cabeçalho e passa a filtrar a home
@@ -4487,4 +4506,4 @@ cabeçalho, busca de produto, carrinho e "Entregando em".
 - Capturas a 1400px e a 375px com a lista aberta: a lista abre dentro da tela e
   não há rolagem horizontal (`scrollX` = 0). O cabeçalho do celular segue numa
   linha só.
-- `verificar-acessos.sh`: 388 casos, nenhuma falha.
+- `verificar-acessos.sh`: 390 casos, nenhuma falha.
