@@ -4507,3 +4507,92 @@ login antigo já a deixava, o que fazia a escolha parecer não ter efeito.
   não há rolagem horizontal (`scrollX` = 0). O cabeçalho do celular segue numa
   linha só.
 - `verificar-acessos.sh`: 390 casos, nenhuma falha.
+
+## 2026-10-07 — Lojas sem sublinhado, com hover, e a loja no card do catálogo
+
+**O que mudou**
+
+- **Vitrine de lojas.** As pílulas de filtro e o texto dos cards de loja estavam
+  todos sublinhados: nome, nota, categoria, distância, prazo e taxa, cada um com
+  o seu traço. O sublinhado sai. Ao passar o mouse, ou ao focar pelo teclado, o
+  card sobe 3px e a pílula sobe 2px, os dois com sombra. Quem marcou
+  `prefers-reduced-motion` no sistema vê a sombra e a cor, mas o card e a pílula
+  ficam parados.
+- **Catálogo.** O card de produto do laço do WooCommerce passa a mostrar a loja
+  que vende o produto, logo abaixo do título. A mudança vale também para
+  categorias, busca e relacionados. Na página da própria loja o nome não sai,
+  porque o cabeçalho já diz de quem é.
+
+**Por quê**
+
+- O sublinhado vinha de `.hentry .entry-content a`, do Storefront, que tem
+  especificidade (0,2,1). Ele vencia o `text-decoration: none` autoral, que tem
+  (0,1,0), porque a vitrine mora no conteúdo da página "Lojas parceiras".
+  - A correção usa o mesmo prefixo, numa regra só para a decoração.
+  - Repetir a classe na regra base não resolveria. (0,2,0) não chega a (0,2,1).
+    Além disso, subiria a regra base acima de `--ativa` e de `:hover`.
+- O efeito de subir no card vale só na grade da vitrine. No carrossel da home a
+  faixa é scroll container sem folga em cima, e recortaria o topo do card.
+- A pílula sobe só 2px pelo mesmo motivo: a lista dela recorta o que passar do
+  `padding` de 4px.
+- O nome da loja no card é texto, não link. O card inteiro já é um `<a>`, e
+  um link dentro de outro é HTML inválido.
+- O nome vem de `dokan_get_store_info()`, e não de
+  `reconectar_normalizar_loja()`. Esta última faria três consultas a mais por
+  card.
+
+**Verificação**
+
+- `/store-listing/`, a 1600px, medido no navegador:
+  - nenhum elemento sublinhado entre as pílulas e os cards. Antes eram 6
+    trechos sublinhados nos cards, e as pílulas também saíam sublinhadas;
+  - com o mouse em cima, o card computa `translateY(-3px)` e a pílula
+    `translateY(-2px)`;
+  - a pílula ativa e a de "Limpar filtros" mantêm o fundo e a borda tracejada.
+- `/shop/`: os 12 cards trazem o nome da loja, dentro do link do card
+  (por exemplo "Casa Viva" e "Ateliê Raízes").
+- `/store/demo-casa-viva/`: nenhum `rc-loop-produto__loja`.
+
+## 2026-10-07 — A trilha de navegação encosta no conteúdo
+
+**O que mudou**
+
+- A margem inferior de `.storefront-breadcrumb` caiu de 16px para 8px.
+- Duas caixas vazias que somavam espaço abaixo da trilha deixaram de ocupar
+  lugar:
+  - **Carrinho, checkout e "Minha conta".** O `<h1>` escondido por
+    `.rc-sem-titulo-de-pagina` deixava o `<header>` com os 95,95px de
+    `padding-bottom` que o Storefront dá a essas páginas.
+  - **`/store-listing/`.** A margem de cima de 32px da `.rc-vitrine`, que só
+    faz sentido entre as seções da home, afastava a busca da trilha.
+
+**Verificação**
+
+Medi a distância entre a trilha e o primeiro elemento visível de cada página, a
+1440px e a 375px.
+
+| Página | Antes | Depois |
+| --- | --- | --- |
+| Carrinho e checkout vazios | 112px | 8px |
+| `/store-listing/` | 48px | 8px |
+| Todas as demais | 16px | 8px |
+
+- As demais páginas medidas foram: catálogo, categorias, produto, categoria de
+  produto, página da loja, "Minha conta", transparência, busca, página comum e
+  404.
+- Com login, também ficaram em 8px: carrinho com item, checkout, "Minha conta",
+  pedidos e `/my-orders/`.
+- Fórum, Incubadora, `/dashboard/` e o painel de empresas não têm trilha.
+
+### Adendo — Categorias sem sublinhado
+
+A página "Categorias" caía na mesma regra do Storefront (`.hentry .entry-content a`)
+e sublinhava o nome de cada grupo e de cada card. Os dois saem da regra.
+
+- O título do grupo volta a sublinhar no hover e no foco.
+- "Ver todos os produtos de…" continua sublinhado de propósito. É link de
+  texto, e o sublinhado é o que o distingue sem depender da cor (critério 1.4.1
+  da WCAG 2.1).
+
+Medido em `/categorias/`: o único link sublinhado no conteúdo é
+`.rc-categorias__todos`.
