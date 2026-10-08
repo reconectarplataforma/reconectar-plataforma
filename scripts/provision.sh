@@ -93,8 +93,12 @@ echo "== URL do site: o host de quem pede =="
 # serve aqui: o `wp-config-transformer` não enxerga definição cujo valor é
 # expressão, nunca encontra a anterior e acrescenta uma linha nova a cada
 # execução. Veja o cabeçalho de `configurar-url-dinamica.php`.
+#
+# O esquema vai junto: com `WP_URL=https://…` o host público passa a responder
+# em HTTPS, atrás do proxy do `docker/Caddyfile`.
 reconectar_host_padrao="${WP_URL#*://}"
-php /var/www/scripts/configurar-url-dinamica.php "$(wp config path)" "$reconectar_host_padrao"
+reconectar_esquema_padrao="${WP_URL%%://*}"
+php /var/www/scripts/configurar-url-dinamica.php "$(wp config path)" "$reconectar_host_padrao" "$reconectar_esquema_padrao"
 
 echo "== Idioma (pt_BR) =="
 wp language core is-installed pt_BR || wp language core install pt_BR

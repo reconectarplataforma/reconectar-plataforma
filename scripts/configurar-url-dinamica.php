@@ -4,7 +4,7 @@
  *
  * Executa com PHP puro, a partir do `provision.sh`:
  *
- *     php /var/www/scripts/configurar-url-dinamica.php <wp-config.php> <host-padrao>
+ *     php /var/www/scripts/configurar-url-dinamica.php <wp-config.php> <host-padrao> [esquema-padrao]
  *
  * Existe porque `wp config set` **não serve** para estas três constantes. O
  * `wp-config-transformer`, que está por baixo do comando, não reconhece uma
@@ -26,8 +26,9 @@
  * @package reconectar
  */
 
-$caminho     = $argv[1] ?? '';
-$host_padrao = $argv[2] ?? '';
+$caminho        = $argv[1] ?? '';
+$host_padrao    = $argv[2] ?? '';
+$esquema_padrao = $argv[3] ?? 'http';
 
 if ( '' === $caminho || ! is_file( $caminho ) ) {
 	fwrite( STDERR, "configurar-url-dinamica.php: wp-config.php não encontrado.\n" );
@@ -36,6 +37,16 @@ if ( '' === $caminho || ! is_file( $caminho ) ) {
 
 if ( '' === $host_padrao ) {
 	fwrite( STDERR, "configurar-url-dinamica.php: host padrão não informado.\n" );
+	exit( 1 );
+}
+
+/*
+ * Lista fechada, e não "o que vier antes de `://`": o valor vai parar dentro de
+ * `WP_HOME`, e um `WP_URL` sem esquema faria o `provision.sh` passar o host
+ * inteiro aqui — o site sairia com links `exemplo.com://exemplo.com/`.
+ */
+if ( ! in_array( $esquema_padrao, array( 'http', 'https' ), true ) ) {
+	fwrite( STDERR, "configurar-url-dinamica.php: esquema '{$esquema_padrao}' não é http nem https. Confira o WP_URL.\n" );
 	exit( 1 );
 }
 
@@ -72,6 +83,22 @@ $modelo = <<<'PHP'
  * senha no cadastro de loja: um `Host` forjado sairia dentro desse link. Passam
  * `localhost`, o loopback e os três blocos privados.
  *
+ * O esquema segue o host. Os da allowlist são a rede local, sempre em HTTP; o
+ * host padrão leva o esquema do `WP_URL`. Na produção ele é `https`, e quem
+ * chega por ele chegou pelo proxy TLS (`docker/Caddyfile`): a porta do
+ * WordPress fica presa ao loopback, e é isso que autoriza o `HTTPS = on`
+ * abaixo. Sem ele `is_ssl()` responderia "não" atrás do proxy, e o
+ * `redirect_canonical()` mandaria cada página para a versão HTTPS dela mesma,
+ * que chega de novo como HTTP — laço de redirecionamento.
+ *
+ * O esquema não sai do `X-Forwarded-Proto`, porque no desenvolvimento a porta
+ * do container é alcançável direto e o cabeçalho viria do cliente. Mas atenção:
+ * o `wp-config.php` da imagem oficial do WordPress, acima deste bloco, já
+ * liga `HTTPS` quando o cabeçalho diz `https`. Medido: `curl -H
+ * 'X-Forwarded-Proto: https' localhost:8090` devolve a página com links
+ * `https://localhost`. Na produção quem fecha isso é o Caddy, que descarta o
+ * cabeçalho do cliente, somado à porta do `wordpress` presa ao loopback.
+ *
  * Bloco gerado por `scripts/configurar-url-dinamica.php`. Editar à mão não
  * adianta: o provisionamento seguinte reescreve tudo entre os marcadores.
  */
@@ -85,8 +112,15 @@ define(
 		? $_SERVER['HTTP_HOST']
 		: RECONECTAR_HOST_PADRAO
 );
-define( 'WP_HOME', 'http://' . RECONECTAR_HOST );
-define( 'WP_SITEURL', 'http://' . RECONECTAR_HOST );
+define(
+	'RECONECTAR_ESQUEMA',
+	RECONECTAR_HOST === RECONECTAR_HOST_PADRAO ? RECONECTAR_ESQUEMA_PADRAO : 'http'
+);
+if ( 'https' === RECONECTAR_ESQUEMA && isset( $_SERVER['HTTP_HOST'] ) ) {
+	$_SERVER['HTTPS'] = 'on';
+}
+define( 'WP_HOME', RECONECTAR_ESQUEMA . '://' . RECONECTAR_HOST );
+define( 'WP_SITEURL', RECONECTAR_ESQUEMA . '://' . RECONECTAR_HOST );
 /* END Reconectar: URL do site por requisição */
 PHP;
 
@@ -97,6 +131,7 @@ PHP;
  */
 $bloco = "/* BEGIN Reconectar: URL do site por requisição */\n"
 	. "define( 'RECONECTAR_HOST_PADRAO', " . var_export( $host_padrao, true ) . " );\n"
+	. "define( 'RECONECTAR_ESQUEMA_PADRAO', " . var_export( $esquema_padrao, true ) . " );\n"
 	. substr( $modelo, strlen( RECONECTAR_MARCA_INICIO ) + 1 );
 
 $original = file_get_contents( $caminho );
@@ -121,7 +156,7 @@ $conteudo = preg_replace(
  * de constante redefinida seguiria saindo.
  */
 $conteudo = preg_replace(
-	"#^[ \t]*define\(\s*'(RECONECTAR_HOST|RECONECTAR_HOST_PADRAO|WP_HOME|WP_SITEURL)'.*\n#m",
+	"#^[ \t]*define\(\s*'(RECONECTAR_HOST|RECONECTAR_HOST_PADRAO|RECONECTAR_ESQUEMA_PADRAO|WP_HOME|WP_SITEURL)'.*\n#m",
 	'',
 	$conteudo
 );
@@ -143,7 +178,7 @@ if ( false !== $pos ) {
 }
 
 if ( $conteudo === $original ) {
-	echo "URL por requisição: bloco já estava em dia (fora do HTTP: {$host_padrao}).\n";
+	echo "URL por requisição: bloco já estava em dia (fora da rede local: {$esquema_padrao}://{$host_padrao}).\n";
 	exit( 0 );
 }
 
@@ -152,4 +187,4 @@ if ( false === file_put_contents( $caminho, $conteudo ) ) {
 	exit( 1 );
 }
 
-echo "URL por requisição: bloco gravado (fora do HTTP: {$host_padrao}).\n";
+echo "URL por requisição: bloco gravado (fora da rede local: {$esquema_padrao}://{$host_padrao}).\n";
