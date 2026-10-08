@@ -684,6 +684,64 @@ else
   echo "Página 'Incubadora' já existe."
 fi
 
+echo "== Páginas legais (privacidade, termos, exclusão de dados) =="
+# O Google e a Meta recusam publicar o app de login social sem as três URLs
+# públicas, e `docs/LOGIN_SOCIAL.pdf` as cita por estes slugs — trocar um slug
+# aqui deixa o guia apontando para o 404. A LGPD, requisito do edital, pede a
+# política de qualquer forma.
+#
+# O texto vem de `scripts/paginas/`, versionado, e só é gravado na **criação**:
+# depois disso a página é do administrador, que precisa preencher os marcadores
+# `[A PREENCHER]` (razão social, CNPJ, e-mail do encarregado) — dados que o
+# código não tem e não deve inventar. Reescrever a cada provisionamento
+# apagaria esse preenchimento.
+#
+# A guarda olha qualquer status menos a lixeira: um rascunho com o slug faria o
+# `wp post create` nascer como `politica-de-privacidade-2`, e o link certo
+# seguiria no 404. Página despublicada pelo administrador fica como ele deixou.
+reconectar_criar_pagina_legal() {
+  local slug="$1" titulo="$2"
+  if [ -n "$(wp post list --post_type=page --name="$slug" \
+      --post_status=publish,draft,pending,private,future --field=ID)" ]; then
+    echo "Página '$titulo' já existe."
+  else
+    wp post create "/var/www/scripts/paginas/$slug.html" \
+      --post_type=page \
+      --post_title="$titulo" \
+      --post_name="$slug" \
+      --post_status=publish
+  fi
+}
+
+reconectar_criar_pagina_legal politica-de-privacidade "Política de privacidade"
+reconectar_criar_pagina_legal termos-de-uso "Termos de uso"
+reconectar_criar_pagina_legal exclusao-de-dados "Exclusão de dados"
+
+# `wp_page_for_privacy_policy` é o que o núcleo e o WooCommerce usam no link
+# "política de privacidade" do cadastro e do checkout. A instalação nasce com
+# ela apontando para o rascunho em inglês que o WordPress cria ("Privacy
+# Policy"), e o link leva ao 404 de quem não está logado. Só aponta para a
+# nossa quando ela estiver publicada.
+privacidade_id="$(wp post list --post_type=page --name=politica-de-privacidade --post_status=publish --field=ID | head -n1)"
+if [ -n "$privacidade_id" ] && [ "$(wp option get wp_page_for_privacy_policy)" != "$privacidade_id" ]; then
+  wp option update wp_page_for_privacy_policy "$privacidade_id"
+fi
+
+# Os textos que o WooCommerce põe sobre esse link nascem em inglês e não são
+# traduzidos pelo pacote de idioma: são opções gravadas na ativação. Só troca o
+# valor de fábrica — texto que o administrador escreveu fica.
+reconectar_traduzir_opcao_de_fabrica() {
+  if [ "$(wp option get "$1" 2>/dev/null || true)" = "$2" ]; then
+    wp option update "$1" "$3"
+  fi
+}
+reconectar_traduzir_opcao_de_fabrica woocommerce_registration_privacy_policy_text \
+  "Your personal data will be used to support your experience throughout this website, to manage access to your account, and for other purposes described in our [privacy_policy]." \
+  "Seus dados pessoais serão usados para criar e proteger a sua conta e para as demais finalidades descritas na nossa [privacy_policy]."
+reconectar_traduzir_opcao_de_fabrica woocommerce_checkout_privacy_policy_text \
+  "Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our [privacy_policy]." \
+  "Seus dados pessoais serão usados para processar o pedido, enviá-lo à loja que vai atendê-lo e para as demais finalidades descritas na nossa [privacy_policy]."
+
 echo "== Fórum inicial (bbPress) =="
 if ! wp post list --post_type=forum --field=ID | grep -q .; then
   wp post create \

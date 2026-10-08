@@ -2390,6 +2390,23 @@
   margin: 0 0 4px;
 }
 
+.rc-rodape__links-legais ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+/* A cor de texto suave, e não o link do tema: o `#31BEB1` sobre branco dá
+   2,30:1 e reprova o 1.4.3. O sublinhado é o que distingue o link do texto
+   vizinho, já que a cor não muda. */
+.rc-rodape__links-legais a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .rc-rodape__identificacao {
   display: flex;
   flex-wrap: wrap;

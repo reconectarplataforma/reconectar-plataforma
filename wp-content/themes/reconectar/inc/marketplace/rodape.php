@@ -91,6 +91,8 @@ function reconectar_rodape_legal() {
 			?>
 		</p>
 
+		<?php reconectar_rodape_links_legais(); ?>
+
 		<?php if ( $razao || $cnpj ) : ?>
 			<p class="rc-rodape__identificacao">
 				<?php if ( $razao ) : ?>
@@ -111,5 +113,50 @@ function reconectar_rodape_legal() {
 			</p>
 		<?php endif; ?>
 	</div>
+	<?php
+}
+
+/**
+ * Imprime os links das páginas legais na linha legal do rodapé.
+ *
+ * Moram aqui, e não numa coluna de widget, porque as colunas só são escritas
+ * pelo `provision.sh` quando estão vazias: uma instalação já provisionada nunca
+ * receberia os links sem um reparo à parte. A linha legal é código do tema e
+ * chega a toda instalação no deploy.
+ *
+ * As páginas são criadas pelo `provision.sh` com estes slugs, que o guia de
+ * login social também cita. Só entra a página **publicada** — `get_page_by_path()`
+ * devolve rascunho e lixeira, e um link para elas leva ao 404 de quem não está
+ * logado. Faltando as três, o `<nav>` não é impresso: um marco de navegação vazio
+ * ainda seria anunciado pelo leitor de tela.
+ */
+function reconectar_rodape_links_legais() {
+	$paginas = array(
+		'politica-de-privacidade' => __( 'Política de privacidade', 'reconectar' ),
+		'termos-de-uso'           => __( 'Termos de uso', 'reconectar' ),
+		'exclusao-de-dados'       => __( 'Exclusão de dados', 'reconectar' ),
+	);
+
+	$links = array();
+
+	foreach ( $paginas as $slug => $rotulo ) {
+		$pagina = get_page_by_path( $slug );
+
+		if ( $pagina && 'publish' === $pagina->post_status ) {
+			$links[ get_permalink( $pagina ) ] = $rotulo;
+		}
+	}
+
+	if ( ! $links ) {
+		return;
+	}
+	?>
+	<nav class="rc-rodape__links-legais" aria-label="<?php esc_attr_e( 'Informações legais', 'reconectar' ); ?>">
+		<ul>
+			<?php foreach ( $links as $url => $rotulo ) : ?>
+				<li><a href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $rotulo ); ?></a></li>
+			<?php endforeach; ?>
+		</ul>
+	</nav>
 	<?php
 }
