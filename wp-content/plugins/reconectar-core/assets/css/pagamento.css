@@ -669,3 +669,105 @@
 	background: #fbeeea;
 	color: #9c3a1e;
 }
+
+/* --- Detalhes do pedido recolhidos ------------------------------------- */
+
+/* `Reconectar_Pagamento_Direto::abrir_detalhes_recolhidos()`. Só existe quando
+   há bloco de pagamento acima: nasce fechado, e o resumo tem cara de controle
+   — borda, seta e alvo de 44px — para que ninguém o leia como um título solto
+   e deixe de conferir o pedido. */
+.rc-pedido-detalhes {
+	--rc-pg-borda: #dfe3e6;
+	--rc-pg-texto-suave: #717171;
+	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-pg-fonte-md: var( --rc-fonte-md, 1.125rem );
+
+	box-sizing: border-box;
+	margin: 0 0 2rem;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 8px;
+	background: #fff;
+}
+
+.rc-pedido-detalhes *,
+.rc-pedido-detalhes *::before,
+.rc-pedido-detalhes *::after {
+	box-sizing: inherit;
+}
+
+.rc-pedido-detalhes__resumo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+	min-height: 44px;
+	padding: 0.875rem 3rem 0.875rem 1.25rem;
+	position: relative;
+	cursor: pointer;
+	list-style: none;
+}
+
+/* O marcador nativo some nos dois motores — `list-style` no Firefox, o
+   pseudo-elemento no WebKit — e a seta autoral gira com o estado. */
+.rc-pedido-detalhes__resumo::-webkit-details-marker {
+	display: none;
+}
+
+.rc-pedido-detalhes__resumo::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: 1.25rem;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: translateY( -75% ) rotate( 45deg );
+	transition: transform 0.15s ease;
+}
+
+.rc-pedido-detalhes[open] > .rc-pedido-detalhes__resumo::after {
+	transform: translateY( -25% ) rotate( -135deg );
+}
+
+@media ( prefers-reduced-motion: reduce ) {
+	.rc-pedido-detalhes__resumo::after {
+		transition: none;
+	}
+}
+
+.rc-pedido-detalhes__resumo:focus-visible {
+	outline: 3px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+	border-radius: 8px;
+}
+
+.rc-pedido-detalhes__titulo {
+	margin: 0;
+	font-size: var( --rc-pg-fonte-md );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+.rc-pedido-detalhes__apoio {
+	font-size: var( --rc-pg-fonte-sm );
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-pedido-detalhes__corpo {
+	padding: 0 1.25rem 1.25rem;
+	border-top: 1px solid var( --rc-pg-borda );
+}
+
+/* O título que o WooCommerce imprime repete o do resumo, que já é um `<h2>`. */
+.rc-pedido-detalhes__corpo .woocommerce-order-details__title {
+	display: none;
+}
+
+.rc-pedido-detalhes__corpo .woocommerce-order-details,
+.rc-pedido-detalhes__corpo .woocommerce-customer-details {
+	margin: 1.25rem 0 0;
+}
+
+.rc-pedido-detalhes__corpo .woocommerce-column__title {
+	font-size: var( --rc-pg-fonte-md );
+}
