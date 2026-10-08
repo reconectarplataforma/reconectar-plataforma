@@ -67,7 +67,7 @@ class Reconectar_Enquete_Flutuante {
 	 * @return void
 	 */
 	public static function enfileirar_assets() {
-		if ( is_admin() || self::na_tela_de_modulos() || empty( self::enquetes() ) ) {
+		if ( is_admin() || self::fora_de_lugar() || empty( self::enquetes() ) ) {
 			return;
 		}
 
@@ -91,16 +91,24 @@ class Reconectar_Enquete_Flutuante {
 	}
 
 	/**
-	 * A requisição é a da tela de módulos?
+	 * A requisição é de uma tela onde o cartão não aparece?
 	 *
-	 * Ali o cartão não aparece. A tela é uma escolha de três cartões, e o da
-	 * enquete abria por cima do terceiro — medido a 1400px, cobria metade da
-	 * Praça. Quem escolhe o módulo encontra a enquete na página seguinte.
+	 * Na tela de módulos, que é uma escolha de três cartões: o da enquete abria
+	 * por cima do terceiro — medido a 1400px, cobria metade da Praça. Quem
+	 * escolhe o módulo encontra a enquete na página seguinte.
+	 *
+	 * No painel da loja, que é área de trabalho: a 1920px o cartão cobria a
+	 * coluna da direita da Visão geral — os dois últimos cards e os controles
+	 * dos gráficos. A loja encontra a enquete ao voltar ao mercado.
 	 *
 	 * @return bool
 	 */
-	private static function na_tela_de_modulos() {
-		return class_exists( 'Reconectar_Modulos' ) && Reconectar_Modulos::eh_a_tela();
+	private static function fora_de_lugar() {
+		if ( class_exists( 'Reconectar_Modulos' ) && Reconectar_Modulos::eh_a_tela() ) {
+			return true;
+		}
+
+		return function_exists( 'dokan_is_seller_dashboard' ) && dokan_is_seller_dashboard();
 	}
 
 	/**
@@ -109,7 +117,7 @@ class Reconectar_Enquete_Flutuante {
 	 * @return void
 	 */
 	public static function imprimir() {
-		if ( self::na_tela_de_modulos() ) {
+		if ( self::fora_de_lugar() ) {
 			return;
 		}
 
