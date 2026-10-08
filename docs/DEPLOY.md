@@ -139,7 +139,8 @@ O nome `3-148-211-66.sslip.io` **é** o IP: o sslip.io resolve o nome para o
 número que está escrito nele. Uma instância parada e religada sem Elastic IP
 ganha outro IP público, o nome passa a apontar para o nada, e o certificado
 deixa de valer para o endereço novo. Associe um Elastic IP antes de ligar o
-HTTPS e, se o número mudar, troque o `WP_URL` junto.
+HTTPS e, se o número mudar, troque o `WP_URL` junto. Passo a passo no console,
+com tudo o que muda junto com o número: [`ELASTIC_IP.md`](ELASTIC_IP.md).
 
 ### 5. Security Group
 
