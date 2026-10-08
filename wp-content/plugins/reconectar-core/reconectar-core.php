@@ -100,6 +100,9 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avaliacoes-penden
 // O menu do painel da loja aponta para a comunidade e a Incubadora, e a
 // navegação do site deixa de apontar para elas quando quem navega é a loja.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-navegacao-da-loja.php';
+// A Visão geral do painel da loja: indicadores de marketplace que esta
+// plataforma, sem comissão, sempre zeraria.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-visao-geral-da-loja.php';
 // A escolha de módulo depois do login, para quem trabalha na plataforma.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-modulos.php';
 // As três classes de gateway ficam de fora daqui de propósito: elas estendem
@@ -137,6 +140,7 @@ function reconectar_core_init() {
 	Reconectar_Servicos::init();
 	Reconectar_Avaliacoes_Pendentes::init();
 	Reconectar_Navegacao_Da_Loja::init();
+	Reconectar_Visao_Geral_Da_Loja::init();
 	Reconectar_Modulos::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
