@@ -40,6 +40,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `wp-content/themes/reconectar/assets/icones/categorias/` | os ícones de categoria, autorais e versionados |
 | `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador, Moderador e Super Administrador escolhem Mercado, Incubadora ou Praça a cada login; Loja e Super Administrador têm ainda o cartão do painel |
 | `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
+| `…/includes/class-reconectar-privacidade.php` | apagador e exportador nas ferramentas de privacidade do núcleo: votos, comentários da Incubadora, rastros do fórum, login social, loja |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
 | `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca, interação (vídeo em destaque, avaliação, comentários) |
 | `…/includes/incubadora/` | os templates da Incubadora |
@@ -52,6 +53,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
 | `docs/DADOS_DEMONSTRACAO.md` | o que a carga cria, em detalhe |
 | `docs/CADASTRO_MANUAL.md` | popular um ambiente real à mão, pelo Super Administrador |
+| `docs/EXCLUSAO_DE_DADOS.md` | atender pedido de exclusão: apagador primeiro, conta depois |
 | `DIARIO_DESENVOLVIMENTO.md` | histórico cronológico das entregas |
 
 Plugins e temas de terceiros **não são versionados**. Só `wp-content/themes/reconectar/`
@@ -1534,6 +1536,28 @@ O oculto fica de fora de `comments_open`, das consultas do núcleo e do feed por
 filtros da mesma classe — o tipo `rc_incubadora` não aparece num `get_comments()`
 que não o peça. Comentário de tipo novo herda esse cuidado, ou vaza para o
 `/wp-admin` e para o RSS.
+
+### Os apagadores de privacidade acham o titular pelo e-mail da conta
+
+Excluir a conta **antes** de rodar **Ferramentas → Apagar dados pessoais** não dá
+erro: cada apagador — núcleo, WooCommerce, Dokan, `Reconectar_Privacidade` —
+procura `get_user_by( 'email' )`, não acha ninguém e responde "nada a remover".
+O relatório sai limpo e os votos, o IP do fórum e o vínculo social ficam. Por
+isso o apagador anonimiza e **não** exclui a conta; a ordem está em
+`docs/EXCLUSAO_DE_DADOS.md`.
+
+Ao gravar dado pessoal novo que nenhum apagador alcança — mapa `user_id => …`
+em meta, comentário sem e-mail, meta de terceiro —, ele entra em
+`Reconectar_Privacidade` no mesmo commit, no apagador **e** no exportador.
+
+### `NextendSocialLogin::$providers` traz provedores que não existem
+
+A lista mistura os reais (Google, Facebook, Twitter) com as vitrines da versão
+Pro — Slack, Apple, GitHub e mais dezessete —, que herdam de
+`NextendSocialProviderDummy`, **não** de `NextendSocialProvider`, e não têm
+`isUserConnected()` nem `removeConnectionByUserID()`. Medido: um laço sobre a
+lista inteira é erro fatal no primeiro deles. Filtre por
+`instanceof NextendSocialProvider`.
 
 ## Convenções
 

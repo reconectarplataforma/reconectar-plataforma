@@ -105,6 +105,10 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-navegacao-da-loja
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-visao-geral-da-loja.php';
 // A escolha de módulo depois do login, para quem trabalha na plataforma.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-modulos.php';
+// Apagador e exportador das ferramentas de privacidade do núcleo: o que a
+// página de exclusão de dados promete e só esta plataforma grava. Por último
+// porque lê as constantes do fórum, da Incubadora, das enquetes e do comprovante.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-privacidade.php';
 // As três classes de gateway ficam de fora daqui de propósito: elas estendem
 // `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
 // exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do
@@ -155,5 +159,6 @@ function reconectar_core_init() {
 	Reconectar_Incubadora_Editor::init();
 	Reconectar_Incubadora_Busca::init();
 	Reconectar_Incubadora_Interacao::init();
+	Reconectar_Privacidade::init();
 }
 add_action( 'plugins_loaded', 'reconectar_core_init' );
