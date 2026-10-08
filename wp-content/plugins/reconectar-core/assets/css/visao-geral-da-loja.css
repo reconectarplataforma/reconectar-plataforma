@@ -1,0 +1,81 @@
+/**
+ * Visão geral do painel da loja.
+ *
+ * O markup é do WooCommerce Admin, renderizado pelo Dokan em React; nada aqui
+ * muda estrutura, só leitura. Os tokens de fonte vêm do tema com valor de
+ * reserva, porque o plugin não pode exigir tema nenhum.
+ *
+ * Sem build e sem CDN, como o resto do projeto.
+ */
+
+.dokan-dashboard .woocommerce-layout__header-wrapper {
+	--rc-vg-fonte-2xs: var( --rc-fonte-2xs, 0.75rem );
+	--rc-vg-fonte-xl: var( --rc-fonte-xl, 1.5rem );
+
+	box-sizing: border-box;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem 1.5rem;
+}
+
+/*
+ * O título quebrava em "Visão / geral" a 1920px: o bloco do saldo, ao lado,
+ * ocupava a linha inteira e espremia o `<h3>` à largura da maior palavra.
+ */
+.dokan-dashboard .woocommerce-layout__header-wrapper .entry-title {
+	flex: 0 0 auto;
+	margin: 0;
+	font-size: var( --rc-vg-fonte-xl );
+	white-space: nowrap;
+}
+
+.dokan-dashboard .woocommerce-layout__header-wrapper .dokan-analytics-vendor-earning-section {
+	flex: 0 1 auto;
+	width: auto;
+}
+
+/*
+ * Os botões da legenda ficam desabilitados enquanto houver só uma série
+ * marcada, para que ela não possa ser desmarcada. O Storefront pinta todo
+ * `button:disabled` com `opacity: 0.5 !important`, e a legenda — a linha que
+ * diz o que o gráfico mede — saía cinza-claro sobre branco, abaixo do
+ * contraste de 4,5:1. O `!important` daqui existe só para vencer aquele, e
+ * nenhuma especificidade venceria sem ele.
+ */
+.dokan-dashboard .woocommerce-legend__item > button:disabled {
+	opacity: 1 !important;
+	cursor: default;
+}
+
+/*
+ * Os eixos do d3 saem em 10px, abaixo do piso da escala do projeto.
+ */
+.dokan-dashboard .d3-chart__container .tick text {
+	font-size: var( --rc-fonte-2xs, 0.75rem );
+}
+
+/*
+ * A legenda em coluna nasce com `min-width: 320px`, maior que o rodapé do
+ * gráfico no celular: medido em 375px, 320px num rodapé de 278, e o total da
+ * série saía cortado na borda do cartão. É o piso, e não a largura, que
+ * precisa sair — `width` sozinho ganharia a cascata e não mudaria nada.
+ */
+.dokan-dashboard .woocommerce-chart__footer .woocommerce-legend {
+	box-sizing: border-box;
+	min-width: 0;
+	max-width: 100%;
+}
+
+/*
+ * No celular o WooCommerce puxa os filtros 8px para a esquerda, contando com
+ * o recuo do `/wp-admin`. Na moldura do Dokan não há esse recuo, e o "P" de
+ * "Período" ficava atrás da borda do conteúdo.
+ */
+@media ( max-width: 782px ) {
+	.dokan-dashboard .woocommerce-filters {
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
