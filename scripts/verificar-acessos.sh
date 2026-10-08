@@ -122,7 +122,11 @@ conferir() {
 
   local ok="sim"
   [ "$codigo" != "$codigo_esperado" ] && ok="nao"
-  if [ -n "$destino_esperado" ] && [[ "$destino" != *"$destino_esperado"* ]]; then
+  # Destino com `=` na frente compara inteiro: "302 =$BASE/" é a home e só
+  # ela, enquanto a comparação por trecho aceitaria qualquer URL do site.
+  if [[ "$destino_esperado" == =* ]]; then
+    [ "$destino" != "${destino_esperado#=}" ] && ok="nao"
+  elif [ -n "$destino_esperado" ] && [[ "$destino" != *"$destino_esperado"* ]]; then
     ok="nao"
   fi
 
@@ -849,23 +853,40 @@ else
   echo "  --    sessões de cliente, loja ou moderador ausentes; resposta de serviço não verificada"
 fi
 
+caminho_incubadora="$(wp_eval '
+  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+  echo $p ? wp_parse_url( get_permalink( $p[0] ), PHP_URL_PATH ) : "";')"
+
+# A leitura é do módulo, não do login: Loja, Administrador, Moderador e Super
+# Administrador leem; o cliente volta à home, e o visitante vai ao login. A home
+# é conferida por inteiro (`=`), porque um trecho de URL aceitaria também o
+# login — que para o cliente seria um laço.
+echo "Leitura da Incubadora (só para quem tem o módulo)"
+if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+  conferir ""               "$caminho_incubadora" "302 wp-login.php" "visitante é mandado entrar"
+  conferir "$JAR_CLIENTE"   "$caminho_incubadora" "302 =$BASE/"      "cliente volta à home"
+  conferir "$JAR_CLIENTE"   "/incubadora/"        "302 =$BASE/"      "cliente volta à home pela âncora"
+  conferir "$JAR_VENDEDOR"  "$caminho_incubadora" "200"              "loja lê"
+  conferir "$JAR_MODERADOR" "$caminho_incubadora" "200"              "moderador lê"
+  conferir_corpo "$JAR_CLIENTE"   "/" 'href="'"$BASE"'/incubadora/"' "ausente"  "cliente sem a Incubadora no menu"
+  conferir_corpo "$JAR_MODERADOR" "/" 'href="'"$BASE"'/incubadora/"' "presente" "moderador com a Incubadora no menu"
+else
+  echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; leitura não verificada"
+fi
+
 # O editor é uma camada por cima da leitura, e a camada inteira — script, nonce,
-# rota — só pode chegar a quem escreve. O nonce no HTML do cliente não abriria
+# rota — só pode chegar a quem escreve. O nonce no HTML da loja não abriria
 # a escrita sozinho, porque a capacidade é conferida antes dele; mas é a
 # segunda trava, e esta linha é o que avisa no dia em que ela ficar sozinha.
 # A agulha é o nome do objeto de dados, que só sai junto do script.
 echo "Editor da Incubadora (só para quem escreve)"
-caminho_incubadora="$(wp_eval '
-  $p = get_posts( array( "post_type" => "incubadora_pagina", "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
-  echo $p ? wp_parse_url( get_permalink( $p[0] ), PHP_URL_PATH ) : "";')"
-if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
+if [ -n "$caminho_incubadora" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraEditor" "presente" "moderador recebe o editor"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "cliente só lê"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "reconectarIncubadoraEditor" "ausente"  "loja só lê"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" 'data-rc-incubadora="editar"' "ausente" "cliente sem o botão Editar"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="editar"' "ausente" "loja sem o botão Editar"
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "tinymce.min.js" "ausente" "o TinyMCE só carrega no clique"
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" "reconectarIncubadoraArvore" "presente" "moderador recebe a árvore interativa"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "reconectarIncubadoraArvore" "ausente"  "cliente sem a árvore interativa"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "reconectarIncubadoraArvore" "ausente"  "loja sem a árvore interativa"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" 'data-rc-incubadora="mover"' "ausente" "loja sem o botão Mover"
 else
   echo "  --    nenhuma página publicada na Incubadora, ou sessões ausentes; editor não verificado"
@@ -885,15 +906,15 @@ versao_incubadora="$(wp_eval '
   if ( $p ) { $r = wp_get_post_revisions( $p[0], array( "posts_per_page" => 1 ) ); echo $r ? key( $r ) : (int) wp_save_post_revision( $p[0] ); }')"
 if [ -n "$caminho_incubadora" ] && [ -n "$versao_incubadora" ] && [ "$versao_incubadora" != "0" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora" '?historico=1"' "presente" "moderador recebe o link Histórico"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" '?historico=1"' "ausente"  "cliente sem o link Histórico"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" '?historico=1"' "ausente"  "loja sem o link Histórico"
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "presente" "moderador vê a lista de versões"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "cliente recebe a página, não a lista"
+  conferir "$JAR_CLIENTE"   "$caminho_incubadora?historico=1" "302 =$BASE/" "cliente volta à home pelo histórico"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?historico=1" "rc-incubadora__versoes" "ausente"  "loja recebe a página, não a lista"
   conferir_corpo "$JAR_MODERADOR" "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "presente" "moderador vê a versão"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "cliente recebe a página atual"
+  conferir "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "302 =$BASE/" "cliente volta à home pela versão"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?versao=$versao_incubadora" "rc-incubadora__faixa" "ausente"  "loja recebe a página atual"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora?versao=$versao_incubadora" "incubadora-historico.js" "ausente" "cliente sem o script de restaurar"
-  conferir "$JAR_CLIENTE"   "$caminho_incubadora?versao=999999999" "200" "versão inexistente não vaza ao cliente"
+  conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora?versao=$versao_incubadora" "incubadora-historico.js" "ausente" "loja sem o script de restaurar"
+  conferir "$JAR_VENDEDOR"  "$caminho_incubadora?versao=999999999" "200" "versão inexistente não vaza à loja"
   conferir "$JAR_MODERADOR" "$caminho_incubadora?versao=999999999" "404" "versão inexistente é 404 a quem edita"
   conferir ""               "$caminho_incubadora?historico=1"      "302 wp-login.php" "visitante é mandado entrar"
 else
@@ -901,15 +922,12 @@ else
 fi
 
 # Vídeo, avaliação e comentários: três capacidades em jogo, e a tela é o que
-# denuncia a troca de uma pela outra. O cliente lê a conversa e não participa;
-# a loja comenta e avalia, mas o vídeo e a moderação são de quem gere a
-# Incubadora. O aviso do cliente é agulha **presente** de propósito: só a
-# ausência do formulário passaria também com a seção inteira fora do ar.
+# denuncia a troca de uma pela outra. A loja comenta e avalia, mas o vídeo e a
+# moderação são de quem gere a Incubadora. O cliente nem chega à página — ver
+# "Leitura da Incubadora" —, e por isso não tem caso aqui; as recusas dele no
+# transporte seguem em "Interação na Incubadora por HTTP".
 echo "Interação na Incubadora (vídeo, avaliação e comentários)"
 if [ -n "$caminho_incubadora" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-comentarios__aviso"        "presente" "cliente lê a conversa e vê o aviso"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-avaliacao__form"           "ausente"  "cliente sem os botões de avaliar"
-  conferir_corpo "$JAR_CLIENTE"   "$caminho_incubadora" "rc-comentarios__form--novo"   "ausente"  "cliente sem o campo de comentário"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-comentarios__form--novo"   "presente" "loja comenta"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-avaliacao__form"           "presente" "loja avalia"
   conferir_corpo "$JAR_VENDEDOR"  "$caminho_incubadora" "rc-incubadora__form-video"    "ausente"  "loja sem o formulário de vídeo"
@@ -1006,13 +1024,13 @@ par_busca="$(wp_eval '
   echo $mae && $filha ? "$mae $filha" : "";')"
 if [ -n "$par_busca" ] && [ -f "$JAR_CLIENTE" ] && [ -f "$JAR_VENDEDOR" ] && [ -f "$JAR_MODERADOR" ]; then
   conferir ""               "/incubadora/?q=$palavra_busca" "302 wp-login.php" "visitante é mandado entrar"
-  conferir "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "200" "a âncora com busca não redireciona"
+  conferir "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "302 =$BASE/" "cliente volta à home pela busca"
+  conferir "$JAR_VENDEDOR"  "/incubadora/?q=$palavra_busca" "200" "a âncora com busca não redireciona"
   conferir_corpo "$JAR_MODERADOR" "/incubadora/?q=$palavra_busca" "2 páginas encontradas" "presente" "moderador acha o rascunho e a filha"
-  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "cliente não acha nenhuma das duas"
   conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=$palavra_busca" "Nenhuma página encontrada" "presente" "loja não acha nenhuma das duas"
-  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=$palavra_busca" "Verificação da busca" "ausente" "nem o título vaza ao cliente"
-  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=ab" "Escreva ao menos 3 caracteres" "presente" "busca curta pede mais texto"
-  conferir_corpo "$JAR_CLIENTE"   "/incubadora/?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E" "<script>alert(1)" "ausente" "texto buscado não volta como marcação"
+  conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=$palavra_busca" "Verificação da busca" "ausente" "nem o título vaza à loja"
+  conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=ab" "Escreva ao menos 3 caracteres" "presente" "busca curta pede mais texto"
+  conferir_corpo "$JAR_VENDEDOR"  "/incubadora/?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E" "<script>alert(1)" "ausente" "texto buscado não volta como marcação"
 else
   echo "  --    sessões ausentes, ou o par de teste não foi criado; busca não verificada"
 fi
@@ -1063,16 +1081,16 @@ if [ -n "$arquivo_teste" ]; then
   rota_arquivo="/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=$arquivo_teste"
   conferir ""               "/wp-content/uploads/reconectar-incubadora/$arquivo_teste" "403" "acesso direto à pasta barrado"
   conferir ""               "$rota_arquivo" "401" "visitante não baixa"
-  conferir "$JAR_CLIENTE"   "$rota_arquivo" "200" "cliente logado baixa"
+  conferir "$JAR_CLIENTE"   "$rota_arquivo" "403" "cliente não baixa"
   conferir "$JAR_VENDEDOR"  "$rota_arquivo" "200" "loja logada baixa"
-  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-type: image/png" "tipo vem do arquivo"
-  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^x-content-type-options: nosniff" "navegador não adivinha o tipo"
-  conferir_cabecalho "$JAR_CLIENTE" "$rota_arquivo" "^content-security-policy: .*sandbox" "arquivo aberto em sandbox"
-  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=00000000000000000000000000000000.png" "404" "nome válido inexistente"
-  conferir "$JAR_CLIENTE"   "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=..%2F..%2F..%2Fwp-config.php" "404" "caminho fora da pasta recusado"
+  conferir_cabecalho "$JAR_VENDEDOR" "$rota_arquivo" "^content-type: image/png" "tipo vem do arquivo"
+  conferir_cabecalho "$JAR_VENDEDOR" "$rota_arquivo" "^x-content-type-options: nosniff" "navegador não adivinha o tipo"
+  conferir_cabecalho "$JAR_VENDEDOR" "$rota_arquivo" "^content-security-policy: .*sandbox" "arquivo aberto em sandbox"
+  conferir "$JAR_VENDEDOR"  "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=00000000000000000000000000000000.png" "404" "nome válido inexistente"
+  conferir "$JAR_VENDEDOR"  "/wp-admin/admin-post.php?action=reconectar_incubadora_arquivo&arquivo=..%2F..%2F..%2Fwp-config.php" "404" "caminho fora da pasta recusado"
 
   total=$((total + 1))
-  codigo_post="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR_CLIENTE" -X POST "$BASE$rota_arquivo")"
+  codigo_post="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR_VENDEDOR" -X POST "$BASE$rota_arquivo")"
   if [ "$codigo_post" = "405" ]; then
     [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "arquivo" "POST não entrega"
   else

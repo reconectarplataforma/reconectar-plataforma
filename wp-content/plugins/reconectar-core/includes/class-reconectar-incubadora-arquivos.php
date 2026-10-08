@@ -439,7 +439,7 @@ class Reconectar_Incubadora_Arquivos {
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * Entrega um arquivo a quem está logado.
+	 * Entrega um arquivo a quem lê a Incubadora.
 	 *
 	 * Os cabeçalhos são a segunda metade da conferência de tipo do envio.
 	 * `nosniff` impede o navegador de adivinhar HTML num arquivo declarado como
@@ -465,6 +465,10 @@ class Reconectar_Incubadora_Arquivos {
 
 		if ( ! is_user_logged_in() ) {
 			self::recusar_entrega( 401, __( 'Entre na plataforma para ver este arquivo.', 'reconectar-core' ) );
+		}
+
+		if ( ! Reconectar_Incubadora::pode_ler() ) {
+			self::recusar_entrega( 403, __( 'Este arquivo é da Incubadora, que não faz parte do seu perfil.', 'reconectar-core' ) );
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- rota de leitura embutida em `<img>`; a trava é a sessão.

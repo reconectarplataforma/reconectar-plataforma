@@ -862,9 +862,9 @@ else
   transparencia_id=$(wp post list --post_type=page --name=transparencia --post_status=publish --field=ID)
   [ -n "$transparencia_id" ] && wp menu item add-post "menu-principal" "$transparencia_id" --title="Transparência" --position=6
 
-  # O visitante não vê este item: a Incubadora é só para quem entrou, e
-  # `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` o tira pelo ID
-  # da página — um link que só leva ao login seria defeito de interface.
+  # Visitante e cliente não veem este item — a Incubadora não é área deles —, e
+  # `Reconectar_Incubadora_Leitura::ocultar_item_de_quem_nao_usa()` o tira pelo ID
+  # da página.
   incubadora_id=$(wp post list --post_type=page --name=incubadora --post_status=publish --field=ID)
   [ -n "$incubadora_id" ] && wp menu item add-post "menu-principal" "$incubadora_id" --title="Incubadora" --position=7
 

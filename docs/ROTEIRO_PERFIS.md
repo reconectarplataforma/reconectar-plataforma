@@ -169,17 +169,22 @@ pelo painel.
 > Digite a URL da comunidade à mão. É esse o teste que importa: a trava está no
 > backend, não na ausência do link.
 
-### 1.6 A Incubadora — Ana lê, e só lê
+### 1.6 A Incubadora — Ana não entra
 
-Ainda logada como Ana, abra http://localhost:8090/incubadora/. A âncora leva à
-primeira página da árvore, "Comece por aqui", com as páginas publicadas na
-lateral. Não há botão **Editar**, **Nova subpágina**, **Mover…** nem
-**Histórico**: quem não tem `reconectar_gerir_incubadora` recebe só a leitura,
-e o script do editor nem chega ao navegador.
+O menu de Ana não tem **Incubadora**: ela é módulo da Loja, do Administrador e
+do Moderador, e o cliente compra. Ainda logada como Ana, digite
+http://localhost:8090/incubadora/ à mão: `302` para a home. O mesmo vale para
+qualquer página, busca, histórico ou arquivo da Incubadora.
 
 Saia da conta e abra o mesmo endereço: `302` para o login. A Incubadora é
-interna — o item some do menu do visitante, a página sai com `noindex`, e
-nenhuma URL dela responde sem login.
+interna — a página sai com `noindex`, e nenhuma URL dela responde a quem não
+tem o módulo.
+
+Quem lê sem editar é a Loja: entre como `demo-sabor-da-terra` e abra o mesmo
+endereço. A âncora leva à primeira página da árvore, "Comece por aqui". Não há
+botão **Editar**, **Nova subpágina**, **Mover…** nem **Histórico**: quem não
+tem `reconectar_gerir_incubadora` recebe só a leitura, e o script do editor nem
+chega ao navegador.
 
 ---
 
@@ -1092,7 +1097,7 @@ abaixo. O restante é visual e precisa de olho humano:
 | 30 | Loja sem meio cadastrado não vende, e o motivo aparece | seção 7.3 |
 | 31 | Uma instrução de pagamento por loja, com o valor do sub-pedido | seção 7.5 |
 | 32 | BR Code reconhecido por um app de banco real | seção 7.6 |
-| 33 | Incubadora só para quem está logado, sem edição para cliente e loja | seção 1.6 |
+| 33 | Incubadora fechada ao visitante e ao cliente, sem edição para a loja | seção 1.6 |
 | 34 | Rascunho da Incubadora invisível a quem só lê | 404 em "Atas e decisões", seção 4.6 |
 | 35 | Editar, mover e restaurar sem o `/wp-admin` | seção 4.6 |
 | 36 | Vídeo sem contato com o provedor antes do clique | seção 4.6 |

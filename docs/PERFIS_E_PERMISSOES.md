@@ -154,7 +154,7 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Votar em pergunta ou resposta | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Marcar a melhor resposta | ✅ | ✅ | ✅ | só nas próprias perguntas | ❌ |
 | **Incubadora** | | | | | |
-| Ler as páginas publicadas | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ler as páginas publicadas | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Ver rascunhos, histórico e versões antigas | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Criar, editar, publicar, mover e excluir páginas | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Restaurar versão antiga | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -184,12 +184,12 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Nega escrita no fórum a quem não participa | `negar_escrita_no_forum()` | `map_meta_cap` |
 | Esconde links da comunidade | `ocultar_itens_da_comunidade()` | `wp_nav_menu_objects` |
 | Dá ao Moderador e ao Administrador novos a moderação do fórum | `sincronizar_papel_no_forum_ao_cadastrar()` | `user_register` (20) |
-| Fecha a Incubadora a quem não está logado | `Reconectar_Incubadora::bloquear_leitura()` | `template_redirect` (1) |
+| Fecha a Incubadora ao visitante (login) e ao cliente (home) | `Reconectar_Incubadora::bloquear_leitura()` | `template_redirect` (1) |
 | Dá 404 a página da Incubadora sob mãe em rascunho | `Reconectar_Incubadora_Leitura::exigir_caminho_visivel()` | `template_redirect` (2) |
-| Esconde o item Incubadora do visitante | `Reconectar_Incubadora_Leitura::ocultar_item_do_visitante()` | `wp_nav_menu_objects` |
+| Esconde o item Incubadora do visitante e do cliente | `Reconectar_Incubadora_Leitura::ocultar_item_de_quem_nao_usa()` | `wp_nav_menu_objects` |
 | Mostra o item "Loja" (vitrine própria) só a quem tem loja | `Reconectar_Navegacao_Da_Loja::acrescentar_item_loja_ao_menu()` | `wp_nav_menu_objects` (20) |
 | Barra a escrita na Incubadora | `Reconectar_Incubadora_Acoes::processar_*()` | `admin_post_reconectar_incubadora_*` |
-| Entrega arquivo da Incubadora só a quem está logado | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
+| Entrega arquivo da Incubadora só a quem lê a Incubadora | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
 | Esconde a barra administrativa do site, para todos os perfis | `ocultar_barra_administrativa()` | `show_admin_bar` |
@@ -220,8 +220,11 @@ A Incubadora é a wiki interna da plataforma: páginas e subpáginas do post typ
 `incubadora_pagina`, sob `/incubadora/`. Duas regras, e ambas valem pela URL
 digitada à mão:
 
-- **Ler exige estar logado.** Qualquer um dos cinco papéis lê o que está
-  publicado. O visitante vai para o login, inclusive na busca e no histórico. A
+- **Ler exige ter o módulo.** Loja, Administrador, Moderador e Super
+  Administrador leem o que está publicado — a mesma divisão da tela
+  `/modulos/`, consultada por `Reconectar_Incubadora::pode_ler()`. O visitante
+  vai para o login e o cliente volta à home, inclusive na busca, no histórico
+  e nos arquivos (403). O item do menu segue a mesma regra. A
   saída leva `noindex`, e o oEmbed das páginas responde 404 — o conteúdo é
   interno e não pode aparecer num buscador nem embutido em outro site.
 - **Escrever exige `reconectar_gerir_incubadora`**, que o Super Administrador,
@@ -408,7 +411,7 @@ Administrador não passam por ela — o primeiro vai à conta, o segundo ao
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 390 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 393 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -499,8 +502,8 @@ Em especial, nada dispara alarme se um plugin novo conceder
 (`/wp-admin/` deixaria de redirecionar), mas só quando alguém o rodasse.
 
 **A Incubadora não tem permissão por página.** Quem tem
-`reconectar_gerir_incubadora` edita, move e exclui qualquer página, e quem está
-logado lê qualquer página publicada. Uma área restrita a um grupo exigiria
+`reconectar_gerir_incubadora` edita, move e exclui qualquer página, e quem lê a
+Incubadora lê qualquer página publicada. Uma área restrita a um grupo exigiria
 outro desenho, não um ajuste deste.
 
 **Aparência → Temas continua acessível de leitura** aos dois papéis restritos,
