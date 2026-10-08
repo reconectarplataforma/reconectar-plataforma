@@ -3,9 +3,14 @@
  * Tela de acesso à plataforma.
  *
  * Sobrescreve `woocommerce/templates/myaccount/form-login.php` (versão 9.9.0).
- * O que muda é a apresentação: arte institucional à esquerda, painel de escolha
- * à direita, com os provedores de login social no topo e o par e-mail/senha
- * atrás de um botão.
+ * O que muda é a apresentação: arte institucional à esquerda e, à direita, o
+ * formulário de entrada já aberto, com os provedores de login social acima dele
+ * quando houver algum configurado, e o cadastro atrás de um botão.
+ *
+ * O e-mail e a senha já estiveram atrás de um botão "E-mail e senha", ao lado
+ * dos provedores sociais. Só que, na versão gratuita do Nextend, os botões não
+ * aparecem no formulário do WooCommerce, e a tela virava um menu de uma opção só:
+ * um clique a mais, sem escolha nenhuma, antes de digitar.
  *
  * O que **não** muda são os dois formulários. Todos os `do_action` do
  * WooCommerce estão preservados na ordem original porque não são decoração: o
@@ -66,7 +71,7 @@ do_action( 'woocommerce_before_customer_login_form' );
 	<div class="rc-login__painel">
 
 		<h1 class="rc-login__titulo"><?php esc_html_e( 'Acessar a plataforma', 'reconectar' ); ?></h1>
-		<p class="rc-login__subtitulo"><?php esc_html_e( 'Como deseja continuar?', 'reconectar' ); ?></p>
+		<p class="rc-login__subtitulo"><?php esc_html_e( 'Entre com seu e-mail ou usuário e a senha.', 'reconectar' ); ?></p>
 
 		<?php if ( '' !== $reconectar_sso ) : ?>
 			<div class="rc-login__sso">
@@ -76,26 +81,17 @@ do_action( 'woocommerce_before_customer_login_form' );
 			<p class="rc-login__separador"><span><?php esc_html_e( 'ou', 'reconectar' ); ?></span></p>
 		<?php endif; ?>
 
-		<?php
-		/*
-		 * Os dois botões nascem com `hidden` e é o JavaScript que os revela, ao
-		 * mesmo tempo em que fecha os blocos correspondentes. Assim a tela sem
-		 * script é linear — formulários abertos, nada a clicar antes de digitar —
-		 * e nunca exibe um botão que não abriria coisa alguma.
-		 */
-		?>
-		<button
-			type="button"
-			class="rc-login__botao rc-login__botao--secundario"
-			id="rc-login-gatilho-entrar"
-			aria-expanded="true"
-			aria-controls="rc-login-entrar"
-			hidden
-		><?php esc_html_e( 'E-mail e senha', 'reconectar' ); ?></button>
-
 		<div class="rc-login__bloco" id="rc-login-entrar">
 
-			<h2 class="rc-login__bloco-titulo"><?php esc_html_e( 'Entrar', 'reconectar' ); ?></h2>
+			<?php
+			/*
+			 * Some da tela e fica para o leitor de tela: o título e o subtítulo
+			 * logo acima já dizem que é aqui que se entra, e sem este `<h2>` o
+			 * "Criar uma conta" abaixo seria a única seção da página, com o
+			 * formulário de entrada solto debaixo do `<h1>`.
+			 */
+			?>
+			<h2 class="rc-login__bloco-titulo screen-reader-text"><?php esc_html_e( 'Entrar', 'reconectar' ); ?></h2>
 
 			<form class="woocommerce-form woocommerce-form-login login" method="post" novalidate>
 
@@ -131,6 +127,16 @@ do_action( 'woocommerce_before_customer_login_form' );
 
 		<?php if ( $reconectar_registro_aberto ) : ?>
 
+			<p class="rc-login__separador"><span><?php esc_html_e( 'Ainda não tem conta?', 'reconectar' ); ?></span></p>
+
+			<?php
+			/*
+			 * O botão nasce com `hidden` e é o JavaScript que o revela, ao mesmo
+			 * tempo em que fecha o bloco do cadastro. Assim a tela sem script é
+			 * linear, com os dois formulários abertos, e nunca exibe um botão que
+			 * não abriria coisa alguma.
+			 */
+			?>
 			<button
 				type="button"
 				class="rc-login__botao rc-login__botao--secundario"

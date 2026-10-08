@@ -1,10 +1,10 @@
 /**
- * Tela de acesso: revela os gatilhos e colapsa os formulários.
+ * Tela de acesso: revela o gatilho do cadastro e colapsa o formulário dele.
  *
  * Enriquecimento, como os carrosséis e a busca: o HTML entregue pelo servidor
- * já é uma tela funcional, com os dois formulários abertos e os botões marcados
- * com `hidden`. É este arquivo que inverte a situação — mostra os botões e
- * fecha o que eles abrem. Sem ele, ninguém fica preso atrás de um gatilho que
+ * já é uma tela funcional, com os dois formulários abertos e o botão marcado
+ * com `hidden`. É este arquivo que inverte a situação — mostra o botão e fecha
+ * o que ele abre. O formulário de entrada não tem gatilho e fica sempre aberto. Sem ele, ninguém fica preso atrás de um gatilho que
  * não responde.
  */
 ( function () {
