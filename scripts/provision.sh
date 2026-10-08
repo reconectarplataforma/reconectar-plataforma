@@ -188,6 +188,42 @@ echo "== Idioma dos plugins e temas (pt_BR) =="
 wp language plugin install --all pt_BR
 wp language theme install --all pt_BR
 
+echo "== Tradução autoral do Dokan Lite (pt_BR) =="
+# O Dokan Lite não tem pacote pt_BR no WordPress.org, então a tradução mora
+# no repositório, em `scripts/dokan-lite-pt_BR.po`, e é compilada aqui.
+# `wp-content/languages/` não é versionado nem sincronizado pelo deploy: os
+# arquivos que existiam na máquina de desenvolvimento tinham sido copiados à
+# mão e nunca chegariam ao servidor.
+#
+# São três saídas, e nenhuma substitui a outra:
+#   - `.l10n.php`: desde o WordPress 6.5 é o que o núcleo lê **antes** do
+#     `.mo`. Gerar só o `.mo` deixaria valendo um `.l10n.php` antigo, e a
+#     tradução nova não apareceria, sem erro nenhum.
+#   - `.mo`: o caminho de leitura para quem não tem o `.l10n.php`.
+#   - `.json`: as telas em React do painel do vendedor e do admin, que leem
+#     por `wp_set_script_translations()`. `--no-purge` porque o padrão do
+#     `make-json` apaga do `.po` as strings de JavaScript que ele extrai.
+#
+# Os `.json` antigos saem antes: o nome deles é o md5 do caminho do script,
+# e um script que o Dokan removeu deixaria para trás um arquivo que nada lê.
+#
+# Se um dia o WordPress.org publicar o pacote oficial, `wp language plugin
+# install` acima e as atualizações automáticas de tradução gravariam nestes
+# mesmos nomes. Este bloco roda depois e prevalece no provisionamento; entre
+# um provisionamento e outro, vale o que a atualização automática gravou.
+DOKAN_PO_ORIGEM="/var/www/scripts/dokan-lite-pt_BR.po"
+DIR_IDIOMAS_PLUGINS="/var/www/html/wp-content/languages/plugins"
+if [ -f "$DOKAN_PO_ORIGEM" ] && wp plugin is-installed dokan-lite; then
+  mkdir -p "$DIR_IDIOMAS_PLUGINS"
+  rm -f "$DIR_IDIOMAS_PLUGINS"/dokan-lite-pt_BR-*.json
+  cp "$DOKAN_PO_ORIGEM" "$DIR_IDIOMAS_PLUGINS/dokan-lite-pt_BR.po"
+  wp i18n make-mo "$DIR_IDIOMAS_PLUGINS/dokan-lite-pt_BR.po" "$DIR_IDIOMAS_PLUGINS/dokan-lite-pt_BR.mo"
+  wp i18n make-php "$DIR_IDIOMAS_PLUGINS/dokan-lite-pt_BR.po" "$DIR_IDIOMAS_PLUGINS"
+  wp i18n make-json "$DIR_IDIOMAS_PLUGINS/dokan-lite-pt_BR.po" "$DIR_IDIOMAS_PLUGINS" --no-purge
+else
+  echo "Tradução do Dokan Lite ou o próprio plugin ausente. Pulando."
+fi
+
 echo "== Vitrine pública (cortina 'Em breve' do WooCommerce) =="
 # O WooCommerce instala com "coming_soon" ligado desde a versão 9.1: loja,
 # produto, carrinho e checkout ficam atrás de uma cortina que só o
