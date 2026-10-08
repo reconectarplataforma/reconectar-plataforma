@@ -13,6 +13,10 @@
  * #B05538 (5,0:1), e não o token da marca: o token ficaria certo no nome e
  * errado na tela. O roxo institucional da Incubadora (#663191) mede 8,7:1.
  *
+ * Os cartões de trabalho — "Painel" da Loja e "Painel Admin" do Super
+ * Administrador — não são módulos do edital e por isso não tomam cor da marca:
+ * um ardósia neutro, #3B4A5A (9,1:1), que os separa dos três sem competir.
+ *
  * Sem build e sem CDN, como o resto do projeto.
  */
 
@@ -24,6 +28,7 @@
 	--rc-mo-mercado: #B05538;
 	--rc-mo-incubadora: var( --reconectar-cor-institucional, #663191 );
 	--rc-mo-praca: #1E7C73;
+	--rc-mo-painel: #3B4A5A;
 	--rc-mo-destaque: var( --reconectar-cor-destaque, #F1BF3D );
 
 	--rc-mo-fonte-sm: var( --rc-fonte-sm, 0.875rem );
@@ -169,6 +174,11 @@
 	background: var( --rc-mo-praca );
 }
 
+.rc-modulos__cartao--painel,
+.rc-modulos__cartao--painel-admin {
+	background: var( --rc-mo-painel );
+}
+
 /* O texto fica acima da ilustração e com largura limitada, para que a frase
    nunca corra por baixo do desenho. */
 .rc-modulos__texto {
@@ -268,6 +278,26 @@
 
 	.rc-modulos__titulo {
 		font-size: var( --rc-mo-fonte-3xl );
+	}
+
+	/* Quatro cartões: duas colunas até haver largura para as quatro. Em três
+	   colunas o quarto ficaria sozinho numa linha, com cara de sobra. */
+	.rc-modulos__lista--4 {
+		grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+	}
+}
+
+/* Quatro numa linha só a partir daqui, com a grade mais larga e o nome um
+   degrau menor: em 1120px cada cartão teria 265px, e "Painel Admin" em 36px
+   quebraria em duas linhas. */
+@media ( min-width: 1320px ) {
+	.rc-modulos__lista--4 {
+		grid-template-columns: repeat( 4, minmax( 0, 1fr ) );
+		max-width: 1280px;
+	}
+
+	.rc-modulos__lista--4 .rc-modulos__nome {
+		font-size: var( --rc-mo-fonte-2xl );
 	}
 }
 

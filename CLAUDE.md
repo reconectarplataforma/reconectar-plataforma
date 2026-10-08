@@ -38,7 +38,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `…/includes/painel-empresas/` | os templates das telas do painel |
 | `scripts/icones-de-categoria.php` | associa os ícones SVG às categorias; chamado pelo provisionamento e pela carga |
 | `wp-content/themes/reconectar/assets/icones/categorias/` | os ícones de categoria, autorais e versionados |
-| `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador e Moderador escolhem Mercado, Incubadora ou Praça a cada login |
+| `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador, Moderador e Super Administrador escolhem Mercado, Incubadora ou Praça a cada login; Loja e Super Administrador têm ainda o cartão do painel |
 | `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
 | `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca, interação (vídeo em destaque, avaliação, comentários) |
@@ -83,7 +83,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-393 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+400 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.

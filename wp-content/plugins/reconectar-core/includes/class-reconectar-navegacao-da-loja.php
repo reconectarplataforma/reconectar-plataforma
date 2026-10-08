@@ -439,8 +439,8 @@ class Reconectar_Navegacao_Da_Loja {
 
 		// O caminho de volta à escolha de módulo, no topo da barra. Sem
 		// `permission`, porque nenhuma capacidade descreve "trabalha na
-		// plataforma": o Dokan mostra item sem ela a todos, e o Super
-		// Administrador, que não passa pela tela, não deve vê-lo. Daí o `if`.
+		// plataforma": o Dokan mostra item sem ela a todos, e o cliente, que não
+		// passa pela tela, não deve vê-lo. Daí o `if`.
 		if ( class_exists( 'Reconectar_Modulos' ) && Reconectar_Modulos::escolhe_modulo() ) {
 			$nav['rc-modulos'] = array(
 				'title'     => __( 'Módulos', 'reconectar-core' ),

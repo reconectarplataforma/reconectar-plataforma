@@ -393,17 +393,18 @@ irreversível se algo falhar no meio. Ele recebe por `add_cap()`, e por isso só
 perde o que estiver em `CAPS_LEGADAS`.
 
 **Quem trabalha em mais de um módulo escolhe por onde começar.** Loja,
-Administrador e Moderador entram por `/modulos/` (`Reconectar_Modulos`), uma
-tela de três cartões — Mercado, Incubadora e Praça, os módulos do edital — a
-cada login. O destino de cada cartão depende do perfil: o Mercado é a vitrine
+Administrador, Moderador e Super Administrador entram por `/modulos/`
+(`Reconectar_Modulos`), uma tela com os três módulos do edital — Mercado,
+Incubadora e Praça — a cada login. A Loja e o Super Administrador recebem um
+quarto cartão, de trabalho: "Painel", que leva ao `/dashboard/` do Dokan, e
+"Painel Admin", que leva ao `/wp-admin`. O destino de cada cartão depende do perfil: o Mercado é a vitrine
 da própria loja (`/store/<loja>/`) para a Loja, o painel de empresas para o
 Administrador e a vitrine geral para o Moderador — o painel da loja fica no
 ícone da conta e no item "Painel" da barra lateral. A tela não concede nada: cada botão leva a uma rota que tem as suas
 próprias travas. O desvio só troca o destino **padrão** do login (vazio,
 `/wp-admin`, "Minha conta" ou o painel do Dokan); um `redirect_to` explícito
-vence, para que quem entrou por um link não perca o caminho. Cliente e Super
-Administrador não passam por ela — o primeiro vai à conta, o segundo ao
-`/wp-admin`, e os dois recebem `302` se abrirem a rota à mão.
+vence, para que quem entrou por um link não perca o caminho. O cliente não passa
+por ela: vai à conta, e recebe `302` se abrir a rota à mão.
 
 ## Como verificar
 
@@ -411,7 +412,7 @@ Administrador não passam por ela — o primeiro vai à conta, o segundo ao
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 393 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 400 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -444,7 +445,7 @@ Respostas medidas nesta instalação:
 | Vendedor | `302` → `/dashboard/` | `403` | — | — | `403` | `200` | `200` | `200` |
 | Moderador | `200` | `403` | `403` | `200` | `403` | `302` → módulos | `200` | `200` |
 | Administrador | `200` | `403` | `200` | `200` | `200` | `302` | `200` | `200` |
-| Super Administrador | `200` | `200` | — | — | `200` | — | `200` | `302` → `/wp-admin/` |
+| Super Administrador | `200` | `200` | — | — | `200` | — | `200` | `200` |
 
 Cada célula preenchida é um caso do script, e o travessão marca o que ele não
 cobre — não uma permissão indefinida.
