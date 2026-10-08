@@ -72,7 +72,7 @@ class Reconectar_Incubadora_Leitura {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enfileirar_historico' ), 20 );
 		add_filter( 'body_class', array( __CLASS__, 'classe_do_corpo' ) );
-		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_item_do_visitante' ) );
+		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_item_de_quem_nao_usa' ) );
 	}
 
 	/**
@@ -85,7 +85,7 @@ class Reconectar_Incubadora_Leitura {
 	 * @return string
 	 */
 	public static function shortcode() {
-		if ( ! is_user_logged_in() ) {
+		if ( ! Reconectar_Incubadora::pode_ler() ) {
 			return '';
 		}
 
@@ -281,18 +281,20 @@ class Reconectar_Incubadora_Leitura {
 	}
 
 	/**
-	 * Tira do menu, para o visitante, o item que leva à Incubadora.
+	 * Tira do menu o item da Incubadora para quem não a tem como área de uso.
 	 *
-	 * O portão já o manda ao login; oferecer um link que só leva ao login é
-	 * defeito de interface, a mesma razão de `ocultar_itens_da_comunidade()`.
+	 * Mesma pergunta do portão, `Reconectar_Incubadora::pode_ler()`: anunciar
+	 * um link que só leva ao login ou de volta à home é defeito de interface, a
+	 * razão de `ocultar_itens_da_comunidade()`.
+	 *
 	 * A comparação é pelo ID da âncora, e não pelo rótulo nem pela URL, que o
 	 * administrador pode trocar pelo painel.
 	 *
 	 * @param WP_Post[] $itens Itens do menu.
 	 * @return WP_Post[]
 	 */
-	public static function ocultar_item_do_visitante( $itens ) {
-		if ( is_user_logged_in() ) {
+	public static function ocultar_item_de_quem_nao_usa( $itens ) {
+		if ( Reconectar_Incubadora::pode_ler() ) {
 			return $itens;
 		}
 

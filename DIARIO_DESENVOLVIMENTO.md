@@ -4507,3 +4507,34 @@ login antigo já a deixava, o que fazia a escolha parecer não ter efeito.
   não há rolagem horizontal (`scrollX` = 0). O cabeçalho do celular segue numa
   linha só.
 - `verificar-acessos.sh`: 390 casos, nenhuma falha.
+
+## 2026-10-07 — A Incubadora fecha para o cliente
+
+O cliente logado via "Incubadora" no menu e lia todas as páginas. Isso era
+decisão documentada — "ler é de todo usuário logado, nos cinco perfis" —, e a
+decisão mudou: a Incubadora é módulo de quem vende, e o cliente compra.
+
+A pergunta passou a ter um lugar só, `Reconectar_Incubadora::pode_ler()`, na
+mesma divisão da tela `/modulos/`. Leem a Loja, o Administrador, o Moderador e
+o Super Administrador. Quatro pontos a consultam:
+
+- **O portão** (`bloquear_leitura()`). O visitante segue indo ao login. O
+  cliente vai para a home, como no portão de `/modulos/`: mandá-lo ao login
+  seria um laço, e um 403 não diz para onde ir. Vale para a página, a âncora,
+  a busca, o histórico e as versões.
+- **Os arquivos** (`entregar()`). O cliente recebe 403. Sem esta guarda,
+  imagem e PDF seguiriam abertos a ele pela rota de `admin-post.php`, que não
+  passa pelo portão.
+- **O shortcode**. Colado em outra página, sai vazio para o cliente.
+- **O menu** (`ocultar_item_de_quem_nao_usa()`, antes `ocultar_item_do_visitante()`).
+  O filtro só olhava o login e saía cedo para qualquer um que tivesse entrado.
+
+Escrita, comentário e avaliação não mudaram. Elas já recusavam o cliente pela
+capacidade, e os casos HTTP dele seguem medindo isso.
+
+No `verificar-acessos.sh`, os casos de "cliente só lê" passaram para a Loja,
+que é agora quem lê sem editar. Uma seção nova, "Leitura da Incubadora", mede o
+redirecionamento e o menu. O `conferir` ganhou destino exato com `=` na frente:
+a comparação por trecho aceitaria também o login.
+
+Resultado: 393 casos, nenhuma falha.

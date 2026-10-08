@@ -190,22 +190,48 @@ class Reconectar_Incubadora {
 	}
 
 	/**
-	 * Manda o visitante ao login antes de qualquer conteúdo da Incubadora.
+	 * O usuário lê a Incubadora?
 	 *
-	 * Só o login é conferido, e não capacidade: ler é de todo usuário logado,
-	 * nos cinco perfis. O retorno é a URL pedida, para o visitante voltar ao
-	 * ponto em que estava. `nocache_headers()` impede que um proxy guarde o
-	 * redirecionamento e o sirva depois a quem já entrou.
+	 * Pelo papel, na mesma divisão da tela `/modulos/`: a Incubadora é módulo
+	 * da Loja, do Administrador e do Moderador, e o Super Administrador a
+	 * alcança por ser a administração técnica. O cliente fica de fora — ele
+	 * compra, e a Incubadora é a formação de quem vende. Até 2026-10-07 lia
+	 * qualquer usuário logado; a decisão mudou, e o item do menu, a rota e os
+	 * arquivos passaram a consultar só este método.
+	 *
+	 * @param int $usuario_id Usuário; 0 usa o corrente.
+	 * @return bool
+	 */
+	public static function pode_ler( $usuario_id = 0 ) {
+		$usuario_id = $usuario_id ? (int) $usuario_id : get_current_user_id();
+
+		if ( ! $usuario_id ) {
+			return false;
+		}
+
+		return Reconectar_Modulos::escolhe_modulo( $usuario_id )
+			|| Reconectar_Permissoes::eh_administracao_tecnica( $usuario_id );
+	}
+
+	/**
+	 * Fecha a Incubadora antes de qualquer conteúdo a quem não a lê.
+	 *
+	 * O visitante vai ao login, com a URL pedida de retorno, para voltar ao
+	 * ponto em que estava. Quem já entrou e não lê — o cliente — vai para a
+	 * home, como faz o portão de `/modulos/`: mandá-lo ao login seria um laço,
+	 * e um 403 numa tela sem saída não diz para onde ir. `nocache_headers()`
+	 * impede que um proxy guarde o redirecionamento e o sirva depois a quem
+	 * tem o direito.
 	 *
 	 * @return void
 	 */
 	public static function bloquear_leitura() {
-		if ( is_user_logged_in() || ! self::requisicao_e_da_incubadora() ) {
+		if ( ! self::requisicao_e_da_incubadora() || self::pode_ler() ) {
 			return;
 		}
 
 		nocache_headers();
-		wp_safe_redirect( wp_login_url( home_url( add_query_arg( array() ) ) ) );
+		wp_safe_redirect( is_user_logged_in() ? home_url( '/' ) : wp_login_url( home_url( add_query_arg( array() ) ) ) );
 		exit;
 	}
 
