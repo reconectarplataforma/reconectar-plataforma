@@ -1,0 +1,47 @@
+# Proxy HTTPS da produção: termina o TLS e repassa ao WordPress.
+#
+# O Caddy obtém e renova o certificado do Let's Encrypt sozinho, por HTTP-01 na
+# porta 80, e redireciona HTTP para HTTPS. Não há cron de renovação, nem certbot,
+# nem certificado em arquivo para copiar: tudo mora no volume `caddy-data`, e
+# perdê-lo só custa uma emissão nova.
+#
+# O endereço vem de `WP_URL`, o mesmo valor que o `provision.sh` grava no
+# `wp-config.php`. Uma fonte só: com uma variável de domínio à parte, as duas
+# divergiriam, e o WordPress carimbaria links para um host que o proxy não serve.
+#
+# `WP_URL` precisa ser um nome que o Let's Encrypt aceite. Os nomes
+# `*.compute.amazonaws.com` são recusados pela política dele, e por isso a
+# produção usa `https://<ip-com-hifens>.sslip.io` — ou um domínio próprio.
+#
+# Para validar sem subir nada:
+#   docker run --rm -e WP_URL=https://exemplo.sslip.io \
+#     -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+#     caddy:2 caddy validate --config /etc/caddy/Caddyfile
+
+{
+	# Só h1 e h2. Com HTTP/3 ligado o Caddy anuncia `Alt-Svc` para a 443/udp,
+	# que nem o Compose nem o Security Group abrem: o navegador tentaria QUIC,
+	# esperaria, e cairia no TCP — latência a mais em toda primeira visita.
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$WP_URL} {
+	encode zstd gzip
+
+	# O Caddy envia `X-Forwarded-Proto: https` e descarta o que o cliente tiver
+	# mandado com esse nome, porque nenhum proxy à frente dele é confiável. Isso
+	# importa: o `wp-config.php` da imagem do WordPress liga `HTTPS` por esse
+	# cabeçalho, e a porta do `wordpress` aberta para fora o aceitaria de
+	# qualquer um. Por isso, na produção, ela fica presa ao loopback.
+	reverse_proxy wordpress:80
+}
+
+# Todo outro nome que chegue à porta 80 — o DNS da AWS, o IP cru, os links
+# antigos já espalhados — vai para o endereço canônico, preservando o caminho.
+# O desafio HTTP-01 do Let's Encrypt não passa por aqui: o Caddy o responde
+# antes de qualquer rota.
+http:// {
+	redir {$WP_URL}{uri} permanent
+}

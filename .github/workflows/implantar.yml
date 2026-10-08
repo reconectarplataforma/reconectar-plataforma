@@ -64,7 +64,7 @@ jobs:
           CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
         run: |
           ssh $OPCOES_SSH "$ALVO" "
-            sudo mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts
+            sudo mkdir -p $CAMINHO_REMOTO/wp-content/themes $CAMINHO_REMOTO/wp-content/plugins $CAMINHO_REMOTO/scripts $CAMINHO_REMOTO/docker
             sudo chown \$(id -un):\$(id -gn) $CAMINHO_REMOTO
           "
 
@@ -105,6 +105,13 @@ jobs:
             docker-compose.yml \
             "$ALVO:$CAMINHO_REMOTO/docker-compose.yml"
 
+          # O arquivo, e não `docker/`: a pasta guarda também os dumps locais
+          # (`docker/backup-*.sql`, fora do Git mas presentes no checkout de quem
+          # desenvolve), e o servidor não tem o que fazer com eles.
+          rsync -az --rsync-path="sudo rsync" -e "ssh $OPCOES_SSH" \
+            docker/Caddyfile \
+            "$ALVO:$CAMINHO_REMOTO/docker/Caddyfile"
+
       # Os serviços são nomeados de propósito, e é assim que o phpMyAdmin fica fora
       # do ar sem precisar de arquivo de override: um `docker-compose.prod.yml`
       # declarando `ports` não substituiria a lista do arquivo base — o Compose
@@ -137,3 +144,35 @@ jobs:
       - name: Provisionar
         if: steps.preparar_ssh.outputs.configurado == 'true'
         run: ssh $OPCOES_SSH "$ALVO" "$COMPOSE run --rm wpcli bash /var/www/scripts/provision.sh"
+
+      # O HTTPS liga pelo arquivo de ambiente do servidor, não por este: com
+      # `WP_URL=https://…` o proxy sobe; com `http://` o site segue como antes.
+      # Vem depois do provisionamento porque é ele que grava o esquema no
+      # `wp-config.php` — subir o proxy antes serviria, por alguns segundos,
+      # páginas com links `http://` dentro de uma conexão HTTPS.
+      #
+      # A segunda guarda existe porque o erro sem ela é mudo. Com
+      # `WORDPRESS_PORT=80` o Docker recusa o proxy e ao menos diz por quê; com
+      # qualquer outra porta pública o proxy sobe, e o WordPress segue
+      # respondendo fora dele, em HTTP puro, a quem mandar
+      # `X-Forwarded-Proto: https` — o `wp-config.php` da imagem acredita.
+      #
+      # `.?` em vez de uma classe com as aspas: a linha vai entre aspas duplas
+      # para o `ssh` e entre simples para o `grep`, e nenhuma das duas aceita a
+      # outra sem um escape que ninguém releria certo.
+      - name: Subir o proxy HTTPS
+        if: steps.preparar_ssh.outputs.configurado == 'true'
+        env:
+          CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
+        run: |
+          ssh $OPCOES_SSH "$ALVO" "
+            if ! grep -Eq '^WP_URL=.?https://' $CAMINHO_REMOTO/.env; then
+              echo 'WP_URL não começa com https:// — o site segue em HTTP, sem proxy.'
+              exit 0
+            fi
+            if ! grep -Eq '^WORDPRESS_PORT=.?127[.]0[.]0[.]1:' $CAMINHO_REMOTO/.env; then
+              echo '::error::WP_URL é https, mas WORDPRESS_PORT não está presa ao loopback. Use WORDPRESS_PORT=127.0.0.1:8090 (docs/DEPLOY.md).'
+              exit 1
+            fi
+            $COMPOSE up -d proxy
+          "

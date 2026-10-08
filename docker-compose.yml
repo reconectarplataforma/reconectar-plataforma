@@ -105,6 +105,40 @@ services:
       - ./scripts:/var/www/scripts
     command: ["bash", "/var/www/scripts/demo-completa.sh"]
 
+  # Proxy HTTPS da produção. Termina o TLS com certificado do Let's Encrypt,
+  # emitido e renovado pelo próprio Caddy, e repassa ao `wordpress`. A
+  # configuração e o porquê de cada linha estão em `docker/Caddyfile`.
+  #
+  # Atrás do profile "https" pelo mesmo motivo do `demo`: no desenvolvimento ele
+  # disputaria a porta 80 da máquina e tentaria emitir certificado para
+  # `localhost`, que o Let's Encrypt recusa. O `implantar.yml` o sobe pelo nome,
+  # o que ativa o profile, e só quando o `WP_URL` do servidor começa com
+  # `https://`.
+  #
+  # Com ele no ar, a 80 é dele: o `.env` do servidor tem de mover o
+  # `WORDPRESS_PORT` para `127.0.0.1:8090`. A trava do loopback não é só para
+  # liberar a porta — o `wp-config.php` declara HTTPS a toda requisição que
+  # chegue pelo host público, e uma porta do `wordpress` aberta para fora
+  # responderia em HTTP puro dizendo que é HTTPS.
+  proxy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - wordpress
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WP_URL: ${WP_URL:-}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # O certificado e a conta ACME. Sem volume, cada recriação do container
+      # pediria certificado novo, e o Let's Encrypt limita a cinco emissões
+      # idênticas por semana — o sexto deploy da semana derrubaria o HTTPS.
+      - caddy-data:/data
+      - caddy-config:/config
+
   phpmyadmin:
     image: phpmyadmin:5
     restart: unless-stopped
@@ -121,3 +155,5 @@ services:
 volumes:
   db-data:
   wordpress-data:
+  caddy-data:
+  caddy-config:

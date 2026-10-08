@@ -9,7 +9,7 @@ dados de demonstração ficam num workflow manual, fora do fluxo automático.
 | Workflow | Quando | O que faz |
 | --- | --- | --- |
 | [`verificar.yml`](../.github/workflows/verificar.yml) | todo push e todo pull request de fork | `php -l` em `reconectar-core/`, `themes/reconectar/` e `scripts/`; `bash -n` nos `scripts/*.sh` |
-| [`implantar.yml`](../.github/workflows/implantar.yml) | push na `main`, ou disparo manual | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` |
+| [`implantar.yml`](../.github/workflows/implantar.yml) | push na `main`, ou disparo manual | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` e, com `WP_URL` em `https://`, `up -d proxy` |
 | [`demonstracao.yml`](../.github/workflows/demonstracao.yml) | só manual, com escolha `instalar`/`remover` | `seed-demo.sh instalar` ou `seed-demo.sh remover -y` |
 
 O preparo do SSH é uma ação composta, [`.github/actions/preparar-ssh/`](../.github/actions/preparar-ssh/action.yml),
@@ -23,14 +23,19 @@ credencial do GitHub**.
 
 ### O recorte da sincronização
 
-Só quatro caminhos sobem, e cada um com o `--delete` aplicado **dentro de si**:
+Só cinco caminhos sobem. Nos três diretórios o `--delete` vale **dentro de si**;
+os dois arquivos vão sem ele:
 
 ```
 wp-content/themes/reconectar/
 wp-content/plugins/reconectar-core/
 scripts/
 docker-compose.yml
+docker/Caddyfile
 ```
+
+`docker/Caddyfile` sobe sozinho, e não a pasta `docker/`, que no checkout de
+quem desenvolve guarda também os dumps do banco local.
 
 `git ls-files wp-content/` devolve exatamente os dois primeiros. O núcleo do
 WordPress, o Storefront, o WooCommerce, o Dokan, o bbPress, o BuddyPress e todo
@@ -96,9 +101,9 @@ os defaults do `docker-compose.yml` são de desenvolvimento e estão no
 repositório.
 
 ```
-WORDPRESS_PORT=80
+WORDPRESS_PORT=127.0.0.1:8090
 WORDPRESS_DEBUG=0
-WP_URL=http://ec2-3-148-211-66.us-east-2.compute.amazonaws.com
+WP_URL=https://3-148-211-66.sslip.io
 
 MYSQL_DATABASE=reconectar
 MYSQL_USER=reconectar
@@ -124,9 +129,24 @@ em `RECONECTAR_HOST_PADRAO`, derivado de `WP_URL`. Com o default
 `http://localhost:8090`, o site sobe carimbando todo asset e todo link com
 `localhost`, e o sintoma é a página crua, sem CSS, para qualquer visitante.
 
-### 4. Security Group
+O esquema do `WP_URL` decide o HTTPS — veja a seção [HTTPS](#https) abaixo.
+Com `https://`, `WORDPRESS_PORT` **tem** de estar presa ao loopback como no
+exemplo; o deploy recusa a subida do proxy se não estiver.
 
-- **80/tcp** para `0.0.0.0/0` — o site.
+### 4. Elastic IP
+
+O nome `3-148-211-66.sslip.io` **é** o IP: o sslip.io resolve o nome para o
+número que está escrito nele. Uma instância parada e religada sem Elastic IP
+ganha outro IP público, o nome passa a apontar para o nada, e o certificado
+deixa de valer para o endereço novo. Associe um Elastic IP antes de ligar o
+HTTPS e, se o número mudar, troque o `WP_URL` junto.
+
+### 5. Security Group
+
+- **80/tcp** para `0.0.0.0/0` — o redirecionamento para HTTPS e o desafio
+  HTTP-01 do Let's Encrypt, que é por onde o certificado é emitido e renovado.
+  Fechar a 80 depois de emitir parece seguro e quebra a renovação, 60 dias depois.
+- **443/tcp** para `0.0.0.0/0` — o site.
 - **22/tcp** para os runners do GitHub.
 
 Este é o preço da opção escolhida: os IPs dos runners hospedados pelo GitHub são
@@ -137,6 +157,56 @@ na própria EC2 eliminaria a exposição, ao custo de manter o runner.
 A 8081 (phpMyAdmin) e a 8090 **não** devem ser liberadas. O phpMyAdmin nem sobe:
 o job nomeia os serviços (`up -d db wordpress`), e é assim que ele fica fora do
 ar sem precisar de arquivo de override.
+
+## HTTPS
+
+O TLS é do serviço `proxy` do `docker-compose.yml`, um Caddy configurado em
+[`docker/Caddyfile`](../docker/Caddyfile). Ele obtém e renova o certificado do
+Let's Encrypt sozinho — sem certbot, sem cron — e redireciona todo acesso HTTP,
+de qualquer nome, para o endereço canônico, preservando o caminho. O certificado
+mora no volume `caddy-data`; o Let's Encrypt limita a cinco emissões idênticas
+por semana, e o volume é o que impede que cada recriação do container gaste uma.
+
+**Por que sslip.io.** O Let's Encrypt recusa, por política, os nomes
+`*.compute.amazonaws.com`. Sem domínio próprio, o caminho é um nome que resolve
+para o IP da instância: `3-148-211-66.sslip.io`. Com domínio próprio, basta um
+registro A para o Elastic IP e o `WP_URL` apontando para ele — nada mais muda.
+
+**Uma fonte só.** O Caddy lê o endereço do mesmo `WP_URL` que o `provision.sh`
+grava no `wp-config.php`. O bloco gerado por `scripts/configurar-url-dinamica.php`
+dá ao host padrão o esquema do `WP_URL` e mantém `http` para os hosts da rede
+local, que seguem atendidos na 8090 sem proxy.
+
+**Por que o loopback.** O `wp-config.php` da imagem oficial do WordPress liga
+`HTTPS` quando recebe `X-Forwarded-Proto: https`, venha de onde vier. O Caddy
+descarta o cabeçalho que o cliente mandar e escreve o dele; mas uma porta do
+`wordpress` aberta para fora aceitaria o cabeçalho forjado de qualquer um. Daí
+`WORDPRESS_PORT=127.0.0.1:8090` — e com ela a 80 fica livre para o proxy.
+
+**Ligar numa instância que já está no ar**, na ordem:
+
+1. Elastic IP associado e 443/tcp aberta no Security Group.
+2. No `.env` do servidor, `WP_URL=https://3-148-211-66.sslip.io` e
+   `WORDPRESS_PORT=127.0.0.1:8090`. As duas chaves não estão entre as que o
+   `wp-config.php` congela na primeira subida: a porta é do Compose, e o
+   `WP_URL` é relido pelo `provision.sh` a cada deploy.
+3. Disparar o `implantar.yml`. O `up -d db wordpress` recria o container com a
+   porta nova, o `provision.sh` regrava o bloco do `wp-config.php` com
+   `https`, e o passo "Subir o proxy HTTPS" sobe o Caddy, que emite o
+   certificado no primeiro acesso.
+
+Conferir: `curl -sI http://3-148-211-66.sslip.io/` responde 301 para o
+`https://`; `curl -s https://3-148-211-66.sslip.io/ | grep -c 'http://3-148'`
+dá zero; e `curl -sI http://<ip>:8090/` falha de fora da instância.
+
+Links `http://ec2-…amazonaws.com` já gravados no banco (menus, widgets,
+conteúdo) continuam funcionando, porque o proxy redireciona qualquer nome na
+porta 80 para o endereço canônico. Reescrevê-los é opcional, com
+`wp search-replace` e `--dry-run` antes.
+
+Sem HSTS, de propósito, por enquanto: com ele o navegador passa a recusar o
+HTTP por meses, e um nome sslip.io que mude de IP deixa de abrir até no
+redirecionamento. Vale ligar quando houver domínio próprio.
 
 ## Secrets e variables do repositório
 
@@ -218,13 +288,13 @@ Na sua máquina, `chmod 400 dev.pem`.
    "Run workflow" do `implantar.yml`): o `provision.sh` tem de imprimir "já
    instalado" / "já ativo" em todas as linhas.
 4. **Superfície.** `curl` na 8081 e na 8090 do DNS público tem de falhar; só a 80
-   responde.
+   (que redireciona) e a 443 respondem.
 5. **RBAC.** `./scripts/verificar-acessos.sh` apontado para o servidor. As travas
    não têm outro teste, e este é o primeiro ambiente onde elas rodam fora do
    `localhost`:
 
    ```bash
-   RECONECTAR_ADMIN_SENHA='…' BASE=http://<dns-publico> ./scripts/verificar-acessos.sh
+   RECONECTAR_ADMIN_SENHA='…' BASE=https://3-148-211-66.sslip.io ./scripts/verificar-acessos.sh
    ```
 
    Fora do `localhost` só roda a parte HTTP — 85 dos 274 casos. Os que dependem
@@ -236,9 +306,6 @@ Na sua máquina, `chmod 400 dev.pem`.
 
 ## O que esta esteira não faz
 
-- **HTTPS.** O bloco de `configurar-url-dinamica.php` monta `http://` fixo
-  (`:88-89`). TLS exigiria um proxy na frente e mexer naquele bloco — que é
-  gerado, então editar à mão não sobrevive ao próximo provisionamento.
 - **Backup do banco antes do deploy.** O deploy não roda migração de schema, mas
   o `provision.sh` escreve opções. Um dump prévio seria a rede de segurança.
 - **Rollback automático.** Voltar é reverter na `main` e disparar o
