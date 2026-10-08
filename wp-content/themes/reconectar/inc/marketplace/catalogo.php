@@ -535,3 +535,46 @@ function reconectar_catalogo_opcao( $rotulo, $url, $ligado, $filhas = array(), $
 	</li>
 	<?php
 }
+
+/**
+ * Imprime, no card do laço do WooCommerce, o nome da loja que vende o produto.
+ *
+ * O card autoral da home (`reconectar_card_produto()`) já trazia a loja; o do
+ * laço — catálogo, categorias, busca, relacionados — não, e num marketplace o
+ * mesmo "Bolsa de lona" pode vir de lojas diferentes, com entrega e prazo
+ * diferentes. Sem o nome, quem compra só descobria de quem é ao abrir o produto.
+ *
+ * Em `woocommerce_shop_loop_item_title` prioridade 15, logo depois do título
+ * (10) e ainda **dentro** do link do card, que o WooCommerce abre em
+ * `woocommerce_before_shop_loop_item` e fecha em `woocommerce_after_shop_loop_item`.
+ * Por isso o nome é texto, e não link para a loja: `<a>` dentro de `<a>` é HTML
+ * inválido, e o navegador fecharia o link do card no meio dele.
+ *
+ * Fora da página da própria loja (`/store/<loja>/`), onde o nome repetido em
+ * todo card não diria nada que o cabeçalho já não disse.
+ *
+ * @return void
+ */
+function reconectar_catalogo_loja_no_card() {
+	if ( ! function_exists( 'dokan_get_store_info' ) ) {
+		return;
+	}
+
+	if ( function_exists( 'dokan_is_store_page' ) && dokan_is_store_page() ) {
+		return;
+	}
+
+	/*
+	 * `dokan_get_store_info()`, e não `reconectar_normalizar_loja()`: esta faz
+	 * nota, categoria principal e entrega, três consultas por card que aqui só
+	 * precisariam do nome — doze vezes por página.
+	 */
+	$info = dokan_get_store_info( (int) get_post_field( 'post_author', get_the_ID() ) );
+
+	if ( empty( $info['store_name'] ) ) {
+		return;
+	}
+
+	echo '<p class="rc-loop-produto__loja">' . esc_html( $info['store_name'] ) . '</p>';
+}
+add_action( 'woocommerce_shop_loop_item_title', 'reconectar_catalogo_loja_no_card', 15 );

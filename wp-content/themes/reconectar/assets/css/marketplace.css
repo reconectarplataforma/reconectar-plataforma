@@ -957,9 +957,32 @@
    deixa de existir e este bloco fica inerte. Não quebra nada, mas sai de cena
    junto com o tema que o criou. */
 
+/* Meio degrau abaixo, e não um inteiro: a trilha é o rótulo do que vem logo
+   depois, e com os 16px de margem mais os 8px de padding ela se lia como uma
+   faixa solta, distante do conteúdo que situa. */
 .storefront-breadcrumb {
-  margin-bottom: var(--rc-espaco);
+  margin-bottom: calc(var(--rc-espaco) / 2);
   padding-block: calc(var(--rc-espaco) / 2);
+}
+
+/* Duas caixas vazias que somavam vão abaixo da trilha, medidas página a página.
+
+   Carrinho, checkout e "Minha conta": o `<h1>` sai da tela por
+   `.rc-sem-titulo-de-pagina`, mas o `<header>` dele guardava os 95,95px de
+   `padding-bottom` que o Storefront dá a essas três páginas em largura cheia —
+   medido no carrinho, 112px entre a trilha e o aviso de carrinho vazio. A regra
+   do pai tem (0,3,0) e esta também: decide a ordem das folhas.
+
+   Vitrine de lojas: `.rc-vitrine` separa as seções da home com 32px em cima e
+   embaixo. Em `/store-listing/` ela é o primeiro bloco do conteúdo, e a margem
+   de cima só afastava a busca da trilha. */
+.rc-sem-titulo-de-pagina .hentry .entry-header {
+  margin: 0;
+  padding: 0;
+}
+
+.entry-content > .rc-vitrine:first-child {
+  margin-top: 0;
 }
 
 /* ==========================================================================
@@ -1317,6 +1340,22 @@
   text-decoration: none;
 }
 
+/* O card sobe quando o ponteiro passa, para dizer que ele inteiro é o link —
+   sem sublinhado, era o único sinal que restava além do cursor. Só na grade da
+   vitrine: no carrossel da home a faixa é scroll container sem folga em cima e
+   recortaria o topo do card. `transform` e sombra não mexem em layout, então
+   nenhum vizinho se desloca. `:focus-within` dá o mesmo retorno a quem chega
+   pelo teclado. */
+.rc-vitrine__grade .rc-card-loja {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.rc-vitrine__grade .rc-card-loja:hover,
+.rc-vitrine__grade .rc-card-loja:focus-within {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+}
+
 .rc-card-loja__logo,
 .rc-card-loja__inicial {
   align-items: center;
@@ -1630,13 +1669,20 @@
      Ao subir a fonte para 14px, 10px de recuo fecham a conta. */
   padding: 10px 16px;
   text-decoration: none;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
 }
 
+/* 2px, e não os 3px do card: a lista é scroll container e recorta o que passar
+   do `padding` de 4px dela — a pílula sobe dentro dessa folga. */
 .rc-pilula:hover,
-.rc-filtros__limpar:hover {
+.rc-filtros__limpar:hover,
+.rc-pilula:focus-visible,
+.rc-filtros__limpar:focus-visible {
   border-color: var(--reconectar-cor-primaria);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   color: var(--reconectar-cor-primaria);
+  transform: translateY(-2px);
 }
 
 /* Filtro ativo muda fundo, borda e peso da fonte — três sinais além da cor,
@@ -1648,13 +1694,60 @@
   font-weight: 600;
 }
 
-.rc-pilula--ativa:hover {
+.rc-pilula--ativa:hover,
+.rc-pilula--ativa:focus-visible {
   color: #ffffff;
   opacity: 0.9;
 }
 
 .rc-filtros__limpar {
   border-style: dashed;
+}
+
+/* O `text-decoration: none` da pílula e do card perdia para
+   `.hentry .entry-content a` do Storefront, (0,2,1), que alcança a vitrine porque
+   ela mora no conteúdo da página "Lojas parceiras": cada pílula e cada trecho do
+   card — nome, nota, categoria, distância, prazo, taxa — saíam sublinhados. O
+   mesmo prefixo mais a classe dá (0,3,0) e vence só aqui, sem subir a
+   especificidade das regras de cor e borda, que as variantes `--ativa` e o
+   `:hover` precisam continuar sobrescrevendo.
+
+   A página "Categorias" mora no mesmo lugar e caía na mesma regra: o nome de
+   cada grupo e o de cada card saíam sublinhados. O título do grupo volta a
+   sublinhar no hover e no foco, e a regra precisa vir aqui com o prefixo — a
+   `.rc-categorias__titulo a:hover` da seção de categorias é (0,2,1) e perderia
+   para o `none` abaixo. O "Ver todos" fica de fora de propósito: é link de
+   texto, e o sublinhado é o que o distingue sem depender da cor. */
+.hentry .entry-content .rc-pilula,
+.hentry .entry-content .rc-filtros__limpar,
+.hentry .entry-content .rc-card-loja__link,
+.hentry .entry-content .rc-card-categoria,
+.hentry .entry-content .rc-categorias__titulo a {
+  text-decoration: none;
+}
+
+.hentry .entry-content .rc-categorias__titulo a:hover,
+.hentry .entry-content .rc-categorias__titulo a:focus-visible {
+  text-decoration: underline;
+}
+
+/* Quem pediu ao sistema menos movimento continua vendo borda, cor e sombra; só
+   o deslocamento sai. */
+@media (prefers-reduced-motion: reduce) {
+  .rc-vitrine__grade .rc-card-loja,
+  .rc-pilula,
+  .rc-filtros__limpar {
+    transition: none;
+  }
+
+  .rc-vitrine__grade .rc-card-loja:hover,
+  .rc-vitrine__grade .rc-card-loja:focus-within,
+  .rc-pilula:hover,
+  .rc-filtros__limpar:hover,
+  .rc-pilula:focus-visible,
+  .rc-filtros__limpar:focus-visible {
+    transform: none;
+  }
 }
 
 /* ==========================================================================
@@ -3942,6 +4035,15 @@
   color: var(--rc-texto);
   font-size: var(--rc-fonte-base);
   font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+  margin: 0 0 6px;
+  padding: 0 12px;
+}
+
+.woocommerce .site-main ul.products.products li.product .rc-loop-produto__loja,
+.woocommerce-page .site-main ul.products.products li.product .rc-loop-produto__loja {
+  color: var(--rc-texto-suave);
+  font-size: var(--rc-fonte-sm);
   line-height: var(--rc-entrelinha-compacta);
   margin: 0 0 6px;
   padding: 0 12px;
