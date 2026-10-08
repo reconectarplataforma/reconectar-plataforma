@@ -6121,3 +6121,46 @@
   font-style: italic;
   font-weight: 400;
 }
+
+/* --- Pedido recebido: faixa de resumo ------------------------------------ */
+
+/* Override `woocommerce/checkout/thankyou.php`. A tela é a de pagar, e o
+   resumo cabe numa faixa só, em vez das cinco linhas altas do original. A
+   largura é a do `.col-full`, como no resto do site: uma coluna centralizada
+   própria desalinhava a tela do cabeçalho e da trilha de navegação. */
+.rc-pedido-recebido {
+  margin: 0 0 2rem;
+}
+
+.rc-pedido-recebido .woocommerce-thankyou-order-received {
+  margin: 0 0 0.75rem;
+  font-size: var(--rc-fonte-lg);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-pedido-recebido__dados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+.rc-pedido-recebido__dado dt {
+  margin: 0;
+  font-size: var(--rc-fonte-xs);
+  font-weight: 400;
+  line-height: var(--rc-entrelinha-justa);
+  color: var(--rc-texto-suave);
+}
+
+.rc-pedido-recebido__dado dd {
+  margin: 0.125rem 0 0;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-compacta);
+}

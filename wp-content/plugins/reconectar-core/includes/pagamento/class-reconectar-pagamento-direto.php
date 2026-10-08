@@ -64,6 +64,17 @@ class Reconectar_Pagamento_Direto {
 	const STATUS_AGUARDANDO = array( 'on-hold', 'pending', 'conferencia' );
 
 	/**
+	 * Pedidos cujas instruções de pagamento já saíram na tela desta requisição.
+	 *
+	 * É o que decide se os detalhes do pedido se recolhem: sem bloco de
+	 * pagamento acima — pedido já pago, serviço sem valor —, os detalhes são o
+	 * conteúdo principal da tela e ficam à vista.
+	 *
+	 * @var array<int, true>
+	 */
+	private static $instrucoes_na_tela = array();
+
+	/**
 	 * Registra os ganchos.
 	 *
 	 * A gravação do meio de cada loja fica em **prioridade 30** de propósito:
@@ -82,6 +93,10 @@ class Reconectar_Pagamento_Direto {
 		add_action( 'woocommerce_checkout_update_order_meta', array( __CLASS__, 'gravar_meios_no_pedido' ), 30 );
 		add_action( 'woocommerce_thankyou', array( __CLASS__, 'instrucoes_na_tela' ), 5 );
 		add_action( 'woocommerce_view_order', array( __CLASS__, 'instrucoes_no_pedido' ), 5 );
+		add_action( 'woocommerce_thankyou', array( __CLASS__, 'abrir_detalhes_recolhidos' ), 9 );
+		add_action( 'woocommerce_thankyou', array( __CLASS__, 'fechar_detalhes_recolhidos' ), 11 );
+		add_action( 'woocommerce_view_order', array( __CLASS__, 'abrir_detalhes_recolhidos' ), 9 );
+		add_action( 'woocommerce_view_order', array( __CLASS__, 'fechar_detalhes_recolhidos' ), 11 );
 		add_action( 'woocommerce_email_before_order_table', array( __CLASS__, 'instrucoes_no_email' ), 10, 4 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'carregar_assets' ) );
 	}
@@ -128,7 +143,7 @@ class Reconectar_Pagamento_Direto {
 			'reconectar-pagamento',
 			RECONECTAR_CORE_URL . 'assets/css/pagamento.css',
 			array(),
-			'0.2.0'
+			'0.3.0'
 		);
 		wp_enqueue_script(
 			'reconectar-pagamento',
@@ -915,6 +930,72 @@ class Reconectar_Pagamento_Direto {
 	}
 
 	/**
+	 * Abre o `<details>` que recolhe os detalhes do pedido sob o pagamento.
+	 *
+	 * Com pagamento pendente, a tela existe para pagar: itens, totais e endereço
+	 * de cobrança são conferência, e impressos por extenso empurravam o
+	 * comprador que fechou várias lojas para longe do resumo de cada uma.
+	 * `<details>` e não abas: é um bloco secundário só, e o elemento nativo
+	 * traz teclado, estado expandido e anúncio no leitor de tela sem uma linha
+	 * de JavaScript. Nasce **fechado**.
+	 *
+	 * Prioridade 9 e 11 em volta de `woocommerce_order_details_table`, que está
+	 * na 10 nos dois ganchos — ela imprime a tabela **e** o endereço de
+	 * cobrança, então os dois entram no recolhimento. Se algum código a tirar
+	 * dali (o bloco de confirmação do WooCommerce faz isso), o `<details>` não
+	 * abre: recolher nada seria um botão que expande o vazio.
+	 *
+	 * O `<h2>` vai dentro do `<summary>`, que o HTML permite, para que o bloco
+	 * siga navegável por cabeçalho mesmo fechado; o título que o WooCommerce
+	 * imprime lá dentro sai pelo CSS, por repetir este.
+	 *
+	 * @param int $pedido_id Identificador do pedido.
+	 * @return void
+	 */
+	public static function abrir_detalhes_recolhidos( $pedido_id ) {
+		if ( ! self::recolhe_detalhes( $pedido_id ) ) {
+			return;
+		}
+
+		printf(
+			'<details class="rc-pedido-detalhes"><summary class="rc-pedido-detalhes__resumo"><h2 class="rc-pedido-detalhes__titulo">%1$s</h2><span class="rc-pedido-detalhes__apoio">%2$s</span></summary><div class="rc-pedido-detalhes__corpo">',
+			esc_html__( 'Detalhes do pedido', 'reconectar-core' ),
+			esc_html__( 'Itens, totais e endereço de cobrança', 'reconectar-core' )
+		);
+	}
+
+	/**
+	 * Fecha o `<details>` aberto por `abrir_detalhes_recolhidos()`.
+	 *
+	 * A condição é a mesma, recalculada: nada mudou entre a 9 e a 11 que a
+	 * altere, e guardar estado entre as duas chamadas seria mais um lugar para
+	 * o par sair desencontrado.
+	 *
+	 * @param int $pedido_id Identificador do pedido.
+	 * @return void
+	 */
+	public static function fechar_detalhes_recolhidos( $pedido_id ) {
+		if ( ! self::recolhe_detalhes( $pedido_id ) ) {
+			return;
+		}
+
+		echo '</div></details>';
+	}
+
+	/**
+	 * Diz se os detalhes deste pedido se recolhem na tela corrente.
+	 *
+	 * @param int $pedido_id Identificador do pedido.
+	 * @return bool
+	 */
+	private static function recolhe_detalhes( $pedido_id ) {
+		$gancho = current_action();
+
+		return isset( self::$instrucoes_na_tela[ (int) $pedido_id ] )
+			&& 10 === has_action( $gancho, 'woocommerce_order_details_table' );
+	}
+
+	/**
 	 * Imprime as instruções no corpo do e-mail do pedido.
 	 *
 	 * Só no e-mail destinado ao comprador: o da loja não precisa repetir os
@@ -1087,5 +1168,9 @@ class Reconectar_Pagamento_Direto {
 		}
 
 		echo '</section>';
+
+		if ( 'tela' === $contexto ) {
+			self::$instrucoes_na_tela[ $pedido->get_id() ] = true;
+		}
 	}
 }
