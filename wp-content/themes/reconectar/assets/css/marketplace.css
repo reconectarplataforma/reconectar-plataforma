@@ -2503,6 +2503,12 @@
   margin: 0 0 16px;
 }
 
+/* O separador do cadastro vem logo depois do "Esqueci minha senha", que zera a
+   margem de baixo; sem esta, a linha encostaria no link. */
+.rc-login__bloco + .rc-login__separador {
+  margin-top: 24px;
+}
+
 .rc-login__separador::before,
 .rc-login__separador::after {
   background: var(--rc-borda);
@@ -2528,11 +2534,15 @@
    este botão nasce agora — não há por que herdar um contraste que já reprova em
    outros pontos do site. O seletor cita o elemento porque `.woocommerce
    button.button` do `style.css` e do Storefront somam 0,2,1 de especificidade e
-   venceriam uma classe sozinha. */
+   venceriam uma classe sozinha. A largura se repete aqui pelo mesmo motivo:
+   `.form-row .button { width: auto }` do `woocommerce.css` do Storefront, com
+   0,2,0, vencia o `width: 100%` de `.rc-login__botao` e deixava o "Entrar" com
+   93px num painel de 414. */
 .rc-login button.rc-login__botao--primario {
   background: var(--reconectar-cor-institucional);
   border: 2px solid transparent;
   color: #ffffff;
+  width: 100%;
 }
 
 .rc-login button.rc-login__botao--primario:hover,
