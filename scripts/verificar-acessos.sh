@@ -551,14 +551,14 @@ else
   falhas=$((falhas + 1))
 fi
 
-# A tela de módulos: Loja, Administrador e Moderador escolhem por onde começar,
-# a cada login. O login se mede pelo `Location` da resposta do formulário, e não
+# A tela de módulos: Loja, Administrador, Moderador e Super Administrador
+# escolhem por onde começar, a cada login. O login se mede pelo `Location` da resposta do formulário, e não
 # pelo jar já autenticado acima: a tela só existe se o destino for trocado ali.
 #
-# Os dois lados de cada trava. O cliente e o Super Administrador não podem cair
-# na tela — o cliente perderia a conta, o Super Administrador o `/wp-admin` —, e
-# um destino explícito precisa vencer, ou quem entrou por um link do fórum
-# perderia o caminho.
+# Os dois lados de cada trava. O cliente não pode cair na tela — perderia a
+# conta —, e um destino explícito precisa vencer, ou quem entrou por um link do
+# fórum perderia o caminho. O Super Administrador cai nela desde que ganhou o
+# cartão "Painel Admin", que é o caminho dele ao `/wp-admin`.
 echo "Tela de módulos"
 
 # Entra com o formulário do `wp-login.php` num jar descartável e devolve
@@ -598,10 +598,12 @@ conferir_login() {
 conferir_login "demo-sabor-da-terra"   "$SENHA_DEMO"  "" "302 /modulos/" "a loja escolhe o módulo ao entrar"
 conferir_login "demo-admin-nosso-chao" "$SENHA_DEMO"  "" "302 /modulos/" "o Administrador escolhe o módulo ao entrar"
 conferir_login "demo-moderador"        "$SENHA_DEMO"  "" "302 /modulos/" "o Moderador escolhe o módulo ao entrar"
+conferir_login "admin"                 "$SENHA_ADMIN" "" "302 /modulos/" "o Super Administrador escolhe o módulo ao entrar"
+conferir_login "admin"                 "$SENHA_ADMIN" "$BASE/wp-admin/plugins.php" "302 /wp-admin/plugins.php" "destino explícito vence a escolha do Super Administrador"
 conferir_login "demo-moderador"        "$SENHA_DEMO"  "$BASE/forums/" "302 /forums/" "destino explícito vence a escolha"
 conferir_login "demo-sabor-da-terra"   "$SENHA_DEMO"  "$BASE/forums/" "302 /forums/" "destino explícito vence o painel da loja"
-total=$((total + 2))
-for login_fora in "demo-cliente-marina:$SENHA_DEMO" "admin:$SENHA_ADMIN"; do
+total=$((total + 1))
+for login_fora in "demo-cliente-marina:$SENHA_DEMO"; do
   resposta="$(destino_do_login "${login_fora%%:*}" "${login_fora#*:}")"
   if [[ "$resposta" == *"/modulos/"* ]]; then
     printf '  FALHA %-24s não escolhe módulo, e foi levado à tela: %s\n' "login ${login_fora%%:*}" "$resposta"
@@ -613,20 +615,28 @@ done
 
 conferir "" "/modulos/" "302 wp-login.php" "visitante vai ao login, com retorno"
 [ -f "$JAR_CLIENTE" ]  && conferir "$JAR_CLIENTE" "/modulos/" "302" "o cliente não escolhe módulo"
-[ -f "$JAR_ADMIN" ]    && conferir "$JAR_ADMIN"   "/modulos/" "302 /wp-admin/" "o Super Administrador volta ao /wp-admin"
+if [ -f "$JAR_ADMIN" ]; then
+  conferir "$JAR_ADMIN" "/modulos/" "200" "o Super Administrador escolhe módulo"
+  conferir_corpo "$JAR_ADMIN" "/modulos/" '/wp-admin/" aria-describedby="rc-modulo-painel-admin"' "presente" "o Painel Admin leva ao /wp-admin"
+  conferir_corpo "$JAR_ADMIN" "/modulos/" 'rc-modulos__cartao--painel"' "ausente" "o Super Administrador não recebe o painel da loja"
+fi
 if [ -f "$JAR_VENDEDOR" ]; then
   conferir_corpo "$JAR_VENDEDOR" "/modulos/" ">Ver minha loja<" "presente" "o Mercado da loja é a vitrine dela"
   conferir_corpo "$JAR_VENDEDOR" "/modulos/" '/store/demo-sabor-da-terra/" aria-describedby="rc-modulo-mercado"' "presente" "a vitrine é a da própria loja"
   conferir_corpo "$JAR_VENDEDOR" "/modulos/" '/dashboard/" aria-describedby="rc-modulo-mercado"' "ausente" "o Mercado da loja não leva ao painel dela"
   conferir_corpo "$JAR_VENDEDOR" "/modulos/" "rc-modulos__cartao--praca" "presente" "a Praça está na tela"
+  conferir_corpo "$JAR_VENDEDOR" "/modulos/" '/dashboard/" aria-describedby="rc-modulo-painel"' "presente" "o Painel da loja leva ao /dashboard/"
+  conferir_corpo "$JAR_VENDEDOR" "/modulos/" "rc-modulo-painel-admin" "ausente" "a loja não recebe o Painel Admin"
   conferir_corpo "$JAR_VENDEDOR" "/modulos/" 'class="rc-enquete"' "ausente" "a enquete não cobre os cartões"
   conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-modulos"' "presente" "volta à escolha pela barra do painel"
   conferir_corpo "$JAR_VENDEDOR" "$MINHA_CONTA" "navigation-link--rc-modulos" "presente" "volta à escolha pelo menu da conta"
 fi
 [ -f "$JAR_EMPRESAS" ]  && conferir_corpo "$JAR_EMPRESAS"  "/modulos/" ">Abrir painel de empresas<" "presente" "o Mercado do Administrador é o painel de empresas"
 [ -f "$JAR_MODERADOR" ] && conferir_corpo "$JAR_MODERADOR" "/modulos/" ">Ir ao mercado<" "presente" "o Mercado do Moderador é a vitrine"
+[ -f "$JAR_MODERADOR" ] && conferir_corpo "$JAR_MODERADOR" "/modulos/" "rc-modulos__lista--3" "presente" "o Moderador não recebe cartão de painel"
+[ -f "$JAR_EMPRESAS" ]  && conferir_corpo "$JAR_EMPRESAS"  "/modulos/" "rc-modulos__lista--3" "presente" "o Administrador não recebe cartão de painel"
 [ -f "$JAR_CLIENTE" ]   && conferir_corpo "$JAR_CLIENTE"   "$MINHA_CONTA" "navigation-link--rc-modulos" "ausente" "o cliente não vê o item Módulos"
-[ -f "$JAR_ADMIN" ]     && conferir_corpo "$JAR_ADMIN"     "/dashboard/" '"rc-modulos"' "ausente" "a barra do Super Administrador não leva à tela"
+[ -f "$JAR_ADMIN" ]     && conferir_corpo "$JAR_ADMIN"     "/dashboard/" '"rc-modulos"' "presente" "a barra do Super Administrador volta à tela"
 
 # O endpoint de voto não tem URL de leitura: só responde a POST, e por isso não
 # cabe em `conferir`. O caso abaixo prova a primeira das duas travas — o nonce.

@@ -52,8 +52,13 @@ $rc_nome    = '' !== trim( (string) $rc_usuario->first_name ) ? $rc_usuario->fir
 		<p class="rc-modulos__apoio"><?php esc_html_e( 'A plataforma é organizada em módulos. Escolha um para entrar; você pode voltar aqui pelo item “Módulos” do painel ou da sua conta.', 'reconectar-core' ); ?></p>
 	</div>
 
-	<ul class="rc-modulos__lista">
-		<?php foreach ( Reconectar_Modulos::cartoes() as $rc_cartao ) : ?>
+	<?php
+	// A quantidade vai na classe porque a grade muda com ela: três cartões cabem
+	// numa linha, quatro não cabem sem espremer o título.
+	$rc_cartoes = Reconectar_Modulos::cartoes();
+	?>
+	<ul class="rc-modulos__lista rc-modulos__lista--<?php echo (int) count( $rc_cartoes ); ?>">
+		<?php foreach ( $rc_cartoes as $rc_cartao ) : ?>
 			<?php $rc_id = 'rc-modulo-' . $rc_cartao['chave']; ?>
 			<li class="rc-modulos__cartao rc-modulos__cartao--<?php echo esc_attr( $rc_cartao['chave'] ); ?>">
 				<div class="rc-modulos__texto">

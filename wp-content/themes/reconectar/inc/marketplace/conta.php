@@ -102,12 +102,13 @@ add_filter( 'woocommerce_get_endpoint_url', 'reconectar_url_do_painel_na_conta',
 /**
  * Leva o Super Administrador ao `/wp-admin` depois do login por "Minha conta".
  *
- * Só o papel `administrator`. Loja, Administrador e Moderador vão à tela de
- * módulos, por `Reconectar_Modulos::depois_do_login()`, no plugin, que é quem
- * conhece a rota. O Super Administrador é diferente
- * porque, sem isto, o Dokan o manda para `/dashboard/` (ele tem a capacidade de
- * loja, e o filtro do Dokan roda em 20): uma tela de vendedor que não é a dele e
- * que não tem o link do painel.
+ * Só o papel `administrator`, e só sem o plugin. Com ele, o Super Administrador
+ * vai à tela de módulos como Loja, Administrador e Moderador, por
+ * `Reconectar_Modulos::depois_do_login()` — que também roda em 25 e antes desta,
+ * por ser do plugin; sem a guarda, esta função desfaria a escolha dele. Sem o
+ * plugin não há tela, e o Dokan o mandaria para `/dashboard/` (ele tem a
+ * capacidade de loja, e o filtro do Dokan roda em 20): uma tela de vendedor que
+ * não é a dele e que não tem o link do painel.
  *
  * Prioridade 25: depois do Dokan, e antes de `reconectar_login_volta_ao_checkout()`
  * (30), para que quem entrou pelo checkout continue voltando ao checkout.
@@ -117,6 +118,10 @@ add_filter( 'woocommerce_get_endpoint_url', 'reconectar_url_do_painel_na_conta',
  * @return string
  */
 function reconectar_login_do_super_administrador( $destino, $usuario = null ) {
+	if ( class_exists( 'Reconectar_Modulos' ) ) {
+		return $destino;
+	}
+
 	if ( $usuario instanceof WP_User && in_array( 'administrator', (array) $usuario->roles, true ) ) {
 		return admin_url();
 	}

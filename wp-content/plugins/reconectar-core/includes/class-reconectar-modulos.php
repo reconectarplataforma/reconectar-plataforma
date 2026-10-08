@@ -3,8 +3,8 @@
  * A tela de módulos: a escolha entre Mercado, Incubadora e Praça, a cada login.
  *
  * O edital organiza a plataforma em módulos — Mercado, Incubadora, Praça e
- * Cooperação —, e quem trabalha nela (Loja, Administrador e Moderador) passa
- * por mais de um. Antes desta tela, o login decidia por eles: a loja caía no
+ * Cooperação —, e quem trabalha nela (Loja, Administrador, Moderador e Super
+ * Administrador) passa por mais de um. Antes desta tela, o login decidia por eles: a loja caía no
  * `/dashboard/`, o Moderador na Incubadora, o Administrador em "Minha conta". A
  * pessoa só descobria os outros módulos pela barra lateral, e não tinha como
  * saber em qual deles estava. Aqui ela escolhe, e a escolha é o que a orienta.
@@ -12,6 +12,12 @@
  * A Cooperação ainda não existe na plataforma e por isso não tem cartão: um
  * cartão que levasse a uma tela vazia diria ao avaliador que há algo pronto. A
  * lista de `cartoes()` já está montada para receber o quarto.
+ *
+ * Fora dos módulos do edital há um cartão de trabalho, conforme o perfil: o
+ * "Painel" da Loja, que é o `/dashboard/` do Dokan, e o "Painel Admin" do Super
+ * Administrador, que é o `/wp-admin`. São as duas casas que o login decidia
+ * sozinho antes desta tela, e sem o cartão a pessoa teria de descobrir o caminho
+ * de volta a elas pela barra lateral ou pelo menu da conta.
  *
  * **Rota própria, sem página.** O painel de empresas mora numa página criada
  * pelo `provision.sh`, e a Transparência ensinou o preço disso: página que não
@@ -126,8 +132,9 @@ class Reconectar_Modulos {
 	 *
 	 * Pelo papel, como `Reconectar_Permissoes::eh_vendedor()`: é identidade, não
 	 * autorização — cada cartão leva a uma área que confere a própria permissão.
-	 * O Super Administrador fica de fora de propósito: a casa dele é o
-	 * `/wp-admin`, e o cliente tem a home e o menu, que já são a vitrine.
+	 * O cliente fica de fora de propósito: ele tem a home e o menu, que já são a
+	 * vitrine. O Super Administrador ficou de fora até ganhar o cartão "Painel
+	 * Admin": antes a tela não tinha como levá-lo ao `/wp-admin`, que é a casa dele.
 	 *
 	 * @param int $usuario_id Usuário; 0 usa o corrente.
 	 * @return bool
@@ -141,7 +148,24 @@ class Reconectar_Modulos {
 
 		return Reconectar_Permissoes::eh_vendedor( $usuario_id )
 			|| Reconectar_Permissoes::eh_admin_de_empresas( $usuario_id )
-			|| Reconectar_Permissoes::eh_moderador_de_conteudo( $usuario_id );
+			|| Reconectar_Permissoes::eh_moderador_de_conteudo( $usuario_id )
+			|| self::eh_super_administrador( $usuario_id );
+	}
+
+	/**
+	 * O usuário tem o papel `administrator`?
+	 *
+	 * Pelo papel, e não por `manage_options`: a capacidade pode ser concedida a
+	 * outro papel, e o cartão "Painel Admin" é do Super Administrador. O mesmo
+	 * teste de `reconectar_login_do_super_administrador()`, no tema.
+	 *
+	 * @param int $usuario_id ID do usuário.
+	 * @return bool
+	 */
+	private static function eh_super_administrador( $usuario_id ) {
+		$usuario = get_userdata( $usuario_id );
+
+		return $usuario && in_array( 'administrator', (array) $usuario->roles, true );
 	}
 
 	/**
@@ -221,7 +245,7 @@ class Reconectar_Modulos {
 			'reconectar-modulos',
 			RECONECTAR_CORE_URL . 'assets/css/modulos.css',
 			array(),
-			'0.1.2'
+			'0.2.0'
 		);
 	}
 
@@ -312,6 +336,11 @@ class Reconectar_Modulos {
 	 * "Painel" da barra lateral. A Incubadora e a Praça são as mesmas para os
 	 * três; a moldura em que abrem é decidida por `Reconectar_Navegacao_Da_Loja`.
 	 *
+	 * O cartão de trabalho vem por último, depois dos módulos do edital: "Painel"
+	 * para a Loja e "Painel Admin" para o Super Administrador. Administrador e
+	 * Moderador não o recebem — o painel do Administrador é o de empresas, que já
+	 * é o Mercado dele, e o Moderador não tem painel próprio.
+	 *
 	 * Um destino vazio **não** some com o cartão: ele sai sem link e dizendo por
 	 * quê. Esconder um módulo inteiro em silêncio é o defeito que a Transparência
 	 * já teve, e aqui ele apagaria um terço da tela sem uma linha de erro.
@@ -347,7 +376,7 @@ class Reconectar_Modulos {
 		// ainda é a Praça.
 		$praca = '' !== $destinos['comunidade'] ? $destinos['comunidade'] : $destinos['forum'];
 
-		return array(
+		$cartoes = array(
 			array_merge(
 				array(
 					'chave'     => 'mercado',
@@ -373,16 +402,41 @@ class Reconectar_Modulos {
 				'url'       => $praca,
 			),
 		);
+
+		if ( Reconectar_Permissoes::eh_vendedor( $usuario_id ) ) {
+			$cartoes[] = array(
+				'chave'     => 'painel',
+				'titulo'    => __( 'Painel', 'reconectar-core' ),
+				'subtitulo' => __( 'Gestão da loja', 'reconectar-core' ),
+				'frase'     => __( 'Pedidos, produtos, saques e as configurações da sua loja.', 'reconectar-core' ),
+				'botao'     => __( 'Abrir o painel', 'reconectar-core' ),
+				'url'       => function_exists( 'dokan_get_navigation_url' ) ? dokan_get_navigation_url() : '',
+			);
+		} elseif ( self::eh_super_administrador( $usuario_id ) ) {
+			$cartoes[] = array(
+				'chave'     => 'painel-admin',
+				'titulo'    => __( 'Painel Admin', 'reconectar-core' ),
+				'subtitulo' => __( 'Administração da plataforma', 'reconectar-core' ),
+				'frase'     => __( 'Usuários, plugins, configurações e o conteúdo da plataforma inteira.', 'reconectar-core' ),
+				'botao'     => __( 'Abrir o Painel Admin', 'reconectar-core' ),
+				'url'       => admin_url(),
+			);
+		}
+
+		return $cartoes;
 	}
 
 	/**
 	 * Ilustração de um cartão, em SVG inline e autoral.
 	 *
-	 * Inline e não arquivo: são três desenhos pequenos, e cada um como imagem
+	 * Inline e não arquivo: são quatro desenhos pequenos, e cada um como imagem
 	 * custaria uma requisição na tela que é a primeira depois do login. Decorativa
 	 * — o título do cartão já diz o que ela mostra —, por isso `aria-hidden`.
 	 *
-	 * @param string $chave `mercado`, `incubadora` ou `praca`.
+	 * Os dois cartões de trabalho dividem o desenho: são o mesmo tipo de lugar,
+	 * e a cor do cartão e o título já os distinguem.
+	 *
+	 * @param string $chave `mercado`, `incubadora`, `praca`, `painel` ou `painel-admin`.
 	 * @return string SVG, ou vazio para chave desconhecida.
 	 */
 	public static function ilustracao( $chave ) {
@@ -411,7 +465,20 @@ class Reconectar_Modulos {
 				. '<path d="M98 30h40a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-26l-10 10V62h-4a8 8 0 0 1-8-8V38a8 8 0 0 1 8-8z" fill="#F1BF3D"/>'
 				. '<path d="M146 52h26a7 7 0 0 1 7 7v12a7 7 0 0 1-7 7h-2v8l-8-8h-16a7 7 0 0 1-7-7V59a7 7 0 0 1 7-7z" fill="#fff"/>'
 				. '<path d="M34 134h150" stroke="#fff" stroke-width="4" stroke-linecap="round"/>',
+			// Uma janela de painel: barra de título e um gráfico de colunas.
+			'painel'     => '<rect x="30" y="24" width="140" height="112" rx="8" fill="#fff" fill-opacity=".25"/>'
+				. '<path d="M38 24h124a8 8 0 0 1 8 8v12H30V32a8 8 0 0 1 8-8z" fill="#fff"/>'
+				. '<circle cx="44" cy="34" r="3.5" fill="#F1BF3D"/><circle cx="56" cy="34" r="3.5" fill="#F1BF3D" fill-opacity=".6"/>'
+				. '<rect x="50" y="96" width="18" height="28" rx="3" fill="#fff"/>'
+				. '<rect x="78" y="76" width="18" height="48" rx="3" fill="#F1BF3D"/>'
+				. '<rect x="106" y="88" width="18" height="36" rx="3" fill="#fff"/>'
+				. '<rect x="134" y="60" width="18" height="64" rx="3" fill="#F1BF3D"/>'
+				. '<path d="M42 128h118" stroke="#fff" stroke-width="4" stroke-linecap="round"/>',
 		);
+
+		if ( 'painel-admin' === $chave ) {
+			$chave = 'painel';
+		}
 
 		if ( ! isset( $desenhos[ $chave ] ) ) {
 			return '';
