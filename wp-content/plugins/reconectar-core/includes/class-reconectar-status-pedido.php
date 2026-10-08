@@ -89,6 +89,29 @@ class Reconectar_Status_Pedido {
 		// um selo sem texto, para todo status desta classe.
 		add_filter( 'dokan_get_order_status_translated', array( __CLASS__, 'rotulo_no_painel_da_loja' ), 10, 2 );
 		add_filter( 'dokan_get_order_status_class', array( __CLASS__, 'cor_no_painel_da_loja' ), 10, 2 );
+
+		// O botão de rastreio saiu do detalhe do pedido (override em
+		// `themes/reconectar/dokan/orders/details.php`), mas o handler do
+		// Dokan seguiria aceitando POST montado à mão. Prioridade 1 para
+		// responder antes dele, que está na 10.
+		add_action( 'wp_ajax_dokan_add_shipping_tracking_info', array( __CLASS__, 'recusar_rastreio' ), 1 );
+	}
+
+	/**
+	 * Recusa a gravação de código de rastreio pelo painel da loja.
+	 *
+	 * O andamento da entrega aqui é dado pelos status desta classe. O
+	 * `wp_send_json_error()` encerra a requisição, então o handler do Dokan
+	 * (`Ajax::add_shipping_tracking_info()`) nunca chega a rodar e nenhuma
+	 * nota de rastreio é gravada no pedido.
+	 *
+	 * @return void
+	 */
+	public static function recusar_rastreio() {
+		wp_send_json_error(
+			array( 'message' => __( 'O registro de rastreamento não está disponível nesta plataforma.', 'reconectar-core' ) ),
+			403
+		);
 	}
 
 	/**
