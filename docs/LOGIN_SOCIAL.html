@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Login social — Google e Facebook</title>
+<style>
+:root{
+  --roxo:#663191; --verde:#31BEB1; --laranja:#CF6442; --amarelo:#F1BF3D;
+  --tinta:#1f1b24; --apoio:#5b5563; --linha:#e3dfe8; --fundo:#f7f5fa;
+  --google:#1a73e8; --meta:#0866ff; --alerta:#b3261e;
+}
+@page{ size:A4; margin:16mm 15mm 18mm; }
+*{ box-sizing:border-box; }
+html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body{ margin:0; font-family:"Poppins","Segoe UI","Helvetica Neue",Arial,sans-serif; color:var(--tinta); font-size:10.3pt; line-height:1.45; background:#fff; }
+h1,h2,h3{ line-height:1.2; margin:0 0 .5em; }
+h2{ font-size:17pt; color:var(--roxo); margin-top:0; }
+h3{ font-size:12pt; margin-top:1.2em; }
+p{ margin:.4em 0 .7em; }
+code{ font-family:"DejaVu Sans Mono",Consolas,monospace; font-size:8.8pt; background:var(--fundo); border:1px solid var(--linha); border-radius:4px; padding:1px 4px; word-break:break-all; }
+.pagina{ page-break-after:always; padding-right:1mm; }
+.pagina:last-child{ page-break-after:auto; }
+.evitar-quebra{ break-inside:avoid; }
+
+/* capa */
+.capa{ height:262mm; display:flex; flex-direction:column; justify-content:space-between; padding:18mm 14mm; border-radius:10px; color:#fff;
+  background:linear-gradient(135deg,var(--roxo) 0%, #4a2a6e 45%, var(--verde) 100%); }
+.capa small{ letter-spacing:.14em; text-transform:uppercase; opacity:.85; font-size:9pt; }
+.capa h1{ font-size:34pt; margin:.3em 0 .2em; }
+.capa .sub{ font-size:13pt; max-width:120mm; opacity:.95; }
+.capa .logos{ display:flex; gap:10mm; align-items:center; margin-top:14mm; }
+.capa .rodape{ font-size:9pt; opacity:.9; border-top:1px solid rgba(255,255,255,.35); padding-top:5mm; }
+
+/* blocos */
+.caixa{ border:1px solid var(--linha); border-radius:8px; padding:3.4mm 5mm; margin:3.2mm 0; background:#fff; }
+.caixa.alerta{ border-color:#f1c4c0; background:#fdf3f2; }
+.caixa.alerta strong.t{ color:var(--alerta); }
+.caixa.dica{ border-color:#bfe9e5; background:#f0fbfa; }
+.caixa.nota{ border-color:#f4dfa3; background:#fffaf0; }
+.t{ display:block; margin-bottom:1mm; }
+.tabela{ width:100%; border-collapse:collapse; font-size:9.5pt; margin:3mm 0; }
+.tabela th,.tabela td{ border:1px solid var(--linha); padding:2mm 3mm; text-align:left; vertical-align:top; }
+.tabela th{ background:var(--fundo); }
+.ok{ color:#1e7d43; font-weight:600; } .falta{ color:var(--alerta); font-weight:600; }
+
+/* passos */
+ol.passos{ counter-reset:p; list-style:none; padding:0; margin:3mm 0; }
+ol.passos>li{ counter-increment:p; position:relative; padding:0 0 2.2mm 11mm; }
+ol.passos>li::before{ content:counter(p); position:absolute; left:0; top:-.5mm; width:7mm; height:7mm; border-radius:50%; background:var(--roxo); color:#fff; font-weight:700; font-size:9pt; display:flex; align-items:center; justify-content:center; }
+.g ol.passos>li::before{ background:var(--google); } .f ol.passos>li::before{ background:var(--meta); }
+.botao{ display:inline-block; font-weight:600; border:1px solid currentColor; border-radius:4px; padding:0 4px; font-size:9pt; white-space:nowrap; }
+.g .botao{ color:var(--google); } .f .botao{ color:var(--meta); } .w .botao{ color:#2271b1; }
+
+/* telas ilustrativas */
+.tela{ border:1px solid #cfcad6; border-radius:8px; overflow:hidden; margin:4mm 0 2mm; box-shadow:0 1mm 3mm rgba(40,20,60,.08); break-inside:avoid; background:#fff; }
+.tela .barra{ background:#eceaf0; padding:1.6mm 3mm; display:flex; align-items:center; gap:1.6mm; font-size:8pt; color:#555; }
+.tela .barra i{ width:2.4mm; height:2.4mm; border-radius:50%; background:#d4cfd9; display:inline-block; }
+.tela .barra .url{ margin-left:3mm; background:#fff; border-radius:10px; padding:.6mm 3mm; flex:1; color:#444; }
+.tela .corpo{ display:flex; min-height:40mm; font-size:8.6pt; }
+.tela .lado{ width:40mm; background:#f6f6f8; border-right:1px solid #e5e2ea; padding:3mm; }
+.tela .lado div{ padding:1.2mm 2mm; border-radius:4px; color:#444; }
+.tela .lado .ativo{ background:#e3edfd; color:#0b57d0; font-weight:600; }
+.f .tela .lado .ativo{ background:#e7f0ff; color:var(--meta); }
+.w .tela .lado{ background:#1d2327; } .w .tela .lado div{ color:#c3c4c7; } .w .tela .lado .ativo{ background:#2271b1; color:#fff; }
+.tela .principal{ flex:1; padding:4mm 5mm; }
+.tela .principal h4{ margin:0 0 3mm; font-size:11pt; font-weight:600; }
+.campo{ margin:0 0 2.6mm; position:relative; }
+.campo label{ display:block; font-size:7.6pt; color:#5f6368; margin-bottom:.6mm; }
+.campo .valor{ border:1px solid #c4c7c5; border-radius:4px; padding:1.4mm 2.4mm; font-family:"DejaVu Sans Mono",Consolas,monospace; font-size:8pt; background:#fff; color:#202124; word-break:break-all; }
+.campo.destaque .valor{ border:2px solid var(--laranja); background:#fff8f4; }
+.marcador{ position:absolute; right:-2mm; top:-1.5mm; width:5.5mm; height:5.5mm; border-radius:50%; background:var(--laranja); color:#fff; font-weight:700; font-size:8pt; display:flex; align-items:center; justify-content:center; }
+.opcoes{ display:flex; gap:2mm; flex-wrap:wrap; margin-bottom:2.6mm; }
+.opcao{ border:1px solid #c4c7c5; border-radius:6px; padding:1.6mm 2.6mm; font-size:8pt; }
+.opcao.sel{ border:2px solid var(--laranja); background:#fff8f4; font-weight:600; }
+.acoes{ display:flex; gap:2mm; justify-content:flex-end; margin-top:2mm; }
+.btn{ border-radius:16px; padding:1.2mm 4mm; font-size:8pt; font-weight:600; border:1px solid #c4c7c5; color:#0b57d0; background:#fff; }
+.btn.pri{ background:#0b57d0; color:#fff; border-color:#0b57d0; }
+.f .btn.pri{ background:var(--meta); border-color:var(--meta); border-radius:6px; }
+.f .btn{ border-radius:6px; color:#1c2b33; }
+.w .btn.pri{ background:#2271b1; border-color:#2271b1; border-radius:3px; }
+.legenda{ font-size:8pt; color:var(--apoio); margin:0 0 4mm; font-style:italic; }
+.selo{ display:inline-block; font-size:7.4pt; font-weight:700; border-radius:3px; padding:.3mm 1.6mm; background:#e6f4ea; color:#137333; }
+.selo.cinza{ background:#eee; color:#555; }
+
+/* fluxo */
+.fluxo{ display:flex; align-items:stretch; gap:2mm; margin:5mm 0; }
+.fluxo .no{ flex:1; border:1px solid var(--linha); border-radius:8px; padding:3mm; font-size:8.6pt; background:var(--fundo); text-align:center; }
+.fluxo .no b{ display:block; font-size:9.4pt; margin-bottom:1mm; color:var(--roxo); }
+.fluxo .seta{ align-self:center; color:var(--laranja); font-size:16pt; font-weight:700; }
+.duas{ display:flex; gap:5mm; } .duas>*{ flex:1; }
+.cabecalho-secao{ display:flex; align-items:center; gap:3mm; border-bottom:3px solid var(--roxo); padding-bottom:2mm; margin-bottom:4mm; }
+.g .cabecalho-secao{ border-color:var(--google); } .f .cabecalho-secao{ border-color:var(--meta); } .w .cabecalho-secao{ border-color:#2271b1; }
+.cabecalho-secao h2{ margin:0; }
+.g h2{ color:var(--google); } .f h2{ color:var(--meta); } .w h2{ color:#2271b1; }
+</style>
+</head>
+<body>
+
+<!-- ============ CAPA ============ -->
+<section class="pagina">
+  <div class="capa">
+    <div>
+      <small>Plataforma Reconectar · guia de configuração</small>
+      <h1>Login social<br>com Google e Facebook</h1>
+      <p class="sub">Como criar os aplicativos no Google Cloud e no Meta for Developers e ligá-los ao Nextend Social Login, para que compradores entrem na plataforma com a conta que já têm.</p>
+      <div class="logos">
+        <svg width="54" height="54" viewBox="0 0 48 48" aria-label="Google"><circle cx="24" cy="24" r="24" fill="#fff"/><path fill="#4285F4" d="M39.2 24.4c0-1.1-.1-2.1-.3-3.1H24v5.9h8.5a7.3 7.3 0 0 1-3.2 4.8v4h5.1c3-2.8 4.8-6.9 4.8-11.6z"/><path fill="#34A853" d="M24 40c4.3 0 7.9-1.4 10.5-3.9l-5.1-4c-1.4 1-3.2 1.5-5.4 1.5-4.1 0-7.6-2.8-8.9-6.6h-5.3v4.1A16 16 0 0 0 24 40z"/><path fill="#FBBC05" d="M15.1 27c-.3-1-.5-2-.5-3s.2-2 .5-3v-4.1H9.8a16 16 0 0 0 0 14.2z"/><path fill="#EA4335" d="M24 14.4c2.3 0 4.4.8 6.1 2.4l4.5-4.5A16 16 0 0 0 9.8 16.9l5.3 4.1c1.3-3.8 4.8-6.6 8.9-6.6z"/></svg>
+        <svg width="54" height="54" viewBox="0 0 48 48" aria-label="Facebook"><circle cx="24" cy="24" r="24" fill="#fff"/><circle cx="24" cy="24" r="17" fill="#0866FF"/><path fill="#fff" d="M26.4 41v-11h3.7l.6-4.3h-4.3v-2.7c0-1.2.4-2.1 2.1-2.1h2.3v-3.8c-.4-.1-1.8-.2-3.3-.2-3.3 0-5.5 2-5.5 5.6v3.2h-3.7V30h3.7v10.5"/></svg>
+      </div>
+    </div>
+    <div class="rodape">
+      Endereço considerado neste guia: <strong>https://3-148-211-66.sslip.io</strong><br>
+      As telas dos consoles são <strong>ilustrações esquemáticas</strong>, não capturas reais: Google e Meta mudam o layout com frequência. Os nomes de menus e botões seguem a documentação oficial do Nextend, conferida em outubro de 2026.
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANTES DE COMEÇAR ============ -->
+<section class="pagina">
+  <h2>Antes de começar</h2>
+  <p>O login social já está pronto do lado da plataforma: o plugin <strong>Nextend Social Login</strong> é instalado pelo provisionamento, e a tela de acesso (<code>/minha-conta/</code>) mostra os botões assim que cada provedor tiver credenciais. Sem credenciais, os botões simplesmente não aparecem e o login por e-mail e senha segue funcionando.</p>
+  <p>O que falta é criar um <strong>aplicativo</strong> em cada provedor. Ele é a identidade da plataforma diante do Google e da Meta, e gera duas chaves — um <em>ID</em> público e um <em>segredo</em> — que são coladas no painel do WordPress.</p>
+
+  <h3>Como o login acontece</h3>
+  <div class="fluxo">
+    <div class="no"><b>1. Comprador</b>clica em “Continuar com Google” na tela de acesso</div>
+    <div class="seta">→</div>
+    <div class="no"><b>2. Google / Meta</b>pede login e autorização para compartilhar nome e e-mail</div>
+    <div class="seta">→</div>
+    <div class="no"><b>3. Retorno</b>o provedor devolve a pessoa à <em>URL de retorno</em> da plataforma</div>
+    <div class="seta">→</div>
+    <div class="no"><b>4. Plataforma</b>o Nextend cria a conta ou entra na existente</div>
+  </div>
+  <p>A <strong>URL de retorno</strong> é o ponto que mais dá errado: ela precisa ser cadastrada no provedor <em>exatamente</em> como abaixo — com <code>https</code>, sem barra a mais, com o parâmetro.</p>
+  <table class="tabela">
+    <tr><th>Provedor</th><th>URL de retorno (redirect URI)</th></tr>
+    <tr><td>Google</td><td><code>https://3-148-211-66.sslip.io/wp-login.php?loginSocial=google</code></td></tr>
+    <tr><td>Facebook</td><td><code>https://3-148-211-66.sslip.io/wp-login.php?loginSocial=facebook</code></td></tr>
+  </table>
+  <p class="legenda">Conferidas no próprio Nextend instalado e respondendo 200 na produção. O painel do Nextend também mostra a URL sugerida em cada provedor — se divergir desta tabela, vale a do painel.</p>
+
+  <h3>Situação dos pré-requisitos</h3>
+  <table class="tabela">
+    <tr><th>Item</th><th>Exigido por</th><th>Situação</th></tr>
+    <tr><td>Site em HTTPS</td><td>Google e Meta</td><td class="ok">Pronto — certificado Let's Encrypt</td></tr>
+    <tr><td>Página pública de <strong>Política de privacidade</strong></td><td>Google e Meta (e LGPD)</td><td class="falta">Falta — hoje responde 404</td></tr>
+    <tr><td>Página pública de <strong>Termos de uso</strong></td><td>Google e Meta</td><td class="falta">Falta — hoje responde 404</td></tr>
+    <tr><td>Página de <strong>instruções para exclusão de dados</strong></td><td>Meta</td><td class="falta">Falta</td></tr>
+    <tr><td>Endereço definitivo (Elastic IP ou domínio próprio)</td><td>—</td><td class="falta">Pendente — veja o alerta abaixo</td></tr>
+    <tr><td><strong>Verificação de empresa</strong> (Business Verification) na Meta</td><td>Meta</td><td class="falta">A fazer, com documentos da organização</td></tr>
+  </table>
+</section>
+
+<section class="pagina">
+  <div class="caixa alerta evitar-quebra">
+    <strong class="t">Faça o endereço definitivo primeiro</strong>
+    O endereço <code>3-148-211-66.sslip.io</code> é o próprio IP da instância. Ao associar o Elastic IP, o número muda — e com ele as duas URLs de retorno, o domínio autorizado e o site cadastrado nos dois aplicativos. Criar os aplicativos agora significa refazer parte deste guia depois. O passo a passo do Elastic IP está em <code>docs/ELASTIC_IP.md</code>.
+  </div>
+
+  <div class="caixa alerta evitar-quebra">
+    <strong class="t">O sslip.io serve para testar, não para produção</strong>
+    <p>O Google trata como domínio autorizado o domínio “raiz” do endereço, que aqui é <code>sslip.io</code> — um serviço público que não pertence ao projeto. Isso tem dois efeitos:</p>
+    <ul>
+      <li>A <strong>verificação de marca</strong> do Google, necessária para exibir a logo na tela de consentimento, exige comprovar a propriedade do domínio no Google Search Console — o que é impossível para <code>sslip.io</code>. O aplicativo funciona com nome e sem logo.</li>
+      <li>A Meta pode recusar a revisão ou a verificação por o site não estar num domínio da organização.</li>
+    </ul>
+    <p>Para o lançamento, o recomendado é um <strong>domínio próprio</strong> (por exemplo, <code>reconectar.org.br</code>) apontando para o Elastic IP. Trocar o <code>WP_URL</code> é o único ajuste no servidor.</p>
+  </div>
+
+  <div class="caixa nota evitar-quebra">
+    <strong class="t">As páginas legais são conteúdo, não código</strong>
+    Política de privacidade, termos de uso e instruções de exclusão de dados precisam ser redigidas pela organização responsável pela plataforma — de preferência com apoio jurídico, porque a LGPD e o edital cobram. Depois de publicadas no WordPress, as URLs entram nos dois consoles. Para a política de privacidade, o WordPress já tem um rascunho em <strong>Configurações → Privacidade</strong>.
+  </div>
+
+  <div class="caixa dica evitar-quebra">
+    <strong class="t">Onde as chaves moram</strong>
+    O <em>Client Secret</em> do Google e o <em>App Secret</em> da Meta são senhas. Eles são colados <strong>somente</strong> no painel do Nextend, no <code>/wp-admin</code>. Não vão para o repositório, para o <code>.env</code>, para e-mail nem para conversa. Quem tiver o segredo consegue se passar pela plataforma diante do provedor.
+  </div>
+
+  <h3>Ordem sugerida</h3>
+  <ol class="passos">
+    <li>Separar contas Google e Facebook <strong>institucionais</strong>, não pessoais, e fixar o endereço: Elastic IP e, de preferência, domínio próprio.</li>
+    <li>Publicar as três páginas legais no WordPress e anotar as URLs.</li>
+    <li>Criar o aplicativo do <strong>Google</strong> (seção 1). É o mais rápido: sem revisão para nome e e-mail.</li>
+    <li>Iniciar a <strong>verificação de empresa</strong> na Meta, que pode levar dias, e criar o aplicativo do <strong>Facebook</strong> (seção 2).</li>
+    <li>Colar as chaves no Nextend e testar (seção 3).</li>
+  </ol>
+</section>
+
+<!-- ============ GOOGLE ============ -->
+<section class="pagina g">
+  <div class="cabecalho-secao"><svg width="26" height="26" viewBox="0 0 48 48"><path fill="#4285F4" d="M45 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8a10 10 0 0 1-4.4 6.6v5.5h7.1c4.1-3.8 6.5-9.4 6.5-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7A22 22 0 0 0 24 46z"/><path fill="#FBBC05" d="M11.8 28.2a13 13 0 0 1 0-8.4v-5.7H4.5a22 22 0 0 0 0 19.8z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.3 3.3l6.3-6.3A22 22 0 0 0 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg><h2>1. Aplicativo do Google</h2></div>
+  <p>Endereço: <code>https://console.cloud.google.com</code>, entrando com a conta Google da organização.</p>
+
+  <h3>1.1 Criar o projeto</h3>
+  <ol class="passos">
+    <li>No topo, clique no seletor de projeto (<span class="botao">Select a project</span>) e depois em <span class="botao">NEW PROJECT</span>.</li>
+    <li>Em <em>Project name</em>, escreva <strong>Reconectar</strong> e clique em <span class="botao">Create</span>.</li>
+    <li>Confira, no seletor do topo, que o projeto <strong>Reconectar</strong> está selecionado antes de seguir.</li>
+  </ol>
+
+  <h3>1.2 Tela de consentimento (Google Auth Platform)</h3>
+  <ol class="passos">
+    <li>Menu ☰ → <span class="botao">APIs &amp; Services</span> → <span class="botao">OAuth consent screen</span> → <span class="botao">Get started</span>.</li>
+    <li><strong>App information</strong>: <em>App name</em> <strong>Reconectar</strong>; <em>User support email</em> com o e-mail institucional. <span class="botao">Next</span>.</li>
+    <li><strong>Audience</strong>: marque <strong>External</strong> — qualquer pessoa com conta Google poderá entrar. <span class="botao">Next</span>.</li>
+    <li><strong>Contact Information</strong>: e-mail que recebe os avisos do Google. <span class="botao">Next</span>.</li>
+    <li><strong>Finish</strong>: aceite a <em>Google API Services: User Data Policy</em>, clique em <span class="botao">Continue</span> e em <span class="botao">Create</span>.</li>
+  </ol>
+
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">console.cloud.google.com/auth/overview/create</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Overview</div><div>Branding</div><div class="ativo">Audience</div><div>Clients</div><div>Data access</div></div>
+      <div class="principal">
+        <h4>Create branding</h4>
+        <div class="campo destaque"><label>App name *</label><div class="valor">Reconectar</div><span class="marcador">A</span></div>
+        <div class="campo"><label>User support email *</label><div class="valor">contato@organizacao</div></div>
+        <label style="font-size:7.6pt;color:#5f6368">Audience</label>
+        <div class="opcoes"><span class="opcao">Internal</span><span class="opcao sel">External</span></div>
+        <div class="acoes"><span class="btn">Back</span><span class="btn pri">Next</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática. (A) o nome que aparece para o comprador na tela “Fazer login com o Google”. Escolha <strong>External</strong>: <em>Internal</em> só existe para contas Google Workspace e limitaria o login à própria organização.</p>
+</section>
+
+<section class="pagina g">
+  <h3>1.3 Identidade visual e domínios (Branding)</h3>
+  <ol class="passos">
+    <li>No menu lateral, abra <span class="botao">Branding</span>.</li>
+    <li><strong>App logo</strong>: deixe em branco por enquanto. Enviar logo dispara a verificação de marca, que não fecha com <code>sslip.io</code> (veja “Antes de começar”).</li>
+    <li><strong>App domain</strong>: <em>Application home page</em>, <em>Application privacy policy link</em> e <em>Application terms of service link</em>, com as URLs públicas das páginas.</li>
+    <li><strong>Authorized domains</strong>: <span class="botao">Add domain</span> e informe o domínio <em>sem subdomínio</em> — com sslip.io, <code>sslip.io</code>; com domínio próprio, por exemplo <code>reconectar.org.br</code>.</li>
+    <li><span class="botao">Save</span>.</li>
+  </ol>
+
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">console.cloud.google.com/auth/branding</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Overview</div><div class="ativo">Branding</div><div>Audience</div><div>Clients</div><div>Data access</div></div>
+      <div class="principal">
+        <h4>Branding</h4>
+        <div class="campo"><label>Application home page</label><div class="valor">https://3-148-211-66.sslip.io/</div></div>
+        <div class="campo destaque"><label>Application privacy policy link</label><div class="valor">https://3-148-211-66.sslip.io/politica-de-privacidade/</div><span class="marcador">B</span></div>
+        <div class="campo destaque"><label>Application terms of service link</label><div class="valor">https://3-148-211-66.sslip.io/termos-de-uso/</div><span class="marcador">B</span></div>
+        <div class="campo destaque"><label>Authorized domain 1</label><div class="valor">sslip.io</div><span class="marcador">C</span></div>
+        <div class="acoes"><span class="btn pri">Save</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática. (B) os endereços são exemplos: use os das páginas que forem publicadas — hoje elas não existem. (C) domínio raiz, sem <code>3-148-211-66.</code> na frente.</p>
+
+  <h3>1.4 Criar o cliente OAuth (as chaves)</h3>
+  <ol class="passos">
+    <li>No menu lateral, <span class="botao">Clients</span> → <span class="botao">Create client</span>.</li>
+    <li><strong>Application type</strong>: <strong>Web application</strong>. <em>Name</em>: <strong>Reconectar — site</strong>.</li>
+    <li>Em <strong>Authorized redirect URIs</strong>, <span class="botao">Add URI</span> e cole a URL de retorno do Google. <em>Authorized JavaScript origins</em> fica vazio.</li>
+    <li><span class="botao">Create</span>. A janela que abre mostra o <strong>Client ID</strong> e o <strong>Client secret</strong>.</li>
+  </ol>
+</section>
+
+<section class="pagina g">
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">console.cloud.google.com/auth/clients/create</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Overview</div><div>Branding</div><div>Audience</div><div class="ativo">Clients</div><div>Data access</div></div>
+      <div class="principal">
+        <h4>Create OAuth client ID</h4>
+        <div class="campo destaque"><label>Application type *</label><div class="valor">Web application</div><span class="marcador">D</span></div>
+        <div class="campo"><label>Name *</label><div class="valor">Reconectar — site</div></div>
+        <div class="campo"><label>Authorized JavaScript origins</label><div class="valor" style="color:#999">(vazio)</div></div>
+        <div class="campo destaque"><label>Authorized redirect URIs — URIs 1 *</label><div class="valor">https://3-148-211-66.sslip.io/wp-login.php?loginSocial=google</div><span class="marcador">E</span></div>
+        <div class="acoes"><span class="btn">Cancel</span><span class="btn pri">Create</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática. (D) “Web application”, não “Desktop” nem “Android”. (E) o erro mais comum do login social: um caractere diferente aqui e o Google responde <code>redirect_uri_mismatch</code>.</p>
+
+  <div class="caixa alerta evitar-quebra">
+    <strong class="t">Copie o segredo na hora</strong>
+    Em clientes novos, o Google pode exibir o <em>Client secret</em> completo uma única vez, na janela de criação. Use <span class="botao">Download JSON</span> ou copie direto para o Nextend (seção 3). Se perder, crie um segredo novo no próprio cliente — o antigo pode ser desativado em seguida.
+  </div>
+
+  <h3>1.5 Publicar o aplicativo</h3>
+  <ol class="passos">
+    <li>No menu lateral, <span class="botao">Audience</span>.</li>
+    <li>Em <em>Publishing status</em>, clique em <span class="botao">Publish app</span> e confirme.</li>
+  </ol>
+  <p>Enquanto o status for <strong>Testing</strong>, só as contas cadastradas em <em>Test users</em> (até 100) conseguem entrar; as demais recebem “acesso bloqueado”. É útil para testar antes do lançamento — cadastre ali as contas da equipe — e é a causa número um de “funciona para mim e não para os outros”.</p>
+  <p>O Nextend pede apenas nome, e-mail e foto (escopos <code>openid</code>, <code>email</code> e <code>profile</code>). Esses escopos não exigem a revisão de segurança do Google: a publicação é imediata.</p>
+
+  <div class="caixa dica evitar-quebra">
+    <strong class="t">Resumo do Google</strong>
+    Ao final você terá: projeto <strong>Reconectar</strong>, tela de consentimento <strong>External</strong> publicada, e um cliente <strong>Web application</strong> com a URL de retorno cadastrada — e em mãos o <strong>Client ID</strong> (termina em <code>.apps.googleusercontent.com</code>) e o <strong>Client secret</strong>.
+  </div>
+</section>
+
+<!-- ============ FACEBOOK ============ -->
+<section class="pagina f">
+  <div class="cabecalho-secao"><svg width="26" height="26" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#0866FF"/><path fill="#fff" d="M27 46V30.5h5l.8-5.8H27v-3.6c0-1.7.5-2.8 2.9-2.8h3.1v-5.2c-.5-.1-2.4-.2-4.5-.2-4.5 0-7.5 2.7-7.5 7.7v4.3h-5v5.8h5V46"/></svg><h2>2. Aplicativo do Facebook</h2></div>
+  <p>Endereço: <code>https://developers.facebook.com/apps</code>, com uma conta do Facebook registrada como desenvolvedora. Use a conta de quem vai administrar a plataforma por muito tempo e adicione uma segunda pessoa como administradora do aplicativo, para não depender de uma conta só.</p>
+
+  <div class="caixa alerta evitar-quebra">
+    <strong class="t">Verificação de empresa é obrigatória</strong>
+    Desde 2023 a Meta só libera o Login do Facebook para o público em aplicativos ligados a uma <strong>empresa verificada</strong> (Business Verification), em um <em>Business portfolio</em> do Meta Business Suite. A verificação pede razão social, CNPJ, endereço, telefone e documento que comprove os dados, e leva de alguns dias a algumas semanas. Comece por ela, em paralelo à criação do aplicativo. Sem ela, o login funciona apenas para quem tem papel no aplicativo (administradores, desenvolvedores e testadores).
+  </div>
+
+  <h3>2.1 Criar o aplicativo</h3>
+  <ol class="passos">
+    <li>Clique em <span class="botao">Create App</span>.</li>
+    <li><em>App name</em>: <strong>Reconectar</strong>; <em>App contact email</em>: e-mail institucional. <span class="botao">Next</span>.</li>
+    <li>Em <strong>Use cases</strong>, escolha <strong>Authenticate and request data from users with Facebook Login</strong>. <span class="botao">Next</span>.</li>
+    <li><strong>Business</strong>: selecione o <em>Business portfolio</em> da organização (ou deixe para depois — será exigido antes de publicar).</li>
+    <li>Leia os requisitos e conclua; o painel do aplicativo abre.</li>
+  </ol>
+
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">developers.facebook.com/apps/creation</span></div>
+    <div class="corpo">
+      <div class="lado"><div>App details</div><div class="ativo">Use cases</div><div>Business</div><div>Requirements</div><div>Overview</div></div>
+      <div class="principal">
+        <h4>Add use cases</h4>
+        <div class="opcoes" style="flex-direction:column">
+          <span class="opcao sel">✓ Authenticate and request data from users with Facebook Login <span class="marcador" style="position:static;display:inline-flex;margin-left:2mm">F</span></span>
+          <span class="opcao">Launch a game on Facebook</span>
+          <span class="opcao">Manage everything on your Page</span>
+          <span class="opcao">Other</span>
+        </div>
+        <div class="acoes"><span class="btn">Previous</span><span class="btn pri">Next</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática. (F) o caso de uso de login; os outros criam aplicativos de outro tipo, que não oferecem o Login do Facebook do jeito que o Nextend espera.</p>
+
+</section>
+
+<section class="pagina f">
+  <h3>2.2 Permissão de e-mail</h3>
+  <ol class="passos">
+    <li>Menu lateral <span class="botao">Use cases</span> → <span class="botao">Customize</span> ao lado de <em>Authenticate and request data from users with Facebook Login</em>.</li>
+    <li>Em <strong>Permissions</strong>, ache <code>email</code> e clique em <span class="botao">Add</span>. <code>public_profile</code> já vem incluída.</li>
+  </ol>
+  <p>Sem <code>email</code> o Nextend não tem como ligar a conta do Facebook a um comprador da plataforma.</p>
+
+  <h3>2.3 URL de retorno</h3>
+  <ol class="passos">
+    <li>Ainda em <em>Customize</em>, abra <span class="botao">Settings</span> do Facebook Login.</li>
+    <li>Em <strong>Valid OAuth Redirect URIs</strong>, cole a URL de retorno do Facebook.</li>
+    <li>Deixe ligados <em>Client OAuth login</em>, <em>Web OAuth login</em>, <em>Enforce HTTPS</em> e <em>Use Strict Mode for redirect URIs</em>.</li>
+    <li><span class="botao">Save changes</span>. Se a página ficar em branco, recarregue — o salvamento já ocorreu.</li>
+  </ol>
+
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">developers.facebook.com/apps/…/use_cases/customize/settings</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Dashboard</div><div class="ativo">Use cases</div><div>App settings</div><div>App roles</div><div>Review</div><div>Publish</div></div>
+      <div class="principal">
+        <h4>Facebook Login · Settings</h4>
+        <div class="campo"><label>Client OAuth login</label><div class="valor"><span class="selo">Yes</span></div></div>
+        <div class="campo"><label>Use Strict Mode for redirect URIs</label><div class="valor"><span class="selo">Yes</span></div></div>
+        <div class="campo destaque"><label>Valid OAuth Redirect URIs</label><div class="valor">https://3-148-211-66.sslip.io/wp-login.php?loginSocial=facebook</div><span class="marcador">G</span></div>
+        <div class="acoes"><span class="btn pri">Save changes</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática. (G) mesma regra do Google: a URL tem de ser idêntica, ou o Facebook responde “URL bloqueada”.</p>
+
+  <h3>2.4 Configurações básicas</h3>
+  <ol class="passos">
+    <li>Menu lateral <span class="botao">App settings</span> → <span class="botao">Basic</span>.</li>
+    <li><strong>App Domains</strong>: <code>3-148-211-66.sslip.io</code> (ou o domínio próprio).</li>
+    <li><strong>Privacy Policy URL</strong> e <strong>Terms of Service URL</strong>: as páginas públicas.</li>
+    <li><strong>User data deletion</strong>: escolha <em>Data deletion instructions URL</em> e informe a página que explica como pedir a exclusão da conta.</li>
+    <li><strong>App icon</strong> (1024 × 1024 px) e <strong>Category</strong> (por exemplo, <em>Shopping</em>).</li>
+    <li>No fim da página, <span class="botao">+ Add platform</span> → <strong>Website</strong> → <em>Site URL</em>: <code>https://3-148-211-66.sslip.io/</code>.</li>
+    <li><span class="botao">Save changes</span>.</li>
+  </ol>
+</section>
+
+<section class="pagina f">
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">developers.facebook.com/apps/…/settings/basic</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Dashboard</div><div>Use cases</div><div class="ativo">App settings</div><div>App roles</div><div>Review</div><div>Publish</div></div>
+      <div class="principal">
+        <h4>Basic</h4>
+        <div class="duas">
+          <div class="campo"><label>App ID</label><div class="valor">1234567890123456</div></div>
+          <div class="campo destaque"><label>App secret</label><div class="valor">•••••••• <span class="selo cinza">Show</span></div><span class="marcador">H</span></div>
+        </div>
+        <div class="campo destaque"><label>App domains</label><div class="valor">3-148-211-66.sslip.io</div><span class="marcador">I</span></div>
+        <div class="duas">
+          <div class="campo"><label>Privacy Policy URL</label><div class="valor">…/politica-de-privacidade/</div></div>
+          <div class="campo"><label>Terms of Service URL</label><div class="valor">…/termos-de-uso/</div></div>
+        </div>
+        <div class="campo"><label>User data deletion · Data deletion instructions URL</label><div class="valor">…/exclusao-de-dados/</div></div>
+        <div class="campo"><label>Website · Site URL</label><div class="valor">https://3-148-211-66.sslip.io/</div></div>
+        <div class="acoes"><span class="btn">Discard</span><span class="btn pri">Save changes</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática; números fictícios. (H) o <em>App secret</em> só aparece depois de clicar em <em>Show</em> e confirmar a senha do Facebook. (I) o domínio com o subdomínio, ao contrário do Google.</p>
+
+  <h3>2.5 Verificar, revisar e publicar</h3>
+  <ol class="passos">
+    <li><span class="botao">Review</span> → <span class="botao">Verification</span>: inicie ou vincule a verificação de empresa.</li>
+    <li><span class="botao">Review</span> → <span class="botao">App Review</span>: siga os passos com <span class="botao">Next</span> e envie com <span class="botao">Submit for review</span>, se o painel pedir. As permissões <code>email</code> e <code>public_profile</code> costumam ter acesso padrão; a revisão, quando exigida, leva alguns dias.</li>
+    <li><span class="botao">Publish</span> → botão azul <span class="botao">Publish</span>. O aplicativo sai do modo <strong>Development</strong> e passa a <strong>Live</strong>.</li>
+  </ol>
+  <p>Em <strong>Development</strong>, só quem tem papel no aplicativo (<em>App roles</em>) consegue entrar — bom para testar com a equipe antes de publicar.</p>
+
+  <div class="caixa dica evitar-quebra">
+    <strong class="t">Resumo do Facebook</strong>
+    Ao final você terá: aplicativo <strong>Reconectar</strong> com o caso de uso de login e a permissão <code>email</code>, URL de retorno cadastrada, páginas legais informadas, empresa verificada e modo <strong>Live</strong> — e em mãos o <strong>App ID</strong> e o <strong>App secret</strong>.
+  </div>
+</section>
+
+<!-- ============ NEXTEND ============ -->
+<section class="pagina w">
+  <div class="cabecalho-secao"><svg width="26" height="26" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#2271b1"/><text x="24" y="31" font-size="20" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-weight="700">W</text></svg><h2>3. Ligar as chaves no WordPress</h2></div>
+  <p>Entre no <code>/wp-admin</code> com a conta de <strong>Super Administrador</strong> — os outros perfis não chegam às configurações de plugin.</p>
+
+  <ol class="passos">
+    <li>Menu <span class="botao">Configurações</span> → <span class="botao">Nextend Social Login</span>.</li>
+    <li>Na lista de provedores, clique em <span class="botao">Getting Started</span> no cartão do <strong>Google</strong>. Confira se a URL de retorno que o Nextend mostra é a mesma cadastrada no console.</li>
+    <li>Aba <span class="botao">Settings</span>: cole <strong>Client ID</strong> e <strong>Client Secret</strong> e clique em <span class="botao">Save Changes</span>.</li>
+    <li>Clique em <span class="botao">Verify Settings</span>. Uma janela do Google abre; entre com uma conta de teste e autorize. O Nextend confirma que as chaves funcionam.</li>
+    <li>Clique em <span class="botao">Enable</span>. Só depois disso o botão aparece na tela de acesso.</li>
+    <li>Repita com o <strong>Facebook</strong>, colando <strong>App ID</strong> e <strong>App Secret</strong>.</li>
+  </ol>
+
+  <div class="tela">
+    <div class="barra"><i></i><i></i><i></i><span class="url">3-148-211-66.sslip.io/wp-admin/options-general.php?page=nextend-social-login&amp;subview=provider&amp;provider=google</span></div>
+    <div class="corpo">
+      <div class="lado"><div>Painel</div><div>Páginas</div><div>Usuários</div><div class="ativo">Configurações</div><div>· Nextend Social Login</div></div>
+      <div class="principal">
+        <h4>Google <span class="selo cinza">Not Verified</span></h4>
+        <div class="campo"><label>Redirect URI (cadastre no console)</label><div class="valor">https://3-148-211-66.sslip.io/wp-login.php?loginSocial=google</div></div>
+        <div class="campo destaque"><label>Client ID</label><div class="valor">0000000000-xxxxxxxx.apps.googleusercontent.com</div><span class="marcador">J</span></div>
+        <div class="campo destaque"><label>Client Secret</label><div class="valor">GOCSPX-••••••••••••</div><span class="marcador">J</span></div>
+        <div class="acoes"><span class="btn">Verify Settings</span><span class="btn pri">Save Changes</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="legenda">Ilustração esquemática; valores fictícios. (J) as duas chaves vindas da seção 1.4. Depois de verificado, o selo passa a “Verified” e aparece o botão <em>Enable</em>.</p>
+
+  <h3>Teste final</h3>
+  <ol class="passos">
+    <li>Numa janela anônima, abra <code>https://3-148-211-66.sslip.io/minha-conta/</code>. Os botões do Google e do Facebook aparecem no topo, acima de “ou”.</li>
+    <li>Entre com uma conta que <strong>não</strong> tenha papel nos aplicativos — é a única forma de provar que eles estão publicados.</li>
+    <li>Confira que a pessoa caiu logada na plataforma e que, em <span class="botao">Usuários</span>, a conta nova tem o papel <strong>Cliente</strong>.</li>
+  </ol>
+</section>
+
+<!-- ============ PROBLEMAS ============ -->
+<section class="pagina">
+  <h2>Quando algo dá errado</h2>
+  <table class="tabela">
+    <tr><th style="width:36%">O que aparece</th><th>Causa provável e conserto</th></tr>
+    <tr><td><code>Erro 400: redirect_uri_mismatch</code> (Google)</td><td>A URL de retorno do cliente OAuth difere da que o Nextend envia. Compare caractere a caractere: <code>https</code>, o host atual, <code>/wp-login.php?loginSocial=google</code>. Mudanças no console podem levar alguns minutos para valer.</td></tr>
+    <tr><td>“URL bloqueada” / “URL Blocked” (Facebook)</td><td>A mesma coisa do lado da Meta: confira <em>Valid OAuth Redirect URIs</em> e se <em>Web OAuth login</em> está ligado.</td></tr>
+    <tr><td>“Acesso bloqueado: o app não concluiu o processo de verificação” (Google)</td><td>O aplicativo ainda está em <strong>Testing</strong> e a conta não é <em>Test user</em>. Publique (seção 1.5) ou cadastre a conta como testadora.</td></tr>
+    <tr><td>“Recurso indisponível” / app não ativo (Facebook)</td><td>O aplicativo está em <strong>Development</strong>, ou falta a verificação de empresa. Só quem tem papel no aplicativo entra até a publicação.</td></tr>
+    <tr><td>Os botões não aparecem na tela de acesso</td><td>O provedor não foi habilitado no Nextend (<em>Enable</em>), ou as chaves não foram salvas. Sem credenciais, a tela de acesso esconde os botões de propósito.</td></tr>
+    <tr><td>Conta criada sem e-mail (Facebook)</td><td>Faltou a permissão <code>email</code> (seção 2.2), ou a pessoa entrou no Facebook só com telefone.</td></tr>
+    <tr><td>Tudo parou depois de trocar o IP ou o domínio</td><td>As URLs de retorno, o domínio autorizado (Google) e <em>App Domains</em>/<em>Site URL</em> (Facebook) guardam o endereço antigo. Atualize os quatro lugares.</td></tr>
+  </table>
+
+  <h3>Quando o endereço mudar</h3>
+  <p>Ao associar o Elastic IP ou adotar domínio próprio, atualize:</p>
+  <table class="tabela">
+    <tr><th>Onde</th><th>Campo</th></tr>
+    <tr><td>Google · Clients · Reconectar — site</td><td>Authorized redirect URIs</td></tr>
+    <tr><td>Google · Branding</td><td>Home page, privacy policy, terms of service e Authorized domains</td></tr>
+    <tr><td>Facebook · Use cases · Facebook Login · Settings</td><td>Valid OAuth Redirect URIs</td></tr>
+    <tr><td>Facebook · App settings · Basic</td><td>App Domains, Privacy Policy URL, Terms of Service URL, Data deletion URL, Website · Site URL</td></tr>
+  </table>
+  <p>As chaves continuam as mesmas: nada muda no Nextend.</p>
+
+  <h3>Referências</h3>
+  <ul>
+    <li>Nextend — Google: <code>social-login.nextendweb.com/documentation/providers/google/</code></li>
+    <li>Nextend — Facebook: <code>social-login.nextendweb.com/documentation/providers/facebook/</code></li>
+    <li>Repositório: <code>docs/DEPLOY.md</code> (HTTPS) e <code>docs/ELASTIC_IP.md</code> (endereço fixo)</li>
+  </ul>
+</section>
+
+</body>
+</html>
