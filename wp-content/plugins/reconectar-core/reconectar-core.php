@@ -29,6 +29,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-aviso-demo.php';
 // mesmo que alguém troque o tema ativo ou o desative por engano.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-permissoes.php';
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-status-pedido.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-status-rapido.php';
 
 // O Administrador de Empresas opera por uma interface própria da aplicação, e
 // não pelo `/wp-admin`. Os três arquivos abaixo são essa camada: a entidade que
@@ -124,6 +125,7 @@ function reconectar_core_init() {
 	Reconectar_Migracoes::init();
 	Reconectar_Permissoes::init();
 	Reconectar_Status_Pedido::init();
+	Reconectar_Status_Rapido::init();
 	Reconectar_Avatar_Local::init();
 	Reconectar_Empresa::init();
 	Reconectar_Painel_Empresas::init();

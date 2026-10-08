@@ -128,7 +128,7 @@ class Reconectar_Pagamento_Direto {
 			'reconectar-pagamento',
 			RECONECTAR_CORE_URL . 'assets/css/pagamento.css',
 			array(),
-			'0.1.0'
+			'0.2.0'
 		);
 		wp_enqueue_script(
 			'reconectar-pagamento',

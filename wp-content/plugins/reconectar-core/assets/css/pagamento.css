@@ -577,3 +577,95 @@
 	background: #fbeeea;
 	color: #9c3a1e;
 }
+
+/* ==========================================================================
+   Andamento do pedido — botões de status no detalhe do painel da loja
+
+   Mora aqui, e não num arquivo próprio, porque este é o único CSS do plugin
+   que o painel da loja já carrega (`Reconectar_Pagamento_Direto::carregar_assets()`).
+   Os tokens são redeclarados pela mesma razão de `.rc-comprovante-coluna`: o
+   painel fica fora de qualquer `.rc-pagamento`.
+   ========================================================================== */
+
+.rc-status-rapido__corpo {
+	--rc-pg-primaria: var( --reconectar-cor-primaria, #31BEB1 );
+	--rc-pg-texto-suave: #717171;
+	--rc-pg-borda: #dfe3e6;
+
+	--rc-pg-fonte-xs: var( --rc-fonte-xs, 0.8125rem );
+	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+
+	box-sizing: border-box;
+}
+
+.rc-status-rapido__corpo *,
+.rc-status-rapido__corpo *::before,
+.rc-status-rapido__corpo *::after {
+	box-sizing: inherit;
+}
+
+.rc-status-rapido__form {
+	margin: 0 0 0.5rem;
+}
+
+/* Empilhados e de largura inteira: a coluna da direita do detalhe tem um terço
+   da tela, e lado a lado o rótulo mais longo quebraria dentro do botão. */
+.rc-status-rapido__botao {
+	display: block;
+	width: 100%;
+	font: inherit;
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	text-align: center;
+	background: #fff;
+	color: #1a1a1a;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 6px;
+	/* O padding vertical leva o alvo aos 44px do critério 2.5.5 da WCAG 2.1 —
+	   medido, 0.6rem dava 41px com a entrelinha compacta. */
+	padding: 0.7rem 0.75rem;
+	cursor: pointer;
+}
+
+.rc-status-rapido__botao:hover {
+	border-color: var( --rc-pg-primaria );
+}
+
+/* Texto escuro sobre a primária: #31BEB1 mede 2,30:1 com branco — ver
+   `.rc-pagamento__copiar`. */
+.rc-status-rapido__botao--principal {
+	background: var( --rc-pg-primaria );
+	border-color: var( --rc-pg-primaria );
+	font-weight: 600;
+}
+
+.rc-status-rapido__botao:focus-visible {
+	outline: 2px solid var( --reconectar-cor-institucional, #663191 );
+	outline-offset: 2px;
+}
+
+.rc-status-rapido__dica {
+	font-size: var( --rc-pg-fonte-xs );
+	color: var( --rc-pg-texto-suave );
+	margin: 0.75rem 0 0;
+}
+
+/* Mesmos tons e mesma regra de `.rc-comprovante__aviso`: o texto diz o
+   desfecho, e a cor só reforça (critério 1.4.1). */
+.rc-status-rapido__aviso {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	border-radius: 6px;
+	padding: 0.6rem 0.75rem;
+	margin: 0 0 0.75rem;
+}
+
+.rc-status-rapido__aviso--ok {
+	background: #eef8f2;
+	color: #1d6b42;
+}
+
+.rc-status-rapido__aviso--erro {
+	background: #fbeeea;
+	color: #9c3a1e;
+}
