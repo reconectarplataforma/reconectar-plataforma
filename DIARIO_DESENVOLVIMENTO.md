@@ -4627,3 +4627,35 @@ redirecionamento e o menu. O `conferir` ganhou destino exato com `=` na frente:
 a comparação por trecho aceitaria também o login.
 
 Resultado: 393 casos, nenhuma falha.
+
+## 2026-10-08 — E-mails com a marca, e SMTP
+
+Os e-mails saíam no roxo do WooCommerce (`#8526ff`), sem logo, com o rodapé
+"Reconectar – Incubadora Digital / Brasil". Redefinição de senha, conta nova e
+os avisos do BuddyPress saíam em texto puro. E nada era entregue: o `mail()` do
+PHP não entrega a partir do container.
+
+- **SMTP** — `Reconectar_Email::configurar_smtp()`, em `phpmailer_init`, lê
+  `RECONECTAR_SMTP_*` do ambiente. A senha fica só no `.env`, e sem host nada
+  muda. A criptografia sai da porta: 465 usa SSL, 587 usa STARTTLS. Medido
+  contra o Gmail com uma senha errada: nas duas portas a conexão chega à
+  autenticação e é recusada nela.
+- **Cores** — gravadas pelo `provision.sh` como opções do WooCommerce, trocando
+  só o valor de fábrica: base `#663191`, fundo `#f4f1f8`, rodapé `#4d4d57`
+  (o `#787c82` de fábrica dava 4,2:1), cabeçalho centralizado. O teal entra
+  pelo CSS, como faixa entre a logo e o corpo.
+- **Logo** — `logo-email.png`, 480×177 e 49 KB, recortada da
+  `logo-apoio-cor.png` (6250px). A URL é resolvida a cada envio pelo
+  `WP_HOME` dinâmico, nunca gravada na opção.
+- **Rodapé** — "Projeto Nosso Chão Nossa História" e o link da política de
+  privacidade, este também resolvido no envio.
+- **Texto puro** — o que chega ao `wp_mail` sem `Content-Type` e sem HTML é
+  vestido com `wrap_message()` e `style_inline()` do WooCommerce. O BuddyPress
+  passa a usar o `wp_mail` (`bp_email_use_wp_mail`), em vez do mailer próprio,
+  que nem passava pelo SMTP.
+
+Conferido por prévia (`EmailPreview`) e por captura em `pre_wp_mail`:
+pedido em processamento, redefinição de senha do WooCommerce e do núcleo,
+detalhes de acesso, novo vendedor do Dokan e ativação do BuddyPress. Os seis
+saem com a logo, as cores e o rodapé.
+

@@ -34,6 +34,15 @@ services:
       # os header() de pluggable.php e a ação simplesmente não acontece — e o
       # provision.sh só alcança WP_DEBUG_DISPLAY, não esta variável.
       WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-1}
+      # SMTP de saída, lido por `Reconectar_Email`. Sem host, o WordPress fica no
+      # mail() do PHP, que no container não entrega — o estado de quem
+      # desenvolve. A senha mora só no .env, nunca no banco nem no Git.
+      RECONECTAR_SMTP_HOST: ${RECONECTAR_SMTP_HOST:-}
+      RECONECTAR_SMTP_PORTA: ${RECONECTAR_SMTP_PORTA:-587}
+      RECONECTAR_SMTP_USUARIO: ${RECONECTAR_SMTP_USUARIO:-}
+      RECONECTAR_SMTP_SENHA: ${RECONECTAR_SMTP_SENHA:-}
+      RECONECTAR_SMTP_REMETENTE: ${RECONECTAR_SMTP_REMETENTE:-}
+      RECONECTAR_SMTP_NOME: ${RECONECTAR_SMTP_NOME:-}
     volumes:
       - wordpress-data:/var/www/html
       - ./wp-content:/var/www/html/wp-content

@@ -742,6 +742,34 @@ reconectar_traduzir_opcao_de_fabrica woocommerce_checkout_privacy_policy_text \
   "Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our [privacy_policy]." \
   "Seus dados pessoais serão usados para processar o pedido, enviá-lo à loja que vai atendê-lo e para as demais finalidades descritas na nossa [privacy_policy]."
 
+echo "== Identidade visual dos e-mails =="
+# O WooCommerce instala os e-mails no roxo dele (#8526ff), sem logo e com o
+# rodapé em "{site_title}<br />{store_address}" — o endereço da loja, que aqui
+# é só "Brasil". O Dokan usa o mesmo mailer e herda tudo.
+#
+# A base é a institucional, não o teal primário: o WooCommerce escolhe texto
+# branco ou escuro pelo brilho da base, e sobre #31BEB1 o branco fica em 2,3:1.
+# O teal entra pelo CSS de `Reconectar_Email::estilos()`, onde não carrega texto.
+# O cinza do rodapé desce de #787c82 (4,2:1 sobre branco, reprovado) a #4d4d57.
+#
+# A logo não está aqui de propósito: a opção guardaria uma URL absoluta, e o
+# host dela é o do momento do provisionamento. `Reconectar_Email::logo()` a
+# resolve a cada envio. Pelo mesmo motivo, o link da privacidade no rodapé.
+#
+# `auto_sync_with_theme` desligado: ligado, o WooCommerce troca estas cores
+# pelas do tema sempre que achar estilos globais nele.
+#
+# Só troca valor de fábrica — cor escolhida no painel fica.
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_base_color "#8526ff" "#663191"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_background_color "#ffffff" "#f4f1f8"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_footer_text_color "#787c82" "#4d4d57"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_header_alignment "left" "center"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_header_image_width "120" "240"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_auto_sync_with_theme "yes" "no"
+reconectar_traduzir_opcao_de_fabrica woocommerce_email_footer_text \
+  "{site_title}<br />{store_address}" \
+  "{site_title}<br />Projeto Nosso Chão Nossa História"
+
 echo "== Fórum inicial (bbPress) =="
 if ! wp post list --post_type=forum --field=ID | grep -q .; then
   wp post create \
