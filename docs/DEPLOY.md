@@ -133,6 +133,47 @@ O esquema do `WP_URL` decide o HTTPS — veja a seção [HTTPS](#https) abaixo.
 Com `https://`, `WORDPRESS_PORT` **tem** de estar presa ao loopback como no
 exemplo; o deploy recusa a subida do proxy se não estiver.
 
+#### E-mail (SMTP)
+
+Sem estas chaves o site funciona, mas **não envia e-mail nenhum**: o `mail()`
+do PHP não entrega a partir do container. Redefinição de senha, aviso de pedido
+à loja e ao comprador, link de senha da loja nova — tudo some sem erro na tela.
+
+```
+RECONECTAR_SMTP_HOST=smtp.gmail.com
+RECONECTAR_SMTP_PORTA=465
+RECONECTAR_SMTP_USUARIO=reconectar.plataforma@gmail.com
+RECONECTAR_SMTP_SENHA=<senha de app do Gmail, 16 letras, sem espaços>
+RECONECTAR_SMTP_NOME=Reconectar
+```
+
+- **Senha de app, não a da conta.** O Gmail recusa a senha normal por SMTP. Ela
+  é gerada em *Conta Google → Segurança → Senhas de app*, e exige verificação em
+  duas etapas ligada. Revogar a senha de app ali corta o envio sem mexer na conta.
+- **A porta decide a criptografia**: 465 abre já em TLS, 587 sobe com STARTTLS.
+  Não há variável para isso de propósito — `Reconectar_Email::configurar_smtp()`
+  deriva da porta, e as duas funcionam com o Gmail.
+- `RECONECTAR_SMTP_REMETENTE` é opcional e cai no usuário. O Gmail reescreve o
+  remetente para a conta autenticada de qualquer jeito, salvo alias verificado.
+- O Gmail gratuito envia até **500 mensagens por dia**. Passando disso, ele
+  recusa até o dia seguinte.
+
+Ao contrário do resto do `.env`, estas chaves **não** passam pelo
+`wp-config.php`: o plugin as lê do ambiente a cada envio. Dá para acrescentá-las
+depois do primeiro `up` — basta o próximo deploy, que recria o container
+`wordpress` ao ver o ambiente mudado.
+
+Para conferir sem esperar um pedido, no servidor:
+
+```bash
+cd /opt/reconectar
+docker compose exec wordpress php -r 'echo getenv("RECONECTAR_SMTP_HOST"), "\n";'
+```
+
+Deve imprimir `smtp.gmail.com`. Depois, **Esqueci a senha** pelo navegador, com
+uma conta sua. Não teste pelo `wpcli`: só o serviço `wordpress` recebe as
+chaves, e o envio de lá sai pelo `mail()` e falha — parecendo defeito do SMTP.
+
 ### 4. Elastic IP
 
 O nome `3-148-211-66.sslip.io` **é** o IP: o sslip.io resolve o nome para o

@@ -41,6 +41,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador, Moderador e Super Administrador escolhem Mercado, Incubadora ou Praça a cada login; Loja e Super Administrador têm ainda o cartão do painel |
 | `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
 | `…/includes/class-reconectar-privacidade.php` | apagador e exportador nas ferramentas de privacidade do núcleo: votos, comentários da Incubadora, rastros do fórum, login social, loja |
+| `…/includes/class-reconectar-email.php` | SMTP por variável de ambiente, logo e acentos da marca nos e-mails, embrulho dos de texto puro |
 | `…/includes/class-reconectar-migracoes.php` | migrações de dados versionadas (meta e capacidade) |
 | `…/includes/class-reconectar-incubadora*.php` | a Incubadora, wiki interna: rotas, leitura, ações, sanitizador, arquivos, editor, busca, interação (vídeo em destaque, avaliação, comentários) |
 | `…/includes/incubadora/` | os templates da Incubadora |
@@ -1558,6 +1559,32 @@ Pro — Slack, Apple, GitHub e mais dezessete —, que herdam de
 `isUserConnected()` nem `removeConnectionByUserID()`. Medido: um laço sobre a
 lista inteira é erro fatal no primeiro deles. Filtre por
 `instanceof NextendSocialProvider`.
+
+### O Emogrifier do WooCommerce reescreve o atributo `style`
+
+`WC_Email::style_inline()` calcula o estilo de cada elemento a partir do
+`<style>` do template e **grava por cima** do `style` que o elemento já tinha.
+Medido no link de redefinição de senha: `<a style="word-break: break-all;">`
+saiu `<a style="font-weight: normal; text-decoration: underline; color: #663191;">`,
+e a URL vazou do cartão de 600px. Em e-mail, quem estiliza é classe com regra
+em `woocommerce_email_styles` — veja `a.rc-email-url` em
+`Reconectar_Email::estilos()`.
+
+E a cor base não é o teal: o WooCommerce escolhe texto branco ou escuro pelo
+brilho da base, e o branco sobre `#31BEB1` fica em 2,3:1. A base é a
+institucional; o teal entra só onde não carrega texto.
+
+### As variáveis do SMTP só chegam ao serviço `wordpress`
+
+`Reconectar_Email` lê `RECONECTAR_SMTP_*` do ambiente, e só o `wordpress` as
+recebe no `docker-compose.yml`. Um `wp eval 'wp_mail(…)'` pelo `wpcli` sai pelo
+`mail()` do PHP e devolve `false` — parece defeito do SMTP e é o container
+errado. Para medir o caminho do SMTP pelo CLI, passe as variáveis com `-e` (uma
+senha errada basta para ver a conexão e o TLS chegarem à autenticação).
+
+Com o SMTP ligado no desenvolvimento, todo e-mail para os endereços
+`exemplo.invalid` da carga volta como devolução para a caixa do Gmail. A carga
+corta o envio com `pre_wp_mail`; o que se fizer depois, pelo navegador, não.
 
 ## Convenções
 
