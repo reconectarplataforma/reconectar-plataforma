@@ -4659,3 +4659,35 @@ pedido em processamento, redefinição de senha do WooCommerce e do núcleo,
 detalhes de acesso, novo vendedor do Dokan e ativação do BuddyPress. Os seis
 saem com a logo, as cores e o rodapé.
 
+---
+
+## 2026-10-14 — A Comunidade com cara de rede social
+
+O BuddyPress saía com o visual cru do Nouveau: lista corrida de atividades, perfil
+com cabeçalho cinza e avatar pequeno. Só o visual mudou — Grupos e Amizades
+continuam desligados.
+
+- **Feed** — `buddypress/activity/index.php` monta três colunas: cartão do membro
+  com atalhos, o feed com "O que há de novo?" e as publicações em cartões, e
+  "Ativos recentemente". As colunas se decidem por *container query*, não pela
+  tela: três na vitrine (1286px), duas na moldura do painel da loja, uma no
+  celular, onde os atalhos viram pílulas roláveis. A ordem está no DOM, não em
+  `order` no CSS, para o foco seguir a leitura.
+- **Perfil** — capa com degradê da marca, avatar redondo sobreposto, nome e
+  @menção, abas sublinhadas e um cartão "Sobre" (membro desde, último acesso,
+  link da loja). O `<h1>` da página some do olho e fica para o leitor de tela,
+  porque o nome já está na capa.
+- **Membros** — grade de cartões com faixa colorida, avatar centralizado e nome.
+- **CSS** — `assets/css/comunidade.css`, carregado só em `is_buddypress()`. O
+  recuo do texto da publicação segue o do `marketplace.css`, que desenha a
+  barra de citação do bbPress.
+
+Medido: `scrollX` 0 em todas as páginas a 375px; avatar de 168px no desktop e
+120px no celular; texto em `#27272a` e links em `#663191`. Os 400 casos de
+`verificar-acessos.sh` passam.
+
+**Pendência técnica**
+- As regras antigas de BuddyPress em `marketplace.css` (feed, formulário,
+  filtros) convivem com as novas sem conflito visível; consolidá-las em
+  `comunidade.css` fica para um passo à parte.
+

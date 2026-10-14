@@ -144,6 +144,20 @@ function reconectar_enqueue_assets() {
 	}
 
 	/*
+	 * Só nas telas do BuddyPress. Depende do `bp-nouveau` para sair depois dele:
+	 * as regras do pacote são escritas contra `#buddypress`, e as nossas
+	 * precisam ganhar na ordem quando empatam na especificidade.
+	 */
+	if ( function_exists( 'is_buddypress' ) && is_buddypress() ) {
+		wp_enqueue_style(
+			'reconectar-comunidade',
+			$theme_uri . '/assets/css/comunidade.css',
+			wp_style_is( 'bp-nouveau', 'registered' ) ? array( 'reconectar-marketplace', 'bp-nouveau' ) : array( 'reconectar-marketplace' ),
+			reconectar_versao_asset( 'assets/css/comunidade.css' )
+		);
+	}
+
+	/*
 	 * Só no checkout, e não na tela de agradecimento — que é um endpoint da mesma
 	 * página, onde não há formulário de cobrança para recolher.
 	 *

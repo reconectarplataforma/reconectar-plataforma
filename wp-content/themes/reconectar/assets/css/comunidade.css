@@ -1,0 +1,1266 @@
+/*
+ * Comunidade: o BuddyPress vestido de rede social.
+ *
+ * Carregado só em `is_buddypress()`, depois do `bp-nouveau` (veja `enqueue.php`).
+ * O markup vem dos overrides em `buddypress/` e do que o Nouveau monta por JS —
+ * o formulário de publicação e o feed chegam por AJAX —, então boa parte destas
+ * regras alcança elementos que não existem no HTML servido.
+ *
+ * Especificidade. O Nouveau escreve quase tudo como `.buddypress-wrap …` com
+ * três ou quatro classes, e algumas regras com id (`#whats-new-form`). Todo
+ * seletor daqui começa por `#buddypress`, o que basta para vencer as de classe;
+ * contra as de id, repete-se o id no seletor. O CSS inline da capa
+ * (`bp_nouveau_theme_cover_image()`) tem **dois** ids e é vencido com três.
+ *
+ * Duas molduras. A mesma tela abre no painel do Dokan (Loja e Moderador, com a
+ * barra lateral roxa ocupando ~250px) e na vitrine (Administrador e Super
+ * Administrador, em largura cheia). Por isso as colunas se decidem por
+ * **container query** sobre o `#buddypress`, e não por media query: a 1366px de
+ * janela o feed tem ~1050px numa moldura e ~1290px na outra, e é a largura do
+ * conteúdo que decide se cabem três colunas.
+ *
+ * Tokens de cor e de fonte vêm do `:root` de `marketplace.css`. Texto sempre em
+ * `--rc-texto-forte` ou `--rc-texto`; a primária (#31BEB1) mede 2,30:1 sobre o
+ * branco e só aparece onde não carrega texto.
+ */
+
+#buddypress.buddypress-wrap {
+  --rc-texto-forte: #27272a;
+  --rc-link: var(--reconectar-cor-institucional, #663191);
+  container: rc-comunidade / inline-size;
+  font-family: inherit;
+}
+
+#buddypress.buddypress-wrap *,
+#buddypress.buddypress-wrap *::before,
+#buddypress.buddypress-wrap *::after {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Cartão comum
+   ========================================================================== */
+
+#buddypress .rc-comunidade__cartao {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
+  padding: var(--rc-espaco, 16px);
+}
+
+#buddypress .rc-comunidade__cartao + .rc-comunidade__cartao {
+  margin-top: 12px;
+}
+
+#buddypress .rc-comunidade__titulo-cartao {
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-base, 1rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  margin: 0 0 12px;
+}
+
+#buddypress .rc-comunidade__avatar {
+  border-radius: 50%;
+  display: block;
+  flex: none;
+  object-fit: cover;
+}
+
+/* ==========================================================================
+   Feed em três colunas
+   ========================================================================== */
+
+/* Uma coluna até 720px de conteúdo: atalhos viram uma faixa rolável de
+   pílulas acima do feed, e os membros ativos descem para depois dele. */
+#buddypress .rc-comunidade {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#buddypress .rc-comunidade__lateral,
+#buddypress .rc-comunidade__principal {
+  min-width: 0;
+}
+
+#buddypress .rc-comunidade__eu {
+  display: none;
+}
+
+#buddypress .rc-comunidade__atalhos {
+  /* Scroll container horizontal: `position: relative` contém os absolutos dos
+     descendentes, ou o documento passa a rolar na horizontal e a barra
+     inferior do celular se solta (armadilha do carrossel, no CLAUDE.md). */
+  overflow-x: auto;
+  padding: 8px;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+#buddypress .rc-comunidade__atalhos ul {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .rc-comunidade__atalhos a {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--rc-texto-forte);
+  display: flex;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 500;
+  gap: 8px;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  padding: 8px 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+#buddypress .rc-comunidade__atalhos a:hover,
+#buddypress .rc-comunidade__atalhos a:focus-visible {
+  background: var(--rc-fundo, #f7f7f8);
+}
+
+#buddypress .rc-comunidade__atalhos a[aria-current="page"] {
+  background: #f1eaf7;
+  color: var(--rc-link);
+}
+
+#buddypress .rc-comunidade__icone {
+  color: var(--rc-link);
+  flex: none;
+}
+
+@container rc-comunidade (min-width: 720px) {
+  #buddypress .rc-comunidade {
+    align-items: start;
+    grid-template-areas:
+      "atalhos principal"
+      "membros principal";
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  #buddypress .rc-comunidade__lateral--atalhos {
+    grid-area: atalhos;
+  }
+
+  #buddypress .rc-comunidade__principal {
+    grid-area: principal;
+  }
+
+  #buddypress .rc-comunidade__lateral--membros {
+    grid-area: membros;
+  }
+
+  #buddypress .rc-comunidade__eu {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  #buddypress .rc-comunidade__atalhos {
+    overflow: visible;
+  }
+
+  #buddypress .rc-comunidade__atalhos ul {
+    flex-direction: column;
+  }
+
+  #buddypress .rc-comunidade__atalhos a {
+    border-radius: 6px;
+    white-space: normal;
+  }
+}
+
+@container rc-comunidade (min-width: 1040px) {
+  #buddypress .rc-comunidade {
+    grid-template-areas: "atalhos principal membros";
+    grid-template-columns: 220px minmax(0, 1fr) 270px;
+    grid-template-rows: auto;
+  }
+}
+
+#buddypress .rc-comunidade__eu-link {
+  align-items: center;
+  color: var(--rc-texto-forte);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+}
+
+#buddypress .rc-comunidade__eu .rc-comunidade__avatar {
+  height: 56px;
+  width: 56px;
+}
+
+#buddypress .rc-comunidade__eu-nome {
+  font-size: var(--rc-fonte-base, 1rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+}
+
+#buddypress .rc-comunidade__eu-link:hover .rc-comunidade__eu-nome {
+  text-decoration: underline;
+}
+
+#buddypress .rc-comunidade__eu-apoio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+/* Membros ativos */
+
+#buddypress .rc-comunidade__membros {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+#buddypress .rc-comunidade__membros a {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--rc-texto-forte);
+  display: flex;
+  gap: 10px;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  text-decoration: none;
+}
+
+#buddypress .rc-comunidade__membros a:hover,
+#buddypress .rc-comunidade__membros a:focus-visible {
+  background: var(--rc-fundo, #f7f7f8);
+}
+
+#buddypress .rc-comunidade__membros .rc-comunidade__avatar {
+  height: 40px;
+  width: 40px;
+}
+
+#buddypress .rc-comunidade__membro-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#buddypress .rc-comunidade__membro-nome {
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#buddypress .rc-comunidade__membro-apoio,
+#buddypress .rc-comunidade__vazio {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  line-height: var(--rc-entrelinha-compacta, 1.4);
+}
+
+#buddypress .rc-comunidade__ver-todos {
+  color: var(--rc-link);
+  display: inline-block;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   "No que você está pensando?"
+   ========================================================================== */
+
+#buddypress #bp-nouveau-activity-form.activity-update-form {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
+  margin: 0 0 16px;
+  padding: 12px var(--rc-espaco, 16px);
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-form {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-avatar {
+  display: block;
+  flex: none;
+  margin: 0;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-avatar img {
+  border-radius: 50%;
+  height: 40px;
+  width: 40px;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-content {
+  flex: 1 1 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-textarea {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Repetir o id leva a (2,0,0) e vence o `textarea` do Storefront e o
+   `#whats-new-form textarea` do Nouveau sem `!important`. */
+#buddypress #bp-nouveau-activity-form textarea#whats-new {
+  background: var(--rc-fundo, #f7f7f8);
+  border: 1px solid transparent;
+  border-radius: 20px;
+  box-shadow: none;
+  color: var(--rc-texto-forte);
+  font-family: inherit;
+  font-size: var(--rc-fonte-base, 1rem);
+  line-height: var(--rc-entrelinha-compacta, 1.4);
+  min-height: 40px;
+  padding: 9px 16px;
+  width: 100%;
+}
+
+#buddypress #bp-nouveau-activity-form textarea#whats-new:focus {
+  background: var(--rc-superficie, #fff);
+  border-color: var(--rc-link);
+  outline: 2px solid transparent;
+}
+
+#buddypress #bp-nouveau-activity-form textarea#whats-new::placeholder {
+  color: var(--rc-texto);
+  opacity: 1;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-options,
+#buddypress #bp-nouveau-activity-form #whats-new-submit {
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-submit {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#buddypress #bp-nouveau-activity-form #aw-whats-new-submit,
+#buddypress #bp-nouveau-activity-form #whats-new-submit input[type="submit"] {
+  background: var(--rc-link);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  padding: 8px 20px;
+}
+
+#buddypress #bp-nouveau-activity-form #whats-new-submit input[type="reset"] {
+  background: none;
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: 999px;
+  color: var(--rc-texto-forte);
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  padding: 8px 16px;
+}
+
+/* ==========================================================================
+   Abas e filtros
+   ========================================================================== */
+
+#buddypress .bp-navs.dir-navs,
+#buddypress #object-nav.bp-navs,
+#buddypress #subnav.bp-navs {
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .bp-navs.dir-navs {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+#buddypress .bp-navs ul {
+  background: none;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .bp-navs ul li {
+  background: none;
+  border: 0;
+  float: none;
+  margin: 0;
+}
+
+/* As abas principais: texto escuro e sublinhado institucional na selecionada,
+   no lugar do bloco #555 do Nouveau, que pesava mais que o próprio conteúdo. */
+#buddypress .bp-navs.dir-navs ul li a,
+#buddypress #object-nav.bp-navs ul li a {
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--rc-texto);
+  display: block;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  padding: 14px 16px 11px;
+  text-decoration: none;
+}
+
+#buddypress .bp-navs.dir-navs ul li a:hover,
+#buddypress #object-nav.bp-navs ul li a:hover {
+  background: var(--rc-fundo, #f7f7f8);
+  color: var(--rc-texto-forte);
+}
+
+#buddypress .bp-navs.dir-navs ul li.selected a,
+#buddypress .bp-navs.dir-navs ul li.current a,
+#buddypress #object-nav.bp-navs ul li.selected a,
+#buddypress #object-nav.bp-navs ul li.current a {
+  background: none;
+  border-bottom-color: var(--rc-link);
+  color: var(--rc-link);
+}
+
+#buddypress .bp-navs ul li a span.count {
+  background: var(--rc-fundo, #f7f7f8);
+  border: 0;
+  border-radius: 999px;
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-2xs, 0.75rem);
+  margin-left: 4px;
+  padding: 1px 7px;
+}
+
+#buddypress .bp-navs ul li a span.count:empty {
+  display: none;
+}
+
+/* Subabas do perfil (Pessoal, Menções, Favoritos): pílulas. */
+#buddypress #subnav.bp-navs {
+  margin-bottom: 12px;
+}
+
+#buddypress #subnav.bp-navs ul {
+  background: none;
+  box-shadow: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: auto;
+}
+
+#buddypress #subnav.bp-navs ul > li {
+  display: block;
+}
+
+#buddypress #subnav.bp-navs ul li a {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: 999px;
+  color: var(--rc-texto-forte);
+  display: block;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 500;
+  padding: 6px 14px;
+  text-decoration: none;
+}
+
+#buddypress #subnav.bp-navs ul li.selected a,
+#buddypress #subnav.bp-navs ul li.current a {
+  background: var(--rc-link);
+  border-color: var(--rc-link);
+  color: #fff;
+}
+
+#buddypress .subnav-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+#buddypress .subnav-filters::before,
+#buddypress .subnav-filters::after,
+#buddypress .subnav-filters .clearfix::before,
+#buddypress .subnav-filters .clearfix::after {
+  content: none;
+}
+
+#buddypress .subnav-filters > div {
+  float: none;
+  margin: 0;
+}
+
+#buddypress .subnav-filters .subnav-search {
+  align-items: center;
+  display: flex;
+  flex: 1 1 240px;
+  gap: 8px;
+  min-width: 0;
+}
+
+#buddypress .subnav-filters .feed {
+  float: none;
+  margin: 0;
+}
+
+#buddypress .subnav-filters .feed a {
+  color: var(--rc-link);
+}
+
+#buddypress .subnav-filters .bp-search {
+  flex: 1 1 0;
+  float: none;
+  margin: 0;
+  min-width: 0;
+  width: auto;
+}
+
+#buddypress .subnav-filters .bp-search form {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: 999px;
+  display: flex;
+  margin: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* `input[type="search"]` do Storefront tem (0,1,1): o id basta. */
+#buddypress .subnav-filters .bp-search input[type="search"] {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--rc-texto-forte);
+  flex: 1 1 0;
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  min-width: 0;
+  padding: 9px 16px;
+  width: auto;
+}
+
+#buddypress .subnav-filters .bp-search button {
+  background: none;
+  border: 0;
+  color: var(--rc-texto-forte);
+  padding: 0 14px;
+}
+
+#buddypress .subnav-filters .component-filters {
+  flex: 0 0 auto;
+}
+
+#buddypress .subnav-filters .select-wrap {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#buddypress .subnav-filters .select-wrap select {
+  background: none;
+  border: 0;
+  color: var(--rc-texto-forte);
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  padding: 9px 32px 9px 16px;
+}
+
+/* ==========================================================================
+   Publicações
+   ========================================================================== */
+
+#buddypress .activity-list.item-list {
+  border: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .activity-list.item-list > li.activity-item {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
+  column-gap: 12px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  margin: 0 0 12px;
+  padding: var(--rc-espaco, 16px) var(--rc-espaco, 16px) 8px;
+}
+
+/* O clearfix do Nouveau viraria item de grade (armadilha do `ul.products`). */
+#buddypress .activity-list.item-list > li.activity-item::before,
+#buddypress .activity-list.item-list > li.activity-item::after {
+  content: none;
+}
+
+#buddypress .activity-list .activity-item .activity-avatar {
+  float: none;
+  margin: 0;
+  width: auto;
+}
+
+#buddypress .activity-list .activity-item .activity-avatar img.avatar {
+  border-radius: 50%;
+  height: 44px;
+  max-width: none;
+  width: 44px;
+}
+
+#buddypress .activity-list .activity-item .activity-content {
+  margin: 0;
+  min-width: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-header {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  line-height: var(--rc-entrelinha-compacta, 1.4);
+  margin: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-header p {
+  margin: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-header a {
+  color: var(--rc-texto-forte);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#buddypress .activity-list .activity-item .activity-header a:hover {
+  text-decoration: underline;
+}
+
+/* O "há 8 dias" sai do fim da frase e vai para a linha de baixo, como nas
+   redes sociais: a frase do BuddyPress já é longa sem ele. */
+#buddypress .activity-list .activity-item .activity-header a.activity-time-since {
+  color: var(--rc-texto);
+  display: block;
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  font-weight: 400;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+/* O recuo e a citação do bbPress ficam como `marketplace.css` os deixou. */
+#buddypress .activity-list .activity-item .activity-inner {
+  color: var(--rc-texto-forte);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+#buddypress .activity-list .activity-item .activity-inner p {
+  margin: 0 0 8px;
+}
+
+/* A barra de ações ocupa a largura do cartão, sob o avatar inclusive. */
+#buddypress .activity-list .activity-item .activity-meta.action {
+  align-items: center;
+  border-top: 1px solid var(--rc-borda, #e4e4e7);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 0 calc(-44px - 12px);
+  padding: 6px 0 0;
+}
+
+#buddypress .activity-list .activity-item .activity-meta.action .generic-button {
+  margin: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-meta.action .button {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  color: var(--rc-texto);
+  display: inline-flex;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+#buddypress .activity-list .activity-item .activity-meta.action .button:hover,
+#buddypress .activity-list .activity-item .activity-meta.action .button:focus-visible {
+  background: var(--rc-fundo, #f7f7f8);
+  color: var(--rc-texto-forte);
+}
+
+#buddypress .activity-list .activity-item .activity-meta.action .button.unfav {
+  color: var(--rc-link);
+}
+
+/* Comentários */
+
+#buddypress .activity-list .activity-item .activity-comments {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+}
+
+#buddypress .activity-list .activity-item .activity-comments ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .activity-list .activity-item .activity-comments li {
+  border: 0;
+  padding: 6px 0;
+}
+
+#buddypress .activity-list .activity-item .activity-comments .acomment-avatar img {
+  border-radius: 50%;
+  height: 32px;
+  width: 32px;
+}
+
+#buddypress .activity-list .activity-item .activity-comments .acomment-meta,
+#buddypress .activity-list .activity-item .activity-comments .acomment-content {
+  background: var(--rc-fundo, #f7f7f8);
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-sm, 0.875rem);
+}
+
+#buddypress .activity-list .activity-item .activity-comments .acomment-meta {
+  border-radius: 14px 14px 0 0;
+  padding: 8px 12px 0;
+}
+
+#buddypress .activity-list .activity-item .activity-comments .acomment-content {
+  border-radius: 0 0 14px 14px;
+  margin-top: 0;
+  padding: 2px 12px 8px;
+}
+
+#buddypress .activity-list li.load-more,
+#buddypress .activity-list li.load-newest {
+  background: none;
+  border: 0;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+#buddypress .activity-list li.load-more a,
+#buddypress .activity-list li.load-newest a {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  color: var(--rc-link);
+  display: block;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  padding: 12px;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ==========================================================================
+   Perfil
+   ========================================================================== */
+
+#buddypress .rc-perfil__topo {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
+  margin-bottom: 16px;
+  /* `clip`, não `hidden`: recorta a capa nos cantos sem criar scroll
+     container (armadilha do `position: sticky`, no CLAUDE.md). */
+  overflow: clip;
+}
+
+#buddypress #item-header.single-headers {
+  margin: 0;
+  padding: 0;
+}
+
+/* O degradê fica na moldura, atrás da capa: `#header-cover-image` recebe a
+   imagem enviada pelo CSS inline do Nouveau, e um `background-image` declarado
+   nele com três ids apagaria a capa de quem enviou uma. */
+#buddypress #item-header #cover-image-container {
+  background-color: var(--reconectar-cor-institucional, #663191);
+  background-image: linear-gradient(
+    120deg,
+    var(--reconectar-cor-institucional, #663191) 0%,
+    #8a4fb8 45%,
+    var(--reconectar-cor-primaria, #31BEB1) 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 160px;
+  position: relative;
+}
+
+#buddypress #item-header #cover-image-container #header-cover-image {
+  background-color: transparent;
+  height: 160px;
+  position: relative;
+  z-index: 0;
+}
+
+#buddypress .rc-perfil__identidade {
+  align-items: center;
+  background: var(--rc-superficie, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 var(--rc-espaco, 16px) var(--rc-espaco, 16px);
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+#buddypress .rc-perfil__avatar {
+  flex: none;
+  margin-top: -60px;
+}
+
+#buddypress .rc-perfil__avatar a {
+  display: block;
+}
+
+#buddypress .rc-perfil__avatar img.avatar {
+  background: var(--rc-superficie, #fff);
+  border: 4px solid var(--rc-superficie, #fff);
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  display: block;
+  float: none;
+  height: 120px;
+  max-width: none;
+  object-fit: cover;
+  width: 120px;
+}
+
+#buddypress .rc-perfil__dados {
+  min-width: 0;
+}
+
+#buddypress .rc-perfil__nome {
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-2xl, 1.75rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#buddypress .rc-perfil__mencao {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+#buddypress .rc-perfil__meta {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  margin: 4px 0 0;
+}
+
+#buddypress .rc-perfil__acoes {
+  margin: 0;
+}
+
+#buddypress .rc-perfil__acoes ul,
+#buddypress ul.rc-perfil__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#buddypress .rc-perfil__acoes .generic-button {
+  margin: 0;
+}
+
+#buddypress .rc-perfil__acoes .generic-button a,
+#buddypress .rc-perfil__acoes .generic-button button {
+  background: var(--rc-link);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-block;
+  font-family: inherit;
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  padding: 9px 18px;
+  text-decoration: none;
+}
+
+#buddypress .rc-perfil__acoes .generic-button a:hover,
+#buddypress .rc-perfil__acoes .generic-button button:hover {
+  background: #52277a;
+}
+
+#buddypress .rc-perfil__topo #object-nav.bp-navs {
+  border-top: 1px solid var(--rc-borda, #e4e4e7);
+  padding: 0 8px;
+}
+
+/* O `bp-priority-nav` põe a lista em `inline-block` com seletor de id; sem
+   repetir o id ela encolhe à largura do item mais largo e as abas empilham. */
+#buddypress #object-nav #member-primary-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  width: auto;
+}
+
+#buddypress #object-nav #member-primary-nav > li {
+  display: block;
+  flex: none;
+}
+
+@container rc-comunidade (min-width: 720px) {
+  #buddypress #item-header #cover-image-container {
+    background-size: 100% 240px;
+  }
+
+  #buddypress #item-header #cover-image-container #header-cover-image {
+    height: 240px;
+  }
+
+  #buddypress .rc-perfil__identidade {
+    align-items: flex-end;
+    flex-direction: row;
+    gap: 20px;
+    padding: 0 24px 20px;
+    text-align: left;
+  }
+
+  #buddypress .rc-perfil__avatar {
+    margin-top: -64px;
+  }
+
+  #buddypress .rc-perfil__avatar img.avatar {
+    height: 168px;
+    width: 168px;
+  }
+
+  #buddypress .rc-perfil__dados {
+    flex: 1 1 0;
+    padding-bottom: 6px;
+  }
+
+  #buddypress .rc-perfil__acoes {
+    padding-bottom: 8px;
+  }
+
+  #buddypress .rc-perfil__corpo--com-sobre {
+    align-items: start;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+}
+
+/* O clearfix do `.bp-wrap` viraria a primeira célula da grade e empurraria o
+   "Sobre" para a segunda coluna (armadilha do `ul.products`). */
+#buddypress .rc-perfil__corpo::before,
+#buddypress .rc-perfil__corpo::after {
+  content: none;
+}
+
+#buddypress .rc-perfil__corpo {
+  background: none;
+  border: 0;
+  margin: 0;
+}
+
+#buddypress .rc-perfil__corpo--com-sobre > .rc-perfil__sobre {
+  margin-bottom: 16px;
+}
+
+@container rc-comunidade (min-width: 720px) {
+  #buddypress .rc-perfil__corpo--com-sobre > .rc-perfil__sobre {
+    margin-bottom: 0;
+  }
+}
+
+#buddypress .rc-perfil__sobre dl {
+  margin: 0;
+}
+
+#buddypress .rc-perfil__sobre-linha + .rc-perfil__sobre-linha {
+  border-top: 1px solid var(--rc-borda, #e4e4e7);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+#buddypress .rc-perfil__sobre dt {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  font-weight: 400;
+  margin: 0;
+}
+
+#buddypress .rc-perfil__sobre dd {
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  font-weight: 600;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+#buddypress .rc-perfil__sobre dd a {
+  color: var(--rc-link);
+}
+
+#buddypress #item-body.item-body {
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+/* "Atividades de Membro" repetia o que a aba selecionada já diz, em 36px. Fica
+   como título da seção, no tamanho de título de cartão. */
+#buddypress #item-body .bp-screen-title {
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-lg, 1.25rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  margin: 0 0 12px;
+}
+
+/* A ficha da aba Perfil */
+
+#buddypress #item-body .profile .bp-widget {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  margin: 0 0 12px;
+  padding: var(--rc-espaco, 16px);
+}
+
+#buddypress #item-body .profile .bp-widget h2,
+#buddypress #item-body .profile .bp-widget h3 {
+  background: none;
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-base, 1rem);
+  font-weight: 600;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+#buddypress #item-body .profile table.profile-fields {
+  border: 0;
+  margin: 0;
+}
+
+#buddypress #item-body .profile table.profile-fields td {
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--rc-borda, #e4e4e7);
+  color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-sm, 0.875rem);
+  padding: 10px 0;
+}
+
+#buddypress #item-body .profile table.profile-fields tr:first-child td {
+  border-top: 0;
+}
+
+#buddypress #item-body .profile table.profile-fields td.label {
+  color: var(--rc-texto);
+  padding-right: 16px;
+  width: 30%;
+}
+
+/* ==========================================================================
+   Diretório de membros em cartões
+   ========================================================================== */
+
+#buddypress #members-list.item-list {
+  border: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+#buddypress #members-list.item-list::before,
+#buddypress #members-list.item-list::after {
+  content: none;
+}
+
+#buddypress #members-list.item-list > li {
+  background: var(--rc-superficie, #fff);
+  border: 1px solid var(--rc-borda, #e4e4e7);
+  border-radius: var(--rc-raio, 8px);
+  box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
+  float: none;
+  margin: 0;
+  max-width: none;
+  overflow: clip;
+  padding: 0;
+  width: auto;
+}
+
+/* Faixa de capa curta no topo do cartão, no degradê do perfil. */
+#buddypress #members-list.item-list > li .list-wrap {
+  background:
+    linear-gradient(
+      120deg,
+      var(--reconectar-cor-institucional, #663191),
+      var(--reconectar-cor-primaria, #31BEB1)
+    ) top / 100% 56px no-repeat;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding: 20px 14px 16px;
+  text-align: center;
+}
+
+#buddypress #members-list.item-list > li .item-avatar {
+  float: none;
+  margin: 0 auto 10px;
+  width: auto;
+}
+
+#buddypress #members-list.item-list > li .item-avatar img.avatar {
+  background: var(--rc-superficie, #fff);
+  border: 3px solid var(--rc-superficie, #fff);
+  border-radius: 50%;
+  height: 84px;
+  max-width: none;
+  width: 84px;
+}
+
+#buddypress #members-list.item-list > li .item {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  float: none;
+  margin: 0;
+  padding: 0;
+  width: auto;
+}
+
+#buddypress #members-list.item-list > li .item-block {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  float: none;
+  margin: 0;
+  width: auto;
+}
+
+#buddypress #members-list.item-list > li .list-title {
+  font-size: var(--rc-fonte-base, 1rem);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa, 1.25);
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+#buddypress #members-list.item-list > li .list-title a {
+  color: var(--rc-texto-forte);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#buddypress #members-list.item-list > li .list-title a:hover {
+  text-decoration: underline;
+}
+
+#buddypress #members-list.item-list > li .item-meta {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+#buddypress #members-list.item-list > li .members-meta.action,
+#buddypress #members-list.item-list > li ul.members-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  list-style: none;
+  margin: auto 0 0;
+  padding: 12px 0 0;
+}
+
+#buddypress #members-list.item-list > li .members-meta .generic-button a,
+#buddypress #members-list.item-list > li .members-meta .generic-button button {
+  background: none;
+  border: 1px solid var(--rc-link);
+  border-radius: 999px;
+  color: var(--rc-link);
+  font-family: inherit;
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  font-weight: 600;
+  padding: 6px 14px;
+}
+
+/* A última publicação cabe na lista, não no cartão: duas linhas e corta. */
+#buddypress #members-list.item-list > li .user-update {
+  border: 0;
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+#buddypress #members-list.item-list > li .user-update .update {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+}
+
+#buddypress .bp-pagination {
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs, 0.8125rem);
+}

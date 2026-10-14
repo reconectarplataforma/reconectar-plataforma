@@ -58,6 +58,9 @@ $reconectar_modulos = array(
 	'inc/forum/componentes.php',
 	'inc/forum/listagem.php',
 	'inc/forum/sidebar.php',
+
+	// Peças de rede social chamadas pelos overrides de `buddypress/`.
+	'inc/comunidade.php',
 );
 
 foreach ( $reconectar_modulos as $reconectar_modulo ) {
