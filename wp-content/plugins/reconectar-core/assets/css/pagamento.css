@@ -118,16 +118,6 @@
 	border-radius: 6px;
 }
 
-.rc-pagamento__qr-legenda {
-	font-size: var( --rc-pg-fonte-sm );
-	line-height: var( --rc-entrelinha-compacta, 1.4 );
-	color: var( --rc-pg-texto-suave );
-	/* A legenda é frase, não rótulo: a medida curta existe para ela não esticar
-	   até a borda do cartão numa tela larga. */
-	max-width: 24rem;
-	margin: 0.5rem 0 0;
-}
-
 .rc-pagamento__codigo {
 	display: block;
 	font-size: var( --rc-pg-fonte-xs );
@@ -203,6 +193,181 @@
 }
 
 /* ==========================================================================
+   Cartão da loja: QR emoldurado ao lado dos passos
+
+   O QR grande à esquerda e, à direita, o botão de copiar, os passos e os dados
+   da chave — a ordem em que se paga. Os dois lados quebram de linha sozinhos,
+   sem consulta de mídia: a base de 15rem do lado direito é o que manda os
+   passos para baixo do QR quando o cartão estreita, e o cartão mora numa
+   coluna cuja largura a tela não diz (conta do cliente ao lado do menu,
+   agradecimento do checkout em largura cheia).
+   ========================================================================== */
+
+.rc-pagamento__cabeca {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.25rem 1rem;
+	padding-bottom: 1rem;
+	margin-bottom: 1.25rem;
+	border-bottom: 1px solid var( --rc-pg-borda );
+}
+
+.rc-pagamento__cabeca .rc-pagamento__nome,
+.rc-pagamento__cabeca .rc-pagamento__valor {
+	margin: 0;
+}
+
+.rc-pagamento__cabeca .rc-pagamento__valor {
+	font-size: var( --rc-pg-fonte-md );
+}
+
+.rc-pagamento__cabeca .rc-pagamento__meio {
+	margin: 0;
+}
+
+/* --- Faixa de formas de pagamento ------------------------------------------
+
+   `Reconectar_Pagamento_Direto::imprimir_abas_de_meio()`. Grade com mínimo de
+   7rem, e não quatro colunas fixas: no celular o cartão tem uns 300px, e
+   quatro rótulos ali quebrariam "Transferência" no meio da palavra. Abaixo de
+   ~30rem a faixa vira 2×2 sozinha. */
+.rc-pagamento__cabeca:has( + .rc-pagamento__abas ) {
+	border-bottom: 0;
+	margin-bottom: 0;
+}
+
+.rc-pagamento__abas {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 7rem, 1fr ) );
+	margin: 0 0 1.5rem;
+	padding: 0;
+	list-style: none;
+	border-bottom: 1px solid var( --rc-pg-borda );
+}
+
+.rc-pagamento__aba {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.75rem 0.5rem;
+	margin: 0 0 -1px;
+	text-align: center;
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-justa, 1.25 );
+	border-bottom: 3px solid transparent;
+}
+
+.rc-pagamento__aba-icone {
+	width: 1.75rem;
+	height: 1.75rem;
+}
+
+.rc-pagamento__aba-nome {
+	font-weight: 600;
+}
+
+/* Institucional e não a primária: o teal mede 2,30:1 com branco, e aqui ele
+   colore texto. O roxo mede 8,4:1. */
+.rc-pagamento__aba--ativa {
+	color: var( --reconectar-cor-institucional, #663191 );
+	border-bottom-color: currentColor;
+}
+
+/* O texto continua em 4,8:1: esmaecer o rótulo a ponto de não ser lido não
+   ajuda ninguém a entender o que falta. Quem recua é só o ícone. */
+.rc-pagamento__aba--indisponivel {
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-pagamento__aba--indisponivel .rc-pagamento__aba-icone {
+	opacity: 0.45;
+}
+
+.rc-pagamento__aba-estado {
+	font-size: var( --rc-pg-fonte-xs );
+}
+
+.rc-pagamento__pix {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 1.5rem 2rem;
+	margin: 0 0 1.25rem;
+}
+
+/* A moldura cinza é a zona de silêncio estendida: separa o QR do branco do
+   cartão, e é o que o faz ler como "o lugar para apontar a câmera". */
+.rc-pagamento__pix .rc-pagamento__qr {
+	flex: 0 0 auto;
+	padding: 0.875rem;
+	margin: 0;
+	background: #eceff1;
+	border-radius: 12px;
+}
+
+.rc-pagamento__pix .rc-pagamento__qr-imagem {
+	width: 13.5rem;
+	border: 0;
+	border-radius: 4px;
+}
+
+/* `min-width: 0` porque a chave aleatória é uma palavra só de 36 caracteres:
+   sem ele a base mínima do item seria a chave inteira. */
+.rc-pagamento__lado {
+	flex: 1 1 15rem;
+	min-width: 0;
+}
+
+.rc-pagamento__lado .rc-pagamento__dados {
+	margin: 1rem 0 0;
+	padding-top: 1rem;
+	border-top: 1px solid var( --rc-pg-borda );
+}
+
+.rc-pagamento__passos {
+	font-size: var( --rc-pg-fonte-sm );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 1rem 0 0 1.25rem;
+	padding: 0;
+}
+
+.rc-pagamento__passos li {
+	margin: 0 0 0.5rem;
+}
+
+.rc-pagamento__passos li:last-child {
+	margin-bottom: 0;
+}
+
+/* Ao lado do QR o botão é o primeiro elemento e a ação principal da tela:
+   cor institucional cheia, que com branco mede 8,4:1. */
+.rc-pagamento__lado .rc-pagamento__copiar {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: var( --rc-pg-fonte-base );
+	font-weight: 600;
+	background: var( --reconectar-cor-institucional, #663191 );
+	color: #fff;
+	padding: 0.75rem 1.25rem;
+	min-height: 44px;
+}
+
+.rc-pagamento__lado .rc-pagamento__copiar:hover {
+	background: #522776;
+}
+
+.rc-pagamento__copiar-icone {
+	width: 1.125rem;
+	height: 1.125rem;
+	flex: 0 0 auto;
+}
+
+/* ==========================================================================
+   Comprovante — o lado do comprador/* ==========================================================================
    Comprovante — o lado do comprador
 
    O bloco mora dentro de `.rc-pagamento__loja`, portanto herda os tokens
@@ -670,104 +835,130 @@
 	color: #9c3a1e;
 }
 
-/* --- Detalhes do pedido recolhidos ------------------------------------- */
+/* --- Pagamento e resumo do pedido em duas colunas ------------------------ */
 
-/* `Reconectar_Pagamento_Direto::abrir_detalhes_recolhidos()`. Só existe quando
-   há bloco de pagamento acima: nasce fechado, e o resumo tem cara de controle
-   — borda, seta e alvo de 44px — para que ninguém o leia como um título solto
-   e deixe de conferir o pedido. */
-.rc-pedido-detalhes {
+/* `Reconectar_Pagamento_Direto::imprimir_coluna_de_pagamento()` e
+   `abrir_resumo_lateral()`. Flex com quebra, e não grade com consulta de mídia,
+   pela mesma razão do cartão: quem decide se cabem as duas colunas é a largura
+   disponível, não a da tela. O crescimento 999 contra 1 faz o pagamento levar
+   toda a sobra; o resumo fica nos 20rem dele.
+
+   As bases somam 54rem, mais o vão: abaixo disso o resumo cai para **depois** do
+   pagamento, que é a ordem do DOM — no celular quem chega à tela quer pagar,
+   e a conferência vem em seguida. */
+.rc-pedido-pagamento {
 	--rc-pg-borda: #dfe3e6;
 	--rc-pg-texto-suave: #717171;
 	--rc-pg-fonte-sm: var( --rc-fonte-sm, 0.875rem );
+	--rc-pg-fonte-base: var( --rc-fonte-base, 1rem );
 	--rc-pg-fonte-md: var( --rc-fonte-md, 1.125rem );
+	--rc-pg-fonte-lg: var( --rc-fonte-lg, 1.25rem );
 
 	box-sizing: border-box;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0 2rem;
 	margin: 0 0 2rem;
-	border: 1px solid var( --rc-pg-borda );
-	border-radius: 8px;
-	background: #fff;
 }
 
-.rc-pedido-detalhes *,
-.rc-pedido-detalhes *::before,
-.rc-pedido-detalhes *::after {
+.rc-pedido-pagamento *,
+.rc-pedido-pagamento *::before,
+.rc-pedido-pagamento *::after {
 	box-sizing: inherit;
 }
 
-.rc-pedido-detalhes__resumo {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 0.25rem 0.75rem;
-	min-height: 44px;
-	padding: 0.875rem 3rem 0.875rem 1.25rem;
-	position: relative;
-	cursor: pointer;
-	list-style: none;
+.rc-pedido-pagamento__principal {
+	flex: 999 1 32rem;
+	min-width: 0;
 }
 
-/* O marcador nativo some nos dois motores — `list-style` no Firefox, o
-   pseudo-elemento no WebKit — e a seta autoral gira com o estado. */
-.rc-pedido-detalhes__resumo::-webkit-details-marker {
+.rc-pedido-pagamento__principal .rc-pagamento {
+	margin-bottom: 0;
+}
+
+.rc-pedido-pagamento__resumo {
+	flex: 1 1 20rem;
+	min-width: 0;
+	margin: 0 0 2rem;
+	padding: 1.25rem;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 8px;
+	background: #f9fafb;
+	font-size: var( --rc-pg-fonte-sm );
+}
+
+/* Classe repetida: o `h2` do Storefront na conta chega a 2em por seletor de
+   elemento com contexto, e uma classe sozinha perde. */
+.rc-pedido-pagamento__titulo.rc-pedido-pagamento__titulo {
+	font-size: var( --rc-pg-fonte-lg );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.75rem;
+}
+
+/* O título que o WooCommerce imprime repete o da coluna, que já é um `<h2>`. */
+.rc-pedido-pagamento__resumo .woocommerce-order-details__title {
 	display: none;
 }
 
-.rc-pedido-detalhes__resumo::after {
-	content: "";
-	position: absolute;
-	top: 50%;
-	right: 1.25rem;
-	width: 0.5rem;
-	height: 0.5rem;
-	border-right: 2px solid currentColor;
-	border-bottom: 2px solid currentColor;
-	transform: translateY( -75% ) rotate( 45deg );
-	transition: transform 0.15s ease;
+.rc-pedido-pagamento__resumo .woocommerce-order-details,
+.rc-pedido-pagamento__resumo .woocommerce-customer-details {
+	margin: 0 0 1.25rem;
 }
 
-.rc-pedido-detalhes[open] > .rc-pedido-detalhes__resumo::after {
-	transform: translateY( -25% ) rotate( -135deg );
+.rc-pedido-pagamento__resumo .woocommerce-customer-details:last-child {
+	margin-bottom: 0;
 }
 
-@media ( prefers-reduced-motion: reduce ) {
-	.rc-pedido-detalhes__resumo::after {
-		transition: none;
-	}
-}
-
-.rc-pedido-detalhes__resumo:focus-visible {
-	outline: 3px solid var( --reconectar-cor-institucional, #663191 );
-	outline-offset: 2px;
-	border-radius: 8px;
-}
-
-.rc-pedido-detalhes__titulo {
-	margin: 0;
+.rc-pedido-pagamento__resumo .woocommerce-column__title {
 	font-size: var( --rc-pg-fonte-md );
-	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 0 0 0.5rem;
 }
 
-.rc-pedido-detalhes__apoio {
-	font-size: var( --rc-pg-fonte-sm );
+/* A tabela do pedido é de terceiro e vem com o cabeçalho e o zebrado do
+   Storefront; numa coluna de 22rem eles viram ruído, e o que fica é a lista
+   de itens com o valor alinhado à direita, como num recibo. */
+.rc-pedido-pagamento__resumo table.order_details {
+	margin: 0;
+	border: 0;
+	background: transparent;
+}
+
+.rc-pedido-pagamento__resumo table.order_details thead {
+	display: none;
+}
+
+.rc-pedido-pagamento__resumo table.order_details th,
+.rc-pedido-pagamento__resumo table.order_details td {
+	padding: 0.5rem 0;
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var( --rc-pg-borda );
+	vertical-align: top;
+}
+
+.rc-pedido-pagamento__resumo table.order_details td.product-total,
+.rc-pedido-pagamento__resumo table.order_details tfoot td {
+	text-align: right;
+	white-space: nowrap;
+	padding-left: 1rem;
+}
+
+.rc-pedido-pagamento__resumo table.order_details tfoot th {
+	font-weight: 400;
 	color: var( --rc-pg-texto-suave );
 }
 
-.rc-pedido-detalhes__corpo {
-	padding: 0 1.25rem 1.25rem;
-	border-top: 1px solid var( --rc-pg-borda );
+/* Sem destaque por posição: a última linha do `tfoot` do WooCommerce é o meio
+   de pagamento, não o total, e ela não traz classe que diga qual é qual. */
+.rc-pedido-pagamento__resumo table.order_details tfoot tr:last-child th,
+.rc-pedido-pagamento__resumo table.order_details tfoot tr:last-child td {
+	border-bottom: 0;
 }
 
-/* O título que o WooCommerce imprime repete o do resumo, que já é um `<h2>`. */
-.rc-pedido-detalhes__corpo .woocommerce-order-details__title {
-	display: none;
-}
-
-.rc-pedido-detalhes__corpo .woocommerce-order-details,
-.rc-pedido-detalhes__corpo .woocommerce-customer-details {
-	margin: 1.25rem 0 0;
-}
-
-.rc-pedido-detalhes__corpo .woocommerce-column__title {
-	font-size: var( --rc-pg-fonte-md );
+.rc-pedido-pagamento__resumo address {
+	font-style: normal;
+	border: 0;
+	padding: 0;
+	overflow-wrap: anywhere;
 }
