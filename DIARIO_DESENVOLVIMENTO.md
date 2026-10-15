@@ -4696,3 +4696,15 @@ Medido: `scrollX` 0 em todas as páginas a 375px; avatar de 168px no desktop e
   num contêiner que é flex, `grid-column` em item flex e `align-items: stretch`,
   que em flex equivale ao `normal`.
 
+
+## 2026-10-15 — Poppins em WOFF2
+
+Os 18 arquivos da Poppins ganharam versão WOFF2 ao lado do TTF, convertidos uma
+vez com o `fontTools`, sem etapa de build: 2,7 MB viraram 924 KB, cerca de um
+terço por peso. O `fonts.css` declara o WOFF2 primeiro e o TTF como recuo; o
+navegador baixa só o primeiro formato que entende. Os TTF ficam porque a carga
+de demonstração desenha texto nas imagens com o GD, que só lê TTF.
+
+Medido na home a 1280px: quatro pesos baixados, todos `.woff2`, com cerca de
+48 KB cada, e o corpo em Poppins. A Thoge segue em `.otf`: a licença dela não
+foi conferida, e a conversão fica para quando for.
