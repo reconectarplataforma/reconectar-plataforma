@@ -11,6 +11,9 @@
  * seletor daqui começa por `#buddypress`, o que basta para vencer as de classe;
  * contra as de id, repete-se o id no seletor. O CSS inline da capa
  * (`bp_nouveau_theme_cover_image()`) tem **dois** ids e é vencido com três.
+ * Na moldura do painel da loja soma-se o Dokan:
+ * `.dokan-dashboard .dokan-dashboard-content ul li` zera margem e padding de
+ * todo item de lista, com (0,3,2) — o id passa à frente também dela.
  *
  * Duas molduras. A mesma tela abre no painel do Dokan (Loja e Moderador, com a
  * barra lateral roxa ocupando ~250px) e na vitrine (Administrador e Super
@@ -295,25 +298,35 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  margin-bottom: 0;
 }
 
+/* O Nouveau flutua avatar, campo e opções e dá ao avatar 15% da largura da
+   coluna, crescendo até os 150px do arquivo pedido. */
 #buddypress #bp-nouveau-activity-form #whats-new-avatar {
   display: block;
   flex: none;
+  float: none;
   margin: 0;
+  padding: 0;
+  width: auto;
 }
 
 #buddypress #bp-nouveau-activity-form #whats-new-avatar img {
   border-radius: 50%;
+  display: block;
   height: 40px;
+  max-width: none;
   width: 40px;
 }
 
 #buddypress #bp-nouveau-activity-form #whats-new-content {
   flex: 1 1 0;
+  float: none;
   margin: 0;
   min-width: 0;
   padding: 0;
+  width: auto;
 }
 
 #buddypress #bp-nouveau-activity-form #whats-new-textarea {
@@ -353,15 +366,26 @@
 #buddypress #bp-nouveau-activity-form #whats-new-submit {
   background: none;
   border: 0;
+  float: none;
   margin: 0;
   padding: 0;
   width: 100%;
 }
 
+/* O `margin: 0` acima desfaz também os 55px que o Nouveau dá ao `.in-profile`
+   para desviar do avatar flutuante. */
 #buddypress #bp-nouveau-activity-form #whats-new-submit {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* O Nouveau fixa o botão em `width: 8em`, 112px, e "Publicar atualização" em
+   Poppins saía cortado em "Publicar atualiz". */
+#buddypress #bp-nouveau-activity-form #whats-new-submit input {
+  margin: 0;
+  width: auto;
 }
 
 #buddypress #bp-nouveau-activity-form #aw-whats-new-submit,
@@ -512,26 +536,39 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: space-between;
   margin: 0 0 12px;
 }
 
+/* Os contêineres viram flex e trazem `clearfix` do Nouveau: o pseudo-elemento
+   ocuparia posição na linha — a armadilha do clearfix que vira grid item. */
 #buddypress .subnav-filters::before,
 #buddypress .subnav-filters::after,
 #buddypress .subnav-filters .clearfix::before,
-#buddypress .subnav-filters .clearfix::after {
+#buddypress .subnav-filters .clearfix::after,
+#buddypress .subnav-filters .subnav-search::before,
+#buddypress .subnav-filters .subnav-search::after,
+#buddypress .subnav-filters .component-filters::before,
+#buddypress .subnav-filters .component-filters::after {
   content: none;
 }
 
-#buddypress .subnav-filters > div {
+#buddypress .subnav-filters > div,
+#buddypress .subnav-filters .component-filters .filter {
   float: none;
   margin: 0;
 }
 
+/* `min-width: 0` corta a cadeia de largura mínima: sem ele, a do campo de
+   busca subia até aqui e a linha passava da tela — medido, 386px numa coluna
+   de 327 a 375px. */
 #buddypress .subnav-filters .subnav-search {
   align-items: center;
   display: flex;
   flex: 1 1 240px;
+  flex-wrap: wrap;
   gap: 8px;
+  max-width: 520px;
   min-width: 0;
 }
 
@@ -552,6 +589,8 @@
   width: auto;
 }
 
+/* Campo e lupa numa caixa só: o Nouveau desenha a borda em cada um, e a lupa
+   ficava separada do campo por um vão. */
 #buddypress .subnav-filters .bp-search form {
   background: var(--rc-superficie, #fff);
   border: 1px solid var(--rc-borda, #e4e4e7);
@@ -571,6 +610,7 @@
   flex: 1 1 0;
   font-family: inherit;
   font-size: var(--rc-fonte-sm, 0.875rem);
+  margin: 0;
   min-width: 0;
   padding: 9px 16px;
   width: auto;
@@ -580,6 +620,8 @@
   background: none;
   border: 0;
   color: var(--rc-texto-forte);
+  flex: 0 0 auto;
+  margin: 0;
   padding: 0 14px;
 }
 
@@ -608,6 +650,7 @@
    ========================================================================== */
 
 #buddypress .activity-list.item-list {
+  background: none;
   border: 0;
   list-style: none;
   margin: 0;
@@ -619,8 +662,8 @@
   border: 1px solid var(--rc-borda, #e4e4e7);
   border-radius: var(--rc-raio, 8px);
   box-shadow: var(--rc-sombra, 0 1px 3px rgba(0, 0, 0, 0.08));
-  column-gap: 12px;
   display: grid;
+  gap: 12px;
   grid-template-columns: 44px minmax(0, 1fr);
   margin: 0 0 12px;
   padding: var(--rc-espaco, 16px) var(--rc-espaco, 16px) 8px;
@@ -640,6 +683,7 @@
 
 #buddypress .activity-list .activity-item .activity-avatar img.avatar {
   border-radius: 50%;
+  display: block;
   height: 44px;
   max-width: none;
   width: 44px;
@@ -655,6 +699,7 @@
   font-size: var(--rc-fonte-sm, 0.875rem);
   line-height: var(--rc-entrelinha-compacta, 1.4);
   margin: 0;
+  width: auto;
 }
 
 #buddypress .activity-list .activity-item .activity-header p {
@@ -682,20 +727,32 @@
   width: fit-content;
 }
 
-/* O recuo e a citação do bbPress ficam como `marketplace.css` os deixou. */
-#buddypress .activity-list .activity-item .activity-inner {
+/* O bbPress põe a resposta do fórum em citação, com a barra à esquerda; o
+   Nouveau soma a ela um fundo cinza e 1em de recuo nos quatro lados. A barra
+   basta para dizer que o texto é citado, e os 12px à esquerda são o vão entre
+   ela e o texto. */
+#buddypress .activity-list .activity-item .activity-content .activity-inner {
+  background: transparent;
   color: var(--rc-texto-forte);
+  font-size: var(--rc-fonte-base, 1rem);
   line-height: 1.5;
+  margin: 8px 0 0;
   overflow-wrap: anywhere;
+  padding: 0 0 0 12px;
 }
 
 #buddypress .activity-list .activity-item .activity-inner p {
   margin: 0 0 8px;
 }
 
+#buddypress .activity-list .activity-item .activity-inner p:last-child {
+  margin-bottom: 0;
+}
+
 /* A barra de ações ocupa a largura do cartão, sob o avatar inclusive. */
 #buddypress .activity-list .activity-item .activity-meta.action {
   align-items: center;
+  background: none;
   border-top: 1px solid var(--rc-borda, #e4e4e7);
   display: flex;
   flex-wrap: wrap;

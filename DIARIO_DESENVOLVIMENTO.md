@@ -4686,8 +4686,13 @@ Medido: `scrollX` 0 em todas as páginas a 375px; avatar de 168px no desktop e
 120px no celular; texto em `#27272a` e links em `#663191`. Os 400 casos de
 `verificar-acessos.sh` passam.
 
-**Pendência técnica**
-- As regras antigas de BuddyPress em `marketplace.css` (feed, formulário,
-  filtros) convivem com as novas sem conflito visível; consolidá-las em
-  `comunidade.css` fica para um passo à parte.
+**Consolidação do CSS**
+- As regras de BuddyPress que moravam em `marketplace.css` (feed, formulário,
+  filtros) foram para `comunidade.css`, e a seção saiu de lá. Quase todas já
+  perdiam a cascata para as novas; vieram só as declarações que ainda valiam,
+  com os comentários que as explicam. Conferido por estilo computado de cada
+  elemento do `#buddypress`, antes e depois, em feed, perfil, ficha e membros, a
+  1366px e 375px, nas duas molduras: mudaram só três propriedades inertes — grid
+  num contêiner que é flex, `grid-column` em item flex e `align-items: stretch`,
+  que em flex equivale ao `normal`.
 
