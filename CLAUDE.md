@@ -49,6 +49,8 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/verificar-incubadora.php` | operações da Incubadora por WP-CLI, chamado pelo `verificar-acessos.sh` |
 | `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
 | `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
+| `wp-content/themes/reconectar/buddypress/` | overrides do Nouveau: feed em três colunas, perfil com capa |
+| `wp-content/themes/reconectar/inc/comunidade.php` | colunas laterais e cartão "Sobre" da Comunidade; CSS em `assets/css/comunidade.css` |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
 | `docs/PERFIS_E_PERMISSOES.md` | os cinco atores e a matriz de permissões |
 | `docs/ROTEIRO_PERFIS.md` | roteiro de demonstração, com credenciais |
@@ -676,6 +678,41 @@ bbPress 2.6.18 e BuddyPress 14.5.2 são instalados e ativados pelo
 `provision.sh`. O fórum de perguntas e respostas é bbPress com uma camada
 autoral por cima (`Reconectar_Forum`, no plugin; `inc/forum/`, no tema; overrides
 em `themes/reconectar/bbpress/`).
+
+### A capa do perfil do Nouveau traz CSS inline com dois IDs
+
+Com capa ligada, o BuddyPress imprime um `<style>` no `<head>` com seletores como
+`#buddypress #item-header-cover-image #item-header-avatar img.avatar`, de
+especificidade (3,1,1) ou mais. Nenhuma regra autoral por classe chega lá: medido,
+o avatar do perfil saía com **4px**, com a nossa regra de 168px aplicada no
+DevTools e perdida na cascata.
+
+O override `buddypress/members/single/cover-image-header.php` **tira** os IDs
+`#item-header-cover-image`, `#item-header-avatar` e `#item-header-content`, e o
+CSS inline passa a não casar com nada. Ficam `#cover-image-container` e
+`#header-cover-image`, porque o `cover-image.js` os procura para trocar a capa sem
+recarregar. O degradê da marca vai no `#cover-image-container`, **atrás** da
+capa: no `#header-cover-image` ele apagaria a capa que o membro enviar.
+
+### O `bp-priority-nav` deixa a lista de abas em `inline-block`
+
+O script que recolhe abas excedentes num "Mais" põe `#member-primary-nav` e o
+`ul` das subabas em `display: inline-block`, por estilo próprio. Os `<li>` então
+empilham um embaixo do outro — Atividade, Perfil, Notificações em coluna, e
+Pessoal, Menções, Favoritos também. A regra autoral em classe perde para o
+seletor de ID dele.
+
+`#buddypress #object-nav #member-primary-nav { display: flex }` e
+`#buddypress #subnav.bp-navs ul { display: flex }`, com `> li { display: block }`.
+Veja `assets/css/comunidade.css`.
+
+### O `.bp-wrap` do BuddyPress tem clearfix — e ele vira célula de grade
+
+A mesma armadilha do clearfix do tema pai, registrada adiante, com outro
+contêiner. Ao pôr `.bp-wrap` (o corpo do perfil) em grade de duas colunas, o
+`::before` virou o primeiro item: o cartão "Sobre" caiu na segunda coluna e as
+subabas na primeira. O mesmo aconteceu em `li.activity-item`, `#members-list` e
+`.subnav-filters`. `content: none` em cada um.
 
 ### O bbPress processa POST em `template_redirect` **prioridade 8**
 

@@ -278,7 +278,12 @@ function reconectar_marcar_pagina_sem_titulo( $classes ) {
 
 	$listagem_de_lojas = function_exists( 'dokan_is_store_listing' ) && dokan_is_store_listing();
 
-	if ( $do_woocommerce || $listagem_de_lojas ) {
+	// No perfil da Comunidade o nome sai no cabeçalho com capa, logo abaixo
+	// (`buddypress/members/single/cover-image-header.php`), e o `<h1>` repetiria
+	// a mesma palavra duas vezes, uma em cima da outra.
+	$perfil_da_comunidade = function_exists( 'bp_is_user' ) && bp_is_user();
+
+	if ( $do_woocommerce || $listagem_de_lojas || $perfil_da_comunidade ) {
 		$classes[] = 'rc-sem-titulo-de-pagina';
 	}
 
