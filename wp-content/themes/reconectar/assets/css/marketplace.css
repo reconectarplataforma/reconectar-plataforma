@@ -5968,3 +5968,337 @@
   font-weight: 600;
   line-height: var(--rc-entrelinha-compacta);
 }
+
+/* ==========================================================================
+   Detalhes da conta
+   ==========================================================================
+
+   `woocommerce/myaccount/form-edit-account.php`. Antes, cada campo ocupava os
+   ~1400px da coluna num monitor largo — um e-mail de 25 caracteres dentro de
+   uma caixa de 1400 —, e a troca de senha vinha embaixo, num bloco cinza.
+   Agora são dois cartões que dividem a linha quando cabem e empilham quando
+   não cabem. O teto de 72rem é o que mantém cada campo numa largura que ainda
+   lembra o tamanho do que se digita nele. */
+.rc-editar-conta {
+  max-width: 72rem;
+}
+
+.rc-editar-conta__topo {
+  margin-bottom: 1.5rem;
+}
+
+.rc-editar-conta__titulo {
+  margin: 0 0 0.25rem;
+  color: #27272a;
+  font-size: var(--rc-fonte-2xl);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+.rc-editar-conta__descricao {
+  margin: 0;
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+}
+
+/* `min( 100%, 22rem )`: sem o `min`, um celular de 320px, com 288 úteis,
+   receberia uma coluna de 352 e rolaria na horizontal. */
+.rc-editar-conta__grade {
+  display: grid;
+  grid-template-columns: repeat( auto-fit, minmax( min( 100%, 22rem ), 1fr ) );
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* O `<fieldset>` leva as regras do Storefront — fundo cinza, padding de
+   1.618em e `margin` própria —, e o seletor repete a classe para chegar a
+   (0,2,0) sem depender da ordem dos arquivos. `min-width: 0` porque o
+   `<fieldset>` nasce com `min-width: min-content` e estouraria a coluna da
+   grade com qualquer campo largo dentro dele. */
+.rc-editar-conta__cartao.rc-editar-conta__cartao {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 1.5rem;
+  border: 1px solid var(--rc-borda);
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+/* A `<legend>` não aceita ficar dentro do padding como um `<h3>` qualquer: o
+   navegador a encaixa na borda do `<fieldset>`. `float: left` com largura
+   cheia é o que a devolve ao fluxo do cartão, e quem limpa o float é o
+   parágrafo de ajuda logo abaixo. */
+.rc-editar-conta__subtitulo.rc-editar-conta__subtitulo {
+  float: left;
+  width: 100%;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  /* Explícita porque a `<legend>` herda o cinza do `legend` do Storefront, e o
+     `<h2>` do outro cartão, o do título — os dois saíam em tons diferentes. */
+  color: #27272a;
+  font-size: var(--rc-fonte-md);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  background: none;
+}
+
+.rc-editar-conta__subtitulo + * {
+  clear: both;
+}
+
+/* Nome e sobrenome. A grade substitui o par `form-row-first`/`-last` do
+   Storefront, que usa `float` com 47% e deixava um vão de largura arbitrária
+   entre os dois campos. */
+.rc-editar-conta__dupla {
+  display: grid;
+  grid-template-columns: repeat( auto-fit, minmax( min( 100%, 10rem ), 1fr ) );
+  gap: 0 1rem;
+}
+
+.rc-editar-conta .form-row.form-row {
+  float: none;
+  width: auto;
+  margin: 0 0 1.125rem;
+  padding: 0;
+}
+
+.rc-editar-conta__cartao > .form-row:last-child {
+  margin-bottom: 0;
+}
+
+.rc-editar-conta label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+}
+
+/* O Storefront veste os campos por seletor de atributo, com (0,1,1), e pinta
+   tudo de #f2f2f2 sem borda: dentro de um cartão branco, o campo vira só uma
+   faixa cinza, sem contorno que diga onde clicar. A classe repetida chega a
+   (0,3,0). A borda em #8a8a8a mede 3,4:1 sobre o branco — o critério 1.4.11
+   pede 3:1 para o contorno de um componente. */
+.rc-editar-conta .input-text.input-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #8a8a8a;
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+  box-shadow: none;
+  color: #27272a;
+  font-size: var(--rc-fonte-base);
+}
+
+.rc-editar-conta .input-text.input-text:focus {
+  border-color: var(--reconectar-cor-institucional);
+  outline: 3px solid color-mix( in srgb, var(--reconectar-cor-institucional) 30%, transparent );
+  outline-offset: 0;
+}
+
+.rc-editar-conta__ajuda {
+  display: block;
+  margin-top: 0.375rem;
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-editar-conta__ajuda--grupo {
+  margin: 0 0 1.25rem;
+  font-size: var(--rc-fonte-sm);
+}
+
+/* O botão de mostrar senha é injetado pelo JavaScript do WooCommerce e herda o
+   fundo teal de todo `button` do Storefront: um olho branco sobre #31BEB1 mede
+   2,3:1, abaixo dos 3:1 que o critério 1.4.11 pede para ícone que é o único
+   indício do controle. Vira um ícone dentro do campo, no cinza do texto, e o
+   campo ganha recuo à direita para a senha não correr por baixo dele. */
+.rc-editar-conta .password-input {
+  display: block;
+  position: relative;
+}
+
+.rc-editar-conta .password-input .input-text.input-text {
+  padding-right: 3rem;
+}
+
+.rc-editar-conta button.show-password-input {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 var(--rc-raio) var(--rc-raio) 0;
+  background: transparent;
+  color: var(--rc-texto);
+  line-height: 44px;
+}
+
+.rc-editar-conta button.show-password-input:hover,
+.rc-editar-conta button.show-password-input:focus {
+  background: transparent;
+  color: var(--reconectar-cor-institucional);
+}
+
+/* O original o pinta de #e8e8e8 quando a senha está à mostra — 1,2:1 sobre o
+   campo branco, o ícone some exatamente no estado que precisa ser desfeito. */
+.rc-editar-conta button.show-password-input.display-password::after {
+  color: var(--reconectar-cor-institucional);
+}
+
+.rc-editar-conta :is(button, input):focus-visible {
+  outline: 3px solid var(--reconectar-cor-institucional);
+  outline-offset: 2px;
+}
+
+.rc-editar-conta__acoes {
+  margin: 1.5rem 0 0;
+}
+
+/* Institucional pelo mesmo motivo do botão de entrar: branco sobre o teal dá
+   2,3:1. O elemento entra no seletor porque `.woocommerce button.button` soma
+   (0,2,1). */
+.rc-editar-conta button.rc-editar-conta__salvar {
+  min-height: 44px;
+  padding: 0.625rem 1.75rem;
+  border: 0;
+  border-radius: var(--rc-raio);
+  background: var(--reconectar-cor-institucional);
+  color: #ffffff;
+  font-size: var(--rc-fonte-base);
+  font-weight: 600;
+}
+
+.rc-editar-conta button.rc-editar-conta__salvar:hover,
+.rc-editar-conta button.rc-editar-conta__salvar:focus {
+  background: #52277a;
+  color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  .rc-editar-conta__cartao.rc-editar-conta__cartao {
+    padding: 1.125rem;
+  }
+
+  .rc-editar-conta button.rc-editar-conta__salvar {
+    width: 100%;
+  }
+}
+
+/* Endereços de cobrança e entrega, que eram a tela "Endereços". Cada um ocupa a
+   largura do formulário, abaixo dos dois cartões de cima: são dez campos, e
+   espremidos numa coluna de 22rem virariam uma lista comprida ao lado de um
+   cartão de senha quase vazio. Os seletores repetem as classes de cartão para
+   vencer a `margin: 0` dele. */
+.rc-editar-conta__cartao.rc-editar-conta__endereco {
+  margin-top: 1.5rem;
+}
+
+.rc-editar-conta__cartao.rc-editar-conta__endereco[hidden] {
+  display: none;
+}
+
+/* Os filhos diretos são só `.form-row`, porque o `address-i18n.js` os reordena
+   com `appendTo` — qualquer outro elemento aqui dentro iria para o fim da lista.
+   A largura vem das classes `form-row-first`/`-last`/`-wide` que o WooCommerce
+   já põe por país: o par dividindo a linha, o resto ocupando as duas colunas. */
+.rc-editar-conta__campos {
+  display: grid;
+  grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+  gap: 0 1rem;
+}
+
+.rc-editar-conta__campos > .form-row {
+  grid-column: 1 / -1;
+}
+
+.rc-editar-conta__campos > :is(.form-row-first, .form-row-last) {
+  grid-column: auto;
+}
+
+/* Cidade com estado, CEP com telefone. O WooCommerce os marca `form-row-wide`,
+   e dez campos de largura cheia faziam um cartão de 900px de altura com metade
+   de cada linha em branco. Pelo sufixo do id, que é o mesmo nos dois tipos e
+   sobrevive à reordenação do `address-i18n.js`. */
+.rc-editar-conta__campos > :is([id$="_city_field"], [id$="_state_field"], [id$="_postcode_field"], [id$="_phone_field"]) {
+  grid-column: auto;
+}
+
+/* O `<select>` do estado e o do país, quando o selectWoo não os substitui: o
+   Storefront declara `select { font-family: "Source Sans Pro" }` e tira a
+   Poppins herdada. */
+.rc-editar-conta__campos select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #8a8a8a;
+  border-radius: var(--rc-raio);
+  background-color: var(--rc-superficie);
+  color: #27272a;
+  font-family: inherit;
+  font-size: var(--rc-fonte-base);
+}
+
+.rc-editar-conta__campos .select2-container .select2-selection--single {
+  box-sizing: border-box;
+  height: 44px;
+  border: 1px solid #8a8a8a;
+  border-radius: var(--rc-raio);
+  background: var(--rc-superficie);
+}
+
+.rc-editar-conta__campos .select2-container .select2-selection--single .select2-selection__rendered {
+  padding: 0 2.25rem 0 0.75rem;
+  color: #27272a;
+  font-size: var(--rc-fonte-base);
+  line-height: 42px;
+}
+
+.rc-editar-conta__campos .select2-container .select2-selection--single .select2-selection__arrow {
+  height: 42px;
+}
+
+.rc-editar-conta__campos .optional {
+  color: var(--rc-texto);
+  font-weight: 400;
+}
+
+.rc-editar-conta__mesmo {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rc-borda);
+}
+
+/* 20px de lado e a cor institucional no `accent-color`: a caixa nativa do
+   navegador, que já é acessível por teclado e anuncia o estado, só que num
+   tamanho que se acerta com o dedo e com contorno que passa dos 3:1. */
+.rc-editar-conta__mesmo-caixa {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--reconectar-cor-institucional);
+}
+
+.rc-editar-conta .rc-editar-conta__mesmo label {
+  margin: 0;
+  font-size: var(--rc-fonte-base);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .rc-editar-conta__campos {
+    grid-template-columns: minmax( 0, 1fr );
+  }
+}
