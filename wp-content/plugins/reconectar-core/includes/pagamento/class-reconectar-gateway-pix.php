@@ -106,13 +106,6 @@ class Reconectar_Gateway_Pix extends Reconectar_Gateway_Direto {
 		$tipos  = Reconectar_Pagamento_Pix::tipos_de_chave();
 		$rotulo = isset( $tipos[ $dados['tipo_chave'] ] ) ? $tipos[ $dados['tipo_chave'] ] : $dados['tipo_chave'];
 
-		echo '<dl class="rc-pagamento__dados">';
-		self::imprimir_par( __( 'Tipo de chave', 'reconectar-core' ), $rotulo );
-		self::imprimir_par( __( 'Chave PIX', 'reconectar-core' ), $dados['chave'] );
-		self::imprimir_par( __( 'Beneficiário', 'reconectar-core' ), $dados['beneficiario'] );
-		self::imprimir_par( __( 'Cidade', 'reconectar-core' ), $dados['cidade'] );
-		echo '</dl>';
-
 		/*
 		 * O `txid` sai do número do pedido, e é ele que a loja usa para conciliar o
 		 * PIX recebido. É também a razão de este bloco não existir no checkout: lá
@@ -127,10 +120,6 @@ class Reconectar_Gateway_Pix extends Reconectar_Gateway_Direto {
 			$pedido instanceof WC_Order ? (string) $pedido->get_id() : ''
 		);
 
-		if ( ! $codigo ) {
-			return;
-		}
-
 		/*
 		 * O QR Code é exclusivo da tela. Não é escolha de layout: SVG embutido é
 		 * removido por Gmail, Outlook e outros clientes, e `data:` em `<img>` é
@@ -138,7 +127,9 @@ class Reconectar_Gateway_Pix extends Reconectar_Gateway_Direto {
 		 * como um retângulo vazio sobre o copia-e-cola que funciona — pior que a
 		 * ausência dela, pelo mesmo raciocínio do botão de copiar logo abaixo.
 		 */
-		if ( 'tela' === $contexto ) {
+		$qr = '';
+
+		if ( $codigo && 'tela' === $contexto ) {
 			$qr = reconectar_qr_svg(
 				$codigo,
 				sprintf(
@@ -148,14 +139,42 @@ class Reconectar_Gateway_Pix extends Reconectar_Gateway_Direto {
 				),
 				array( 'class' => 'rc-pagamento__qr-imagem' )
 			);
+		}
 
-			if ( $qr ) {
-				printf(
-					'<figure class="rc-pagamento__qr">%1$s<figcaption class="rc-pagamento__qr-legenda">%2$s</figcaption></figure>',
-					$qr, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG montado por reconectar_qr_svg(), que escapa cada atributo.
-					esc_html__( 'Abra o app do seu banco, escolha PIX e aponte a câmera para este código.', 'reconectar-core' )
-				);
-			}
+		/*
+		 * Com o QR na tela, o bloco vira duas colunas: a imagem emoldurada de um
+		 * lado e, do outro, o botão de copiar no topo, os passos e os dados da
+		 * chave. É a ordem em que se paga — escanear ou copiar, seguir o app,
+		 * conferir o beneficiário. Os passos substituem a legenda que ficava sob a
+		 * imagem, que dizia a mesma coisa em uma frase só.
+		 *
+		 * Sem QR — e-mail, ou falha ao montar a imagem — o bloco segue o desenho
+		 * de antes, linear, com o botão depois do código.
+		 */
+		if ( $qr ) {
+			echo '<div class="rc-pagamento__pix">';
+			printf(
+				'<figure class="rc-pagamento__qr">%s</figure>',
+				$qr // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG montado por reconectar_qr_svg(), que escapa cada atributo.
+			);
+			echo '<div class="rc-pagamento__lado">';
+			self::imprimir_botao_de_copiar( $codigo );
+			self::imprimir_passos();
+		}
+
+		echo '<dl class="rc-pagamento__dados">';
+		self::imprimir_par( __( 'Tipo de chave', 'reconectar-core' ), $rotulo );
+		self::imprimir_par( __( 'Chave PIX', 'reconectar-core' ), $dados['chave'] );
+		self::imprimir_par( __( 'Beneficiário', 'reconectar-core' ), $dados['beneficiario'] );
+		self::imprimir_par( __( 'Cidade', 'reconectar-core' ), $dados['cidade'] );
+		echo '</dl>';
+
+		if ( $qr ) {
+			echo '</div></div>';
+		}
+
+		if ( ! $codigo ) {
+			return;
 		}
 
 		printf(
@@ -169,13 +188,53 @@ class Reconectar_Gateway_Pix extends Reconectar_Gateway_Direto {
 
 		// O botão só existe na tela: e-mail não executa JavaScript, e um botão
 		// morto no corpo da mensagem seria pior que a ausência dele.
-		if ( 'tela' === $contexto ) {
-			printf(
-				'<button type="button" class="rc-pagamento__copiar" data-rc-copiar="%1$s">%2$s</button>',
-				esc_attr( $codigo ),
-				esc_html__( 'Copiar código', 'reconectar-core' )
-			);
+		if ( 'tela' === $contexto && ! $qr ) {
+			self::imprimir_botao_de_copiar( $codigo );
 		}
+	}
+
+	/**
+	 * Imprime o botão que copia o código copia-e-cola.
+	 *
+	 * O ícone é decorativo e sai do nome acessível: o texto do botão já diz o
+	 * que ele faz.
+	 *
+	 * @param string $codigo Payload do BR Code.
+	 * @return void
+	 */
+	private static function imprimir_botao_de_copiar( $codigo ) {
+		printf(
+			'<button type="button" class="rc-pagamento__copiar" data-rc-copiar="%1$s">%2$s<span>%3$s</span></button>',
+			esc_attr( $codigo ),
+			'<svg class="rc-pagamento__copiar-icone" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+			esc_html__( 'Copiar código PIX', 'reconectar-core' )
+		);
+	}
+
+	/**
+	 * Imprime os passos de pagamento ao lado do QR Code.
+	 *
+	 * `<ol>` porque a ordem importa e o leitor de tela anuncia "1 de 3". Nenhum
+	 * passo fala em prazo de validade: o BR Code daqui é estático e não expira,
+	 * e um relógio na tela seria um número inventado para apressar o comprador.
+	 *
+	 * @return void
+	 */
+	private static function imprimir_passos() {
+		$permitido = array( 'strong' => array() );
+		$passos    = array(
+			__( '<strong>Abra o app do seu banco</strong> e entre na área PIX.', 'reconectar-core' ),
+			__( 'Escolha <strong>Ler QR Code</strong> e aponte a câmera para o código — ou copie o código e use <strong>PIX Copia e Cola</strong>.', 'reconectar-core' ),
+			__( 'Confira o valor e o beneficiário e <strong>confirme o pagamento</strong>.', 'reconectar-core' ),
+		);
+
+		echo '<ol class="rc-pagamento__passos">';
+
+		foreach ( $passos as $passo ) {
+			printf( '<li>%s</li>', wp_kses( $passo, $permitido ) );
+		}
+
+		echo '</ol>';
 	}
 
 	/**

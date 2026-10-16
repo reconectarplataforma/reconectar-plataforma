@@ -93,10 +93,10 @@ class Reconectar_Pagamento_Direto {
 		add_action( 'woocommerce_checkout_update_order_meta', array( __CLASS__, 'gravar_meios_no_pedido' ), 30 );
 		add_action( 'woocommerce_thankyou', array( __CLASS__, 'instrucoes_na_tela' ), 5 );
 		add_action( 'woocommerce_view_order', array( __CLASS__, 'instrucoes_no_pedido' ), 5 );
-		add_action( 'woocommerce_thankyou', array( __CLASS__, 'abrir_detalhes_recolhidos' ), 9 );
-		add_action( 'woocommerce_thankyou', array( __CLASS__, 'fechar_detalhes_recolhidos' ), 11 );
-		add_action( 'woocommerce_view_order', array( __CLASS__, 'abrir_detalhes_recolhidos' ), 9 );
-		add_action( 'woocommerce_view_order', array( __CLASS__, 'fechar_detalhes_recolhidos' ), 11 );
+		add_action( 'woocommerce_thankyou', array( __CLASS__, 'abrir_resumo_lateral' ), 9 );
+		add_action( 'woocommerce_thankyou', array( __CLASS__, 'fechar_resumo_lateral' ), 11 );
+		add_action( 'woocommerce_view_order', array( __CLASS__, 'abrir_resumo_lateral' ), 9 );
+		add_action( 'woocommerce_view_order', array( __CLASS__, 'fechar_resumo_lateral' ), 11 );
 		add_action( 'woocommerce_email_before_order_table', array( __CLASS__, 'instrucoes_no_email' ), 10, 4 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'carregar_assets' ) );
 	}
@@ -143,7 +143,7 @@ class Reconectar_Pagamento_Direto {
 			'reconectar-pagamento',
 			RECONECTAR_CORE_URL . 'assets/css/pagamento.css',
 			array(),
-			'0.3.0'
+			'0.5.5'
 		);
 		wp_enqueue_script(
 			'reconectar-pagamento',
@@ -895,7 +895,7 @@ class Reconectar_Pagamento_Direto {
 	 * @return void
 	 */
 	public static function instrucoes_na_tela( $pedido_id ) {
-		self::imprimir_instrucoes( wc_get_order( $pedido_id ) );
+		self::imprimir_coluna_de_pagamento( wc_get_order( $pedido_id ) );
 	}
 
 	/**
@@ -926,69 +926,179 @@ class Reconectar_Pagamento_Direto {
 			return;
 		}
 
-		self::imprimir_instrucoes( $pedido );
+		self::imprimir_coluna_de_pagamento( $pedido );
 	}
 
 	/**
-	 * Abre o `<details>` que recolhe os detalhes do pedido sob o pagamento.
+	 * Imprime as instruções como coluna principal de uma grade com o resumo.
+	 *
+	 * A grade abre aqui, na prioridade 5, e fecha em `fechar_resumo_lateral()`,
+	 * na 11 — o resumo do pedido é a `woocommerce_order_details_table` da 10, e
+	 * só entre esses dois pontos dá para pô-la ao lado do pagamento sem
+	 * sobrescrever template do WooCommerce.
+	 *
+	 * A saída passa por buffer porque só depois de imprimir se sabe se houve o
+	 * que imprimir: pedido sem loja a pagar não gera bloco, e uma grade aberta
+	 * em volta de nada deixaria a tabela do pedido espremida numa coluna lateral
+	 * ao lado do vazio. A decisão de abrir é a mesma de `tem_resumo_lateral()`,
+	 * que a 9 e a 11 refazem — é o que mantém as três tags casadas.
+	 *
+	 * @param WC_Order|false $pedido Pedido.
+	 * @return void
+	 */
+	private static function imprimir_coluna_de_pagamento( $pedido ) {
+		ob_start();
+		self::imprimir_instrucoes( $pedido );
+		$html = ob_get_clean();
+
+		if ( '' === $html ) {
+			return;
+		}
+
+		if ( ! self::tem_resumo_lateral( $pedido->get_id() ) ) {
+			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- já escapado em imprimir_instrucoes().
+			return;
+		}
+
+		echo '<div class="rc-pedido-pagamento"><div class="rc-pedido-pagamento__principal">';
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- já escapado em imprimir_instrucoes().
+		echo '</div>';
+	}
+
+	/**
+	 * Imprime a faixa de formas de pagamento no topo do cartão da loja.
+	 *
+	 * Só o meio escolhido no checkout fica ativo; os outros aparecem esmaecidos
+	 * e marcados como indisponíveis. Cartão e boleto ainda não existem na
+	 * plataforma — a faixa antecipa o desenho de quando houver escolha, sem
+	 * oferecer o que não há.
+	 *
+	 * É lista, não `role="tablist"`: nada aqui troca de painel. Abas que não
+	 * respondem às setas, ou botões desabilitados que nunca se habilitam,
+	 * anunciariam ao leitor de tela um controle que não existe. O item ativo
+	 * leva `aria-current`, e o estado dos outros sai em texto, não só na cor.
+	 *
+	 * O meio ativo vem do pedido, não da ordem da lista: uma loja que recebe
+	 * por transferência acende a aba dela, e a do PIX fica indisponível.
+	 *
+	 * @param string                      $ativo    ID do gateway desta loja.
+	 * @param Reconectar_Gateway_Direto[] $gateways Gateways diretos, por ID.
+	 * @return void
+	 */
+	private static function imprimir_abas_de_meio( $ativo, $gateways ) {
+		$icones = array(
+			'pix'           => '<path d="M12 3l4 4-4 4-4-4zM12 13l4 4-4 4-4-4zM3 12l4-4 4 4-4 4zM13 12l4-4 4 4-4 4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+			'transferencia' => '<path d="M4 10h16M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18M12 3l9 5H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+			'cartao'        => '<rect x="3" y="5.5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18M6.5 15h4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+			'boleto'        => '<path d="M4 5v14M7 5v14M9.5 5v14M13 5v14M15.5 5v14M18 5v14M20 5v14" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+		);
+
+		$abas = array(
+			array(
+				'id'    => self::GATEWAY_PIX,
+				'icone' => 'pix',
+				'nome'  => isset( $gateways[ self::GATEWAY_PIX ] ) ? $gateways[ self::GATEWAY_PIX ]->get_title() : __( 'PIX', 'reconectar-core' ),
+			),
+			array(
+				'id'    => self::GATEWAY_TRANSFERENCIA,
+				'icone' => 'transferencia',
+				// O título do gateway é "Transferência bancária": longo demais para
+				// a aba de 7rem, que no celular divide a linha com outra.
+				'nome'  => __( 'Transferência', 'reconectar-core' ),
+			),
+			array(
+				'id'    => '',
+				'icone' => 'cartao',
+				'nome'  => __( 'Cartão de crédito', 'reconectar-core' ),
+			),
+			array(
+				'id'    => '',
+				'icone' => 'boleto',
+				'nome'  => __( 'Boleto', 'reconectar-core' ),
+			),
+		);
+
+		printf(
+			'<ul class="rc-pagamento__abas" aria-label="%s">',
+			esc_attr__( 'Formas de pagamento', 'reconectar-core' )
+		);
+
+		foreach ( $abas as $aba ) {
+			$ativa = '' !== $aba['id'] && $ativo === $aba['id'];
+
+			printf(
+				'<li class="rc-pagamento__aba%1$s"%2$s><svg class="rc-pagamento__aba-icone" viewBox="0 0 24 24" aria-hidden="true" focusable="false">%3$s</svg><span class="rc-pagamento__aba-nome">%4$s</span>%5$s</li>',
+				$ativa ? ' rc-pagamento__aba--ativa' : ' rc-pagamento__aba--indisponivel',
+				$ativa ? ' aria-current="true"' : '',
+				$icones[ $aba['icone'] ], // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG literal desta função.
+				esc_html( $aba['nome'] ),
+				$ativa ? '' : '<span class="rc-pagamento__aba-estado">' . esc_html__( 'indisponível', 'reconectar-core' ) . '</span>'
+			);
+		}
+
+		echo '</ul>';
+	}
+
+	/**
+	 * Abre a coluna lateral com o resumo do pedido, ao lado do pagamento.
 	 *
 	 * Com pagamento pendente, a tela existe para pagar: itens, totais e endereço
-	 * de cobrança são conferência, e impressos por extenso empurravam o
-	 * comprador que fechou várias lojas para longe do resumo de cada uma.
-	 * `<details>` e não abas: é um bloco secundário só, e o elemento nativo
-	 * traz teclado, estado expandido e anúncio no leitor de tela sem uma linha
-	 * de JavaScript. Nasce **fechado**.
+	 * de cobrança são conferência. Antes eles iam recolhidos num `<details>`
+	 * abaixo do pagamento, porque impressos por extenso empurravam o comprador
+	 * de várias lojas para longe do QR de cada uma. Na coluna lateral eles não
+	 * empurram nada — no monitor ficam ao lado, e no celular a coluna cai para
+	 * **depois** do pagamento —, então o recolhimento deixou de pagar o clique a
+	 * mais que custava para conferir um total.
 	 *
 	 * Prioridade 9 e 11 em volta de `woocommerce_order_details_table`, que está
 	 * na 10 nos dois ganchos — ela imprime a tabela **e** o endereço de
-	 * cobrança, então os dois entram no recolhimento. Se algum código a tirar
-	 * dali (o bloco de confirmação do WooCommerce faz isso), o `<details>` não
-	 * abre: recolher nada seria um botão que expande o vazio.
+	 * cobrança, então os dois entram na coluna. Se algum código a tirar dali (o
+	 * bloco de confirmação do WooCommerce faz isso), nem a grade abre: uma
+	 * coluna lateral vazia ao lado do pagamento só roubaria largura dele.
 	 *
-	 * O `<h2>` vai dentro do `<summary>`, que o HTML permite, para que o bloco
-	 * siga navegável por cabeçalho mesmo fechado; o título que o WooCommerce
-	 * imprime lá dentro sai pelo CSS, por repetir este.
+	 * `<aside>` com rótulo: é conteúdo complementar ao principal, e o leitor de
+	 * tela o lista entre as regiões da página pelo título.
 	 *
 	 * @param int $pedido_id Identificador do pedido.
 	 * @return void
 	 */
-	public static function abrir_detalhes_recolhidos( $pedido_id ) {
-		if ( ! self::recolhe_detalhes( $pedido_id ) ) {
+	public static function abrir_resumo_lateral( $pedido_id ) {
+		if ( ! self::tem_resumo_lateral( $pedido_id ) ) {
 			return;
 		}
 
 		printf(
-			'<details class="rc-pedido-detalhes"><summary class="rc-pedido-detalhes__resumo"><h2 class="rc-pedido-detalhes__titulo">%1$s</h2><span class="rc-pedido-detalhes__apoio">%2$s</span></summary><div class="rc-pedido-detalhes__corpo">',
-			esc_html__( 'Detalhes do pedido', 'reconectar-core' ),
-			esc_html__( 'Itens, totais e endereço de cobrança', 'reconectar-core' )
+			'<aside class="rc-pedido-pagamento__resumo" aria-labelledby="rc-resumo-%1$d"><h2 class="rc-pedido-pagamento__titulo" id="rc-resumo-%1$d">%2$s</h2>',
+			(int) $pedido_id,
+			esc_html__( 'Resumo do pedido', 'reconectar-core' )
 		);
 	}
 
 	/**
-	 * Fecha o `<details>` aberto por `abrir_detalhes_recolhidos()`.
+	 * Fecha a coluna aberta por `abrir_resumo_lateral()` e a grade inteira.
 	 *
-	 * A condição é a mesma, recalculada: nada mudou entre a 9 e a 11 que a
-	 * altere, e guardar estado entre as duas chamadas seria mais um lugar para
-	 * o par sair desencontrado.
+	 * A condição é a mesma, recalculada: nada mudou entre a 5 e a 11 que a
+	 * altere, e guardar estado entre as chamadas seria mais um lugar para as
+	 * tags saírem desencontradas.
 	 *
 	 * @param int $pedido_id Identificador do pedido.
 	 * @return void
 	 */
-	public static function fechar_detalhes_recolhidos( $pedido_id ) {
-		if ( ! self::recolhe_detalhes( $pedido_id ) ) {
+	public static function fechar_resumo_lateral( $pedido_id ) {
+		if ( ! self::tem_resumo_lateral( $pedido_id ) ) {
 			return;
 		}
 
-		echo '</div></details>';
+		echo '</aside></div>';
 	}
 
 	/**
-	 * Diz se os detalhes deste pedido se recolhem na tela corrente.
+	 * Diz se este pedido ganha a grade com resumo lateral na tela corrente.
 	 *
 	 * @param int $pedido_id Identificador do pedido.
 	 * @return bool
 	 */
-	private static function recolhe_detalhes( $pedido_id ) {
+	private static function tem_resumo_lateral( $pedido_id ) {
 		$gancho = current_action();
 
 		return isset( self::$instrucoes_na_tela[ (int) $pedido_id ] )
@@ -1102,15 +1212,23 @@ class Reconectar_Pagamento_Direto {
 		foreach ( $blocos as $indice => $bloco ) {
 			$somado += (float) $bloco['total'];
 
+			// Dois filhos, "como pagar" e o comprovante, para que a folha de estilo
+			// possa pô-los lado a lado no cartão largo. Soltos, os seis ou sete
+			// elementos da instrução não teriam como formar uma coluna.
 			echo '<div class="rc-pagamento__loja">';
+			echo '<div class="rc-pagamento__instrucao">';
+			// Nome e valor numa faixa só, como cabeçalho do cartão: são as duas
+			// coisas que o comprador confere antes de abrir o app do banco.
+			echo '<div class="rc-pagamento__cabeca">';
 			printf(
 				'<h3 class="rc-pagamento__nome">%s</h3>',
 				esc_html( self::nome_da_loja( $bloco['loja_id'] ) )
 			);
 
 			// Só quando há mais de um meio no pedido: com um meio só, o `<h2>` acima
-			// já disse qual é, e repetir em cada bloco seria ruído.
-			if ( count( $titulos ) > 1 && isset( $meios[ $indice ] ) ) {
+			// já disse qual é, e repetir em cada bloco seria ruído. Na tela quem diz
+			// o meio de cada loja são as abas, logo abaixo.
+			if ( 'tela' !== $contexto && count( $titulos ) > 1 && isset( $meios[ $indice ] ) ) {
 				printf(
 					'<p class="rc-pagamento__meio">%s</p>',
 					esc_html( $meios[ $indice ]->get_title() )
@@ -1127,6 +1245,11 @@ class Reconectar_Pagamento_Direto {
 					)
 				)
 			);
+			echo '</div>';
+
+			if ( 'tela' === $contexto && isset( $meios[ $indice ] ) ) {
+				self::imprimir_abas_de_meio( $meios[ $indice ]->id, $gateways );
+			}
 
 			if ( isset( $meios[ $indice ] ) ) {
 				$meios[ $indice ]->imprimir_instrucao( $bloco['loja_id'], $bloco['total'], $bloco['pedido'], $contexto );
@@ -1136,6 +1259,8 @@ class Reconectar_Pagamento_Direto {
 					esc_html__( 'Não há instrução de pagamento registrada para esta loja. Entre em contato com a plataforma antes de pagar.', 'reconectar-core' )
 				);
 			}
+
+			echo '</div>';
 
 			/*
 			 * Só no contexto `tela`: um `<form>` dentro do e-mail do pedido não

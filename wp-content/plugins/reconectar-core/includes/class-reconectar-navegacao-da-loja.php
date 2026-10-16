@@ -63,6 +63,7 @@ class Reconectar_Navegacao_Da_Loja {
 		add_filter( 'dokan_get_dashboard_nav', array( __CLASS__, 'registrar_menu' ) );
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'ocultar_itens_do_menu' ), 20 );
 		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'acrescentar_item_loja_ao_menu' ), 20 );
+		add_filter( 'wp_nav_menu_objects', array( __CLASS__, 'levar_minha_conta_aos_modulos' ), 20 );
 		add_filter( 'widget_custom_html_content', array( __CLASS__, 'ocultar_links_do_widget' ), 20 );
 		add_filter( 'dokan_dashboard_nav_active', array( __CLASS__, 'marcar_item_ativo' ) );
 		add_filter( 'body_class', array( __CLASS__, 'classes_do_corpo' ), 30 );
@@ -694,6 +695,56 @@ class Reconectar_Navegacao_Da_Loja {
 		// O walker imprime na ordem do array, e não por `menu_order`: inserir na
 		// posição basta.
 		return $resultado;
+	}
+
+	/**
+	 * Aponta o item "Minha Conta" do menu principal para a tela de módulos, para a loja.
+	 *
+	 * Para a loja, "Minha conta" do WooCommerce é tela de comprador — pedidos e
+	 * endereços —, e a casa dela é a tela de módulos, para onde o login já a
+	 * leva (`Reconectar_Modulos::depois_do_login()`). O item do menu era o único
+	 * caminho que ainda a devolvia a `/my-account/`, longe da escolha de módulo.
+	 * O menu da conta continua alcançável pelo item "Módulos" de lá, ao contrário.
+	 *
+	 * O item é reconhecido pelo ID da página da conta, como a âncora de
+	 * `acrescentar_item_loja_ao_menu()`, e pelo mesmo motivo: o rótulo o
+	 * administrador renomeia, e o slug difere entre os ambientes
+	 * (`/my-account/` aqui, `/minha-conta/` em produção).
+	 *
+	 * O destaque de item corrente sai junto: o núcleo o calculou pela URL antiga,
+	 * e sem tirá-lo o item acenderia em `/my-account/`, para onde já não leva.
+	 *
+	 * @param WP_Post[] $itens Itens do menu, já decorados pelo núcleo.
+	 * @return WP_Post[]
+	 */
+	public static function levar_minha_conta_aos_modulos( $itens ) {
+		if ( ! $itens || ! self::mora_no_painel() || ! function_exists( 'wc_get_page_id' ) ) {
+			return $itens;
+		}
+
+		$pagina_da_conta = (int) wc_get_page_id( 'myaccount' );
+
+		if ( $pagina_da_conta <= 0 ) {
+			return $itens;
+		}
+
+		$destaques = array( 'current-menu-item', 'current_page_item', 'current-menu-ancestor', 'current-menu-parent', 'current_page_parent', 'current_page_ancestor' );
+
+		foreach ( $itens as $item ) {
+			if ( 'post_type' !== $item->type || (int) $item->object_id !== $pagina_da_conta ) {
+				continue;
+			}
+
+			$item->url     = Reconectar_Modulos::url();
+			$item->current = Reconectar_Modulos::eh_a_tela();
+			$item->classes = array_values( array_diff( (array) $item->classes, $destaques ) );
+
+			if ( $item->current ) {
+				$item->classes[] = 'current-menu-item';
+			}
+		}
+
+		return $itens;
 	}
 
 	/**
