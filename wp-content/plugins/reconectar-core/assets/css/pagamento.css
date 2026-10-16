@@ -24,6 +24,7 @@
 	--rc-pg-fonte-xl: var( --rc-fonte-xl, 1.5rem );
 
 	box-sizing: border-box;
+	container: rc-pagamento / inline-size;
 	margin: 0 0 2rem;
 }
 
@@ -229,10 +230,19 @@
 
 /* --- Faixa de formas de pagamento ------------------------------------------
 
-   `Reconectar_Pagamento_Direto::imprimir_abas_de_meio()`. Grade com mínimo de
-   7rem, e não quatro colunas fixas: no celular o cartão tem uns 300px, e
-   quatro rótulos ali quebrariam "Transferência" no meio da palavra. Abaixo de
-   ~30rem a faixa vira 2×2 sozinha. */
+   `Reconectar_Pagamento_Direto::imprimir_abas_de_meio()`. Duas formas, e quem
+   escolhe é a largura do **cartão** (container query), não a da tela — no
+   desktop o cartão divide a linha com o resumo lateral.
+
+   Estreito: grade 2 × 2 de botões contornados, e a ativa marcada por borda e
+   fundo. Duas tentativas anteriores falharam aqui. A grade `auto-fit` com
+   sublinhado saía 3 + 1 ou 2 × 2, com a aba ativa sublinhada numa linha e a
+   linha da faixa embaixo da outra. A faixa única com rolagem lateral escondia
+   meios de pagamento atrás de um gesto. Quatro colunas não cabem: medido a
+   375px, a faixa tem 301px, e "Transferência" pede 85px mesmo em 12px.
+
+   Largo (a partir de 30rem, quatro colunas de 7,5rem): a faixa de abas
+   sublinhadas do desenho de referência. */
 .rc-pagamento__cabeca:has( + .rc-pagamento__abas ) {
 	border-bottom: 0;
 	margin-bottom: 0;
@@ -240,11 +250,11 @@
 
 .rc-pagamento__abas {
 	display: grid;
-	grid-template-columns: repeat( auto-fit, minmax( 7rem, 1fr ) );
+	grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+	gap: 0.5rem;
 	margin: 0 0 1.5rem;
 	padding: 0;
 	list-style: none;
-	border-bottom: 1px solid var( --rc-pg-borda );
 }
 
 .rc-pagamento__aba {
@@ -252,12 +262,30 @@
 	flex-direction: column;
 	align-items: center;
 	gap: 0.375rem;
-	padding: 0.75rem 0.5rem;
-	margin: 0 0 -1px;
+	min-width: 0;
+	padding: 0.625rem 0.5rem;
+	margin: 0;
 	text-align: center;
 	font-size: var( --rc-pg-fonte-sm );
 	line-height: var( --rc-entrelinha-justa, 1.25 );
-	border-bottom: 3px solid transparent;
+	border: 1px solid var( --rc-pg-borda );
+	border-radius: 8px;
+}
+
+@container rc-pagamento (min-width: 30rem) {
+	.rc-pagamento__abas {
+		grid-template-columns: repeat( 4, minmax( 0, 1fr ) );
+		gap: 0;
+		border-bottom: 1px solid var( --rc-pg-borda );
+	}
+
+	.rc-pagamento__aba {
+		padding: 0.75rem 0.5rem;
+		margin: 0 0 -1px;
+		border: 0;
+		border-bottom: 3px solid transparent;
+		border-radius: 0;
+	}
 }
 
 .rc-pagamento__aba-icone {
@@ -273,7 +301,14 @@
    colore texto. O roxo mede 8,4:1. */
 .rc-pagamento__aba--ativa {
 	color: var( --reconectar-cor-institucional, #663191 );
-	border-bottom-color: currentColor;
+	border-color: currentColor;
+	background: #f6f1fa;
+}
+
+@container rc-pagamento (min-width: 30rem) {
+	.rc-pagamento__aba--ativa {
+		background: transparent;
+	}
 }
 
 /* O texto continua em 4,8:1: esmaecer o rótulo a ponto de não ser lido não
@@ -937,11 +972,26 @@
 	vertical-align: top;
 }
 
+.rc-pedido-pagamento__resumo table.order_details {
+	width: 100%;
+}
+
+.rc-pedido-pagamento__resumo table.order_details td.product-name {
+	overflow-wrap: anywhere;
+}
+
+/* O `nowrap` vai no valor, não na célula: a última linha do `tfoot` é o meio
+   de pagamento, e num pedido de várias lojas ele sai "PIX e Transferência
+   bancária" — travado numa linha só, empurrava a tabela inteira para fora do
+   cartão. */
 .rc-pedido-pagamento__resumo table.order_details td.product-total,
 .rc-pedido-pagamento__resumo table.order_details tfoot td {
 	text-align: right;
-	white-space: nowrap;
 	padding-left: 1rem;
+}
+
+.rc-pedido-pagamento__resumo table.order_details .woocommerce-Price-amount {
+	white-space: nowrap;
 }
 
 .rc-pedido-pagamento__resumo table.order_details tfoot th {
@@ -954,6 +1004,121 @@
 .rc-pedido-pagamento__resumo table.order_details tfoot tr:last-child th,
 .rc-pedido-pagamento__resumo table.order_details tfoot tr:last-child td {
 	border-bottom: 0;
+}
+
+/* Subpedidos: o Dokan imprime, depois da tabela do pedido, um `<h2>`, um aviso
+   e uma tabela de cinco colunas com botão (`sub-orders.php`). Na coluna de
+   20rem ela media 392px num espaço de 278 e cortava o "Visualizar". Cada
+   subpedido vira um bloco de duas colunas — número e total em cima, data e
+   status embaixo, botão à direita —, que cabe em qualquer largura. */
+.rc-pedido-pagamento__resumo .woocommerce-order-details > header h2 {
+	font-size: var( --rc-pg-fonte-md );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+	margin: 1.25rem 0 0.5rem;
+}
+
+.rc-pedido-pagamento__resumo .dokan-info {
+	margin: 0 0 0.75rem;
+	padding: 0.75rem;
+	border: 0;
+	border-left: 3px solid var( --reconectar-cor-primaria, #31beb1 );
+	border-radius: 4px;
+	background: #fff;
+	color: var( --rc-pg-texto-suave );
+	font-size: var( --rc-fonte-xs, 0.8125rem );
+	line-height: var( --rc-entrelinha-compacta, 1.4 );
+}
+
+/* O ícone do aviso é absoluto e conta com um recuo à esquerda que o aviso
+   daqui não tem: ele caía em cima de "Observação". */
+.rc-pedido-pagamento__resumo .dokan-info::before {
+	display: none;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders,
+.rc-pedido-pagamento__resumo table.my_account_orders tbody {
+	display: block;
+	width: 100%;
+	margin: 0;
+	border: 0;
+	background: transparent;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders thead {
+	display: none;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders tr {
+	display: grid;
+	grid-template-columns: minmax( 0, 1fr ) auto;
+	grid-template-areas:
+		"numero total"
+		"data   acao"
+		"status acao";
+	gap: 0.125rem 1rem;
+	padding: 0.625rem 0;
+	border-bottom: 1px solid var( --rc-pg-borda );
+	background: transparent;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders tr:last-child {
+	border-bottom: 0;
+}
+
+/* O `!important` responde ao `style` inline que o Dokan põe na célula de
+   status. O zebrado do `table-striped` do Bootstrap 5.3 não é `background`:
+   é um `box-shadow` inset de 9999px, e só zerá-lo tira o cinza. */
+.rc-pedido-pagamento__resumo table.my_account_orders td {
+	display: block;
+	padding: 0 !important;
+	border: 0;
+	background: transparent !important;
+	box-shadow: none !important;
+	text-align: left !important;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-number {
+	grid-area: numero;
+	font-weight: 600;
+}
+
+/* Sem o cabeçalho da tabela, "3198" sozinho não diz o que é. */
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-number a::before {
+	content: "Pedido nº ";
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-total {
+	grid-area: total;
+	text-align: right !important;
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-total .woocommerce-Price-amount {
+	white-space: nowrap;
+	font-weight: 600;
+	color: #333;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-date {
+	grid-area: data;
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-status {
+	grid-area: status;
+	color: var( --rc-pg-texto-suave );
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders td.order-actions {
+	grid-area: acao;
+	align-self: end;
+	justify-self: end;
+}
+
+.rc-pedido-pagamento__resumo table.my_account_orders .button {
+	padding: 0.375rem 0.75rem;
+	font-size: var( --rc-fonte-xs, 0.8125rem );
+	white-space: nowrap;
 }
 
 .rc-pedido-pagamento__resumo address {
