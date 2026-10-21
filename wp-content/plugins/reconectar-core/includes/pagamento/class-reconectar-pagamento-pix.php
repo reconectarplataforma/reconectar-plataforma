@@ -146,16 +146,19 @@ class Reconectar_Pagamento_Pix {
 	/**
 	 * Ícone do método na lista.
 	 *
-	 * @param string $icone  Ícone atual.
+	 * O filtro devolve uma URL: o template do Dokan a põe num `<img src>`.
+	 * Markup aqui saía como imagem quebrada em Configurações → Pagamento.
+	 *
+	 * @param string $icone  URL do ícone atual.
 	 * @param string $metodo Método sendo desenhado.
-	 * @return string Ícone.
+	 * @return string URL do ícone.
 	 */
 	public static function icone( $icone, $metodo ) {
 		if ( self::METODO !== $metodo ) {
 			return $icone;
 		}
 
-		return '<i class="fas fa-bolt" aria-hidden="true"></i>';
+		return RECONECTAR_CORE_URL . 'assets/img/meio-pix.svg';
 	}
 
 	/**
