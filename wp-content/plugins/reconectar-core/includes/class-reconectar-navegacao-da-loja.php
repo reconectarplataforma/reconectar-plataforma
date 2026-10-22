@@ -551,7 +551,7 @@ class Reconectar_Navegacao_Da_Loja {
 			);
 		}
 
-		// Enquetes e categorias do fórum, que os dois perfis operavam no
+		// Enquetes, categorias do fórum e campanhas, que os dois perfis operavam no
 		// `/wp-admin`. Logo depois da Incubadora do Moderador (155) e antes das
 		// ferramentas da comunidade. Sem `#content`: `/gestao/enquetes/` é
 		// prefixo de `/gestao/enquetes/12/`, e ali é o prefixo que deve acender
@@ -577,9 +577,18 @@ class Reconectar_Navegacao_Da_Loja {
 					'permission' => 'edit_forums',
 				);
 			}
+
+			$nav['rc-gestao-campanhas'] = array(
+				'title'      => __( 'Campanhas', 'reconectar-core' ),
+				'icon'       => '<i class="fas fa-bullhorn"></i>',
+				'icon_name'  => 'Megaphone',
+				'url'        => Reconectar_Painel_Gestao::url( Reconectar_Painel_Campanhas::AREA ),
+				'pos'        => 158,
+				'permission' => Reconectar_Permissoes::CAP_GERIR_CAMPANHAS,
+			);
 		}
 
-		// Campanhas, publicações e comentários ainda são moderados no
+		// Publicações e comentários ainda são moderados no
 		// `/wp-admin`, e o item é a saída explícita para lá. Sai da moldura, e o
 		// rótulo diz isso: um nome de tela ("Comentários") prometeria que ela
 		// abre aqui.

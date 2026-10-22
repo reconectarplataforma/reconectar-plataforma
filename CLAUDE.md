@@ -39,7 +39,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/icones-de-categoria.php` | associa os ícones SVG às categorias; chamado pelo provisionamento e pela carga |
 | `wp-content/themes/reconectar/assets/icones/categorias/` | os ícones de categoria, autorais e versionados |
 | `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador, Moderador e Super Administrador escolhem Mercado, Incubadora ou Praça a cada login; Loja e Super Administrador têm ainda o cartão do painel |
-| `…/includes/class-reconectar-painel-gestao.php` | a rota `/gestao/<area>/` na moldura do Dokan: enquetes (`…-painel-enquetes.php`) e categorias do fórum (`…-painel-foruns.php`), para Administrador e Moderador sem o `/wp-admin` |
+| `…/includes/class-reconectar-painel-gestao.php` | a rota `/gestao/<area>/` na moldura do Dokan: enquetes (`…-painel-enquetes.php`) e categorias do fórum (`…-painel-foruns.php`) e campanhas da home (`…-painel-campanhas.php`), para Administrador e Moderador sem o `/wp-admin` |
 | `…/includes/painel-gestao/` | os templates das telas de gestão |
 | `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
 | `…/includes/class-reconectar-privacidade.php` | apagador e exportador nas ferramentas de privacidade do núcleo: votos, comentários da Incubadora, rastros do fórum, login social, loja |
@@ -90,7 +90,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-429 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+445 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.

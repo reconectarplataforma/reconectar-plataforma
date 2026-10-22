@@ -651,9 +651,12 @@ for perfil_jar in "Administrador:$JAR_EMPRESAS" "Moderador:$JAR_MODERADOR"; do
   conferir "$jar" "/gestao/enquetes/nova/" "200" "o $perfil abre a enquete nova"
   conferir "$jar" "/gestao/foruns/"        "200" "o $perfil lista as categorias do fórum"
   conferir "$jar" "/gestao/foruns/nova/"   "200" "o $perfil abre a categoria nova"
+  conferir "$jar" "/gestao/campanhas/"      "200" "o $perfil lista as campanhas"
+  conferir "$jar" "/gestao/campanhas/nova/" "200" "o $perfil abre a campanha nova"
   conferir "$jar" "/gestao/xyz/"           "404" "área inexistente é 404"
   conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-enquetes"' "presente" "a barra do $perfil traz Enquetes"
   conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-foruns"'   "presente" "a barra do $perfil traz Categorias do fórum"
+  conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-campanhas"' "presente" "a barra do $perfil traz Campanhas"
 done
 for perfil_jar in "loja:$JAR_VENDEDOR" "cliente:$JAR_CLIENTE"; do
   perfil="${perfil_jar%%:*}"
@@ -662,6 +665,7 @@ for perfil_jar in "loja:$JAR_VENDEDOR" "cliente:$JAR_CLIENTE"; do
   conferir "$jar" "/gestao/enquetes/"      "403" "a $perfil não gere enquetes"
   conferir "$jar" "/gestao/enquetes/nova/" "403" "a $perfil não cria enquete"
   conferir "$jar" "/gestao/foruns/"        "403" "a $perfil não gere categorias"
+  conferir "$jar" "/gestao/campanhas/"     "403" "a $perfil não gere campanhas"
 done
 [ -f "$JAR_VENDEDOR" ] && conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-gestao-enquetes"' "ausente" "a barra da loja não traz Enquetes"
 
@@ -683,6 +687,19 @@ enviar_gestao() {
     argumentos+=(--data-urlencode "$campo")
   done
   curl -s -b "$jar" -o /dev/null -w '%{http_code} %{redirect_url}' "${argumentos[@]}" "$BASE$caminho"
+}
+
+# O mesmo, em multipart, com um arquivo no campo `arte`. `--form-string` nos
+# campos de texto: com `-F`, um valor que comece por `@` ou `<` seria lido como
+# caminho de arquivo.
+enviar_gestao_com_arte() {
+  local jar="$1" caminho="$2" arte="$3"
+  shift 3
+  local argumentos=()
+  for campo in "$@"; do
+    argumentos+=(--form-string "$campo")
+  done
+  curl -s -b "$jar" -o /dev/null -w '%{http_code} %{redirect_url}' "${argumentos[@]}" -F "arte=@$arte" "$BASE$caminho"
 }
 
 # Registra um caso cujo resultado foi medido fora de `conferir`.
@@ -732,6 +749,52 @@ if banco_alcancavel && [ -f "$JAR_MODERADOR" ] && [ -f "$JAR_EMPRESAS" ]; then
   if [ -n "$id_forum" ]; then
     conferir_corpo "$JAR_VENDEDOR" "/forums/" "$(wp_eval "echo get_the_title( $id_forum );")" "presente" "a categoria nova aparece no fórum"
     wp_eval "wp_delete_post( $id_forum, true );" >/dev/null
+  fi
+
+  # Campanha: rascunho sem arte, publicação recusada sem arte, arte que não é
+  # imagem recusada, e então a publicação com arte de verdade chegando à home.
+  # A descrição é a agulha na home: é o `alt` da faixa.
+  marca="$(date +%s)"
+  alt_campanha="Arte de verificação automática $marca"
+  nonce="$(nonce_da_acao "$JAR_EMPRESAS" "/gestao/campanhas/nova/" "campanha_salvar")"
+  resposta="$(enviar_gestao "$JAR_EMPRESAS" "/gestao/campanhas/nova/" \
+    "reconectar_acao=campanha_salvar" "_wpnonce=$nonce" \
+    "titulo=Verificação automática $marca" "alt=$alt_campanha" "ordem=-99" "estado=draft")"
+  id_campanha="$(printf '%s' "$resposta" | sed -n 's#.*/gestao/campanhas/\([0-9]*\)/?aviso=salva.*#\1#p')"
+  registrar "$([ -n "$id_campanha" ] && echo sim || echo nao)" "campanha nova" "o Administrador cria a campanha em rascunho, sem arte (veio: $resposta)"
+
+  if [ -n "$id_campanha" ]; then
+    caminho="/gestao/campanhas/$id_campanha/"
+    nonce="$(nonce_da_acao "$JAR_MODERADOR" "$caminho" "campanha_salvar")"
+    resposta="$(enviar_gestao "$JAR_MODERADOR" "$caminho" \
+      "reconectar_acao=campanha_salvar" "_wpnonce=$nonce" \
+      "titulo=Verificação automática $marca" "alt=$alt_campanha" "ordem=-99" "estado=publish")"
+    registrar "$([[ "$resposta" == 302*"$caminho?aviso=erro"* ]] && echo sim || echo nao)" "campanha sem arte" "publicar sem arte é recusado (veio: $resposta)"
+
+    falsa="$(mktemp --suffix=.png)"
+    printf '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' >"$falsa"
+    resposta="$(enviar_gestao_com_arte "$JAR_MODERADOR" "$caminho" "$falsa" \
+      "reconectar_acao=campanha_salvar" "_wpnonce=$nonce" \
+      "titulo=Verificação automática $marca" "alt=$alt_campanha" "ordem=-99" "estado=publish")"
+    rm -f "$falsa"
+    registrar "$([[ "$resposta" == 302*"$caminho?aviso=erro"* ]] && echo sim || echo nao)" "campanha arte falsa" "SVG com extensão .png é recusado (veio: $resposta)"
+
+    resposta="$(enviar_gestao_com_arte "$JAR_MODERADOR" "$caminho" "$RAIZ_PROJETO/wp-content/themes/reconectar/assets/img/logo-email.png" \
+      "reconectar_acao=campanha_salvar" "_wpnonce=$nonce" \
+      "titulo=Verificação automática $marca" "alt=$alt_campanha" "ordem=-99" "estado=publish")"
+    registrar "$([[ "$resposta" == 302*"$caminho?aviso=publicada"* ]] && echo sim || echo nao)" "campanha publicada" "o Moderador publica com arte enviada (veio: $resposta)"
+    conferir_corpo "" "/" "$alt_campanha" "presente" "a campanha publicada aparece na home"
+
+    resposta="$(enviar_gestao "$JAR_VENDEDOR" "$caminho" \
+      "reconectar_acao=campanha_lixeira" "_wpnonce=invalido")"
+    registrar "$([ "${resposta%% *}" = "403" ] && echo sim || echo nao)" "campanha da loja" "a loja não manda campanha para a lixeira (veio: $resposta)"
+
+    nonce="$(nonce_da_acao "$JAR_MODERADOR" "$caminho" "campanha_lixeira")"
+    resposta="$(enviar_gestao "$JAR_MODERADOR" "$caminho" \
+      "reconectar_acao=campanha_lixeira" "_wpnonce=$nonce")"
+    registrar "$([[ "$resposta" == 302*"/gestao/campanhas/?aviso=na-lixeira"* ]] && echo sim || echo nao)" "campanha na lixeira" "o Moderador manda a campanha para a lixeira (veio: $resposta)"
+    conferir_corpo "" "/" "$alt_campanha" "ausente" "a campanha na lixeira sai da home"
+    wp_eval "\$a = get_post_thumbnail_id( $id_campanha ); if ( \$a ) { wp_delete_attachment( \$a, true ); } wp_delete_post( $id_campanha, true );" >/dev/null
   fi
 fi
 

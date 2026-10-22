@@ -184,3 +184,43 @@
 	height: 100%;
 	background: var( --rc-pe-institucional );
 }
+
+/* Campanhas
+   ------------------------------------------------------------------------- */
+
+/* Na proporção da faixa da home, 3:1, para que a miniatura mostre o corte que
+   o visitante vai ver — e não o quadrado de 150px que o WordPress gera. */
+.rc-painel-gestao__miniatura {
+	display: block;
+	width: 96px;
+	max-width: none;
+	height: 32px;
+	border-radius: 3px;
+	object-fit: cover;
+}
+
+.rc-painel-gestao__miniatura--vazia {
+	border: 1px dashed var( --rc-pe-borda );
+	background: #f6f7f8;
+}
+
+.rc-painel-gestao__arte {
+	display: block;
+	width: 100%;
+	max-width: 600px;
+	height: auto;
+	margin: 0.35rem 0 0.75rem;
+	aspect-ratio: 3 / 1;
+	border-radius: 4px;
+	object-fit: cover;
+}
+
+/* O campo de arquivo herda o fundo branco dos inputs; a borda tracejada diz que
+   é lugar de soltar algo, e o `box-sizing` impede o transbordo no celular. */
+.rc-painel-gestao .rc-formulario__campo input[type="file"] {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0.65rem;
+	border: 1px dashed var( --rc-pe-borda );
+	border-radius: 4px;
+}

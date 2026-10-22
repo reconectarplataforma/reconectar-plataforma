@@ -70,8 +70,9 @@ class Reconectar_Painel_Gestao {
 	 */
 	public static function areas() {
 		return array(
-			'enquetes' => 'Reconectar_Painel_Enquetes',
-			'foruns'   => 'Reconectar_Painel_Foruns',
+			'enquetes'  => 'Reconectar_Painel_Enquetes',
+			'foruns'    => 'Reconectar_Painel_Foruns',
+			'campanhas' => 'Reconectar_Painel_Campanhas',
 		);
 	}
 
@@ -280,6 +281,25 @@ class Reconectar_Painel_Gestao {
 	private static function processar( $classe, $item ) {
 		if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) ) {
 			return;
+		}
+
+		// Acima de `post_max_size` o PHP esvazia `$_POST` inteiro, ação e nonce
+		// junto: sem esta conferência, enviar uma arte grande demais recarregaria
+		// a tela calada, como se nada tivesse sido pedido.
+		$tamanho = isset( $_SERVER['CONTENT_LENGTH'] ) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+		$teto    = wp_convert_hr_to_bytes( (string) ini_get( 'post_max_size' ) );
+
+		if ( empty( $_POST ) && $teto > 0 && $tamanho > $teto ) {
+			self::redirecionar(
+				self::area(),
+				$item,
+				'erro',
+				sprintf(
+					/* translators: %s: tamanho máximo legível, como "2 MB". */
+					__( 'O arquivo passa do limite de %s. Nada foi gravado.', 'reconectar-core' ),
+					size_format( wp_max_upload_size() )
+				)
+			);
 		}
 
 		$acao = isset( $_POST['reconectar_acao'] ) ? sanitize_key( wp_unslash( $_POST['reconectar_acao'] ) ) : '';

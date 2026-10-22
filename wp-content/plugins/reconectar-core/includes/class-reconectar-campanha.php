@@ -319,8 +319,24 @@ class Reconectar_Campanha {
 		}
 
 		$enviado = isset( $_POST['reconectar_campanha'] ) ? (array) wp_unslash( $_POST['reconectar_campanha'] ) : array();
-		$valor   = function ( $chave ) use ( $enviado ) {
-			return isset( $enviado[ $chave ] ) ? sanitize_text_field( $enviado[ $chave ] ) : '';
+
+		self::gravar( $post_id, $enviado );
+	}
+
+	/**
+	 * Grava as metas de uma campanha a partir dos campos enviados.
+	 *
+	 * Compartilhado pelo metabox do `/wp-admin` e pela tela de
+	 * `/gestao/campanhas/`: duas gravações paralelas divergiriam na primeira
+	 * correção feita em só uma delas. Quem chama já conferiu nonce e capacidade.
+	 *
+	 * @param int   $post_id ID da campanha.
+	 * @param array $enviado Campos sem barras: `link`, `inicio`, `fim`, `ordem` e `alt`.
+	 * @return void
+	 */
+	public static function gravar( $post_id, array $enviado ) {
+		$valor = function ( $chave ) use ( $enviado ) {
+			return isset( $enviado[ $chave ] ) && is_scalar( $enviado[ $chave ] ) ? sanitize_text_field( (string) $enviado[ $chave ] ) : '';
 		};
 
 		update_post_meta( $post_id, self::META_LINK, esc_url_raw( $valor( 'link' ) ) );
@@ -336,7 +352,7 @@ class Reconectar_Campanha {
 		 * formulário nenhum.
 		 */
 		$alt = $valor( 'alt' );
-		update_post_meta( $post_id, self::META_ALT, '' !== $alt ? $alt : $post->post_title );
+		update_post_meta( $post_id, self::META_ALT, '' !== $alt ? $alt : (string) get_post_field( 'post_title', $post_id ) );
 	}
 
 	/**
@@ -349,7 +365,7 @@ class Reconectar_Campanha {
 	 * @param string $valor Valor cru vindo do POST.
 	 * @return string Data em `Y-m-d`, ou vazio.
 	 */
-	private static function normalizar_data( $valor ) {
+	public static function normalizar_data( $valor ) {
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $valor ) ) {
 			return '';
 		}
