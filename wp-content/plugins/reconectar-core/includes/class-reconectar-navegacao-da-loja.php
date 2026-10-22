@@ -551,8 +551,8 @@ class Reconectar_Navegacao_Da_Loja {
 			);
 		}
 
-		// Enquetes, categorias do fórum e campanhas, que os dois perfis operavam no
-		// `/wp-admin`. Logo depois da Incubadora do Moderador (155) e antes das
+		// Enquetes, categorias do fórum, campanhas e moderação, que os dois perfis
+		// operavam no `/wp-admin`. Logo depois da Incubadora do Moderador (155) e antes das
 		// ferramentas da comunidade. Sem `#content`: `/gestao/enquetes/` é
 		// prefixo de `/gestao/enquetes/12/`, e ali é o prefixo que deve acender
 		// o item — o mesmo caso das telas de empresas.
@@ -586,12 +586,22 @@ class Reconectar_Navegacao_Da_Loja {
 				'pos'        => 158,
 				'permission' => Reconectar_Permissoes::CAP_GERIR_CAMPANHAS,
 			);
+
+			// A loja também tem `moderate_comments`, dado pelo Dokan: o portão é a
+			// capacidade própria, ou o item apareceria para toda loja.
+			$nav['rc-gestao-moderacao'] = array(
+				'title'      => __( 'Moderação', 'reconectar-core' ),
+				'icon'       => '<i class="fas fa-shield-alt"></i>',
+				'icon_name'  => 'ShieldCheck',
+				'url'        => Reconectar_Painel_Gestao::url( Reconectar_Painel_Moderacao::AREA ),
+				'pos'        => 159,
+				'permission' => Reconectar_Permissoes::CAP_MODERAR,
+			);
 		}
 
-		// Publicações e comentários ainda são moderados no
-		// `/wp-admin`, e o item é a saída explícita para lá. Sai da moldura, e o
-		// rótulo diz isso: um nome de tela ("Comentários") prometeria que ela
-		// abre aqui.
+		// Publicações ainda se editam no `/wp-admin`, e o item é a saída
+		// explícita para lá. Sai da moldura, e o rótulo diz isso: um nome de
+		// tela ("Publicações") prometeria que ela abre aqui.
 		if ( $moderador ) {
 			$nav['rc-painel-wp'] = array(
 				'title'      => __( 'Painel do WordPress', 'reconectar-core' ),

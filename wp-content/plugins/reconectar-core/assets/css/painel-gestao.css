@@ -33,6 +33,38 @@
 	font-weight: 600;
 }
 
+/* Botões
+   ------------------------------------------------------------------------- */
+
+/* Colisão de nome, não de especificidade: o `marketplace.css` do tema declara
+   `.rc-botao` laranja, em (0,1,0), e carrega depois deste plugin. Com a mesma
+   especificidade, o fundo dele vence o das variantes, e todo botão das telas
+   de gestão saía laranja — "Desaprovar", "Spam" e "Lixeira" com o mesmo peso
+   visual de "Aprovar". Medido na fila de moderação. O escopo sobe a (0,2,0). */
+.rc-painel-gestao .rc-botao {
+	opacity: 1;
+}
+
+.rc-painel-gestao .rc-botao--primario {
+	background: var( --rc-pe-institucional );
+	color: #fff;
+}
+
+.rc-painel-gestao .rc-botao--primario:is( :hover, :focus ) {
+	background: #52277a;
+	color: #fff;
+}
+
+.rc-painel-gestao .rc-botao--discreto {
+	background: transparent;
+	color: var( --rc-pe-institucional );
+}
+
+.rc-painel-gestao .rc-botao--discreto:is( :hover, :focus ) {
+	background: #f3eefa;
+	color: var( --rc-pe-institucional );
+}
+
 /* Campos que o `painel-empresas.css` não veste
    ------------------------------------------------------------------------- */
 
@@ -223,4 +255,115 @@
 	padding: 0.65rem;
 	border: 1px dashed var( --rc-pe-borda );
 	border-radius: 4px;
+}
+
+/* Moderação
+   ------------------------------------------------------------------------- */
+
+/* Abas como links, e não como `role="tab"`: cada uma é uma URL própria, que
+   recarrega a lista e pode ir para o favorito. A atual leva `aria-current`. */
+.rc-painel-gestao__abas ul,
+.rc-painel-gestao__situacoes ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* O `style.css` do Dokan zera o padding de todo `li` dentro da moldura, em
+   (0,3,2); aqui o zero é o que se quer, e fica declarado para não depender dele. */
+.rc-painel-gestao__abas li,
+.rc-painel-gestao__situacoes li {
+	margin: 0;
+	padding: 0;
+}
+
+.rc-painel-gestao__abas {
+	margin: 0 0 1rem;
+	border-bottom: 1px solid var( --rc-pe-borda );
+}
+
+.rc-painel-gestao__abas a {
+	display: block;
+	padding: 0.5rem 0.25rem;
+	border-bottom: 3px solid transparent;
+	color: var( --rc-pe-texto-suave );
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.rc-painel-gestao__abas a[aria-current="page"] {
+	border-bottom-color: var( --rc-pe-institucional );
+	color: var( --rc-pe-institucional );
+}
+
+.rc-painel-gestao__situacoes {
+	margin: 0 0 1.25rem;
+	font-size: var( --rc-pe-fonte-sm );
+}
+
+.rc-painel-gestao__situacoes a {
+	color: var( --rc-pe-institucional );
+}
+
+/* Sem sublinhado e em negrito: a situação atual não é link para outro lugar. */
+.rc-painel-gestao__situacoes a[aria-current="page"] {
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.rc-painel-gestao__contagem {
+	color: var( --rc-pe-texto-suave );
+	font-variant-numeric: tabular-nums;
+}
+
+.rc-painel-gestao :is( .rc-painel-gestao__abas, .rc-painel-gestao__situacoes ) a:focus-visible {
+	outline: 3px solid var( --rc-pe-institucional );
+	outline-offset: 2px;
+}
+
+.rc-painel-gestao__trecho {
+	min-width: 16rem;
+}
+
+.rc-painel-gestao__decisoes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin: 0;
+}
+
+.rc-painel-gestao__decisoes .rc-botao {
+	white-space: nowrap;
+}
+
+.rc-painel-gestao__paginacao ul {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.35rem;
+	margin: 0 0 2rem;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-painel-gestao__paginacao :is( a, span ) {
+	display: block;
+	min-width: 2.25rem;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 4px;
+	text-align: center;
+}
+
+.rc-painel-gestao__paginacao a {
+	color: var( --rc-pe-institucional );
+}
+
+.rc-painel-gestao__paginacao .current {
+	border-color: var( --rc-pe-institucional );
+	background: var( --rc-pe-institucional );
+	color: #fff;
 }

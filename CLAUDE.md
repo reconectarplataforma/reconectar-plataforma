@@ -39,7 +39,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `scripts/icones-de-categoria.php` | associa os ícones SVG às categorias; chamado pelo provisionamento e pela carga |
 | `wp-content/themes/reconectar/assets/icones/categorias/` | os ícones de categoria, autorais e versionados |
 | `…/includes/class-reconectar-modulos.php` | a tela `/modulos/`: Loja, Administrador, Moderador e Super Administrador escolhem Mercado, Incubadora ou Praça a cada login; Loja e Super Administrador têm ainda o cartão do painel |
-| `…/includes/class-reconectar-painel-gestao.php` | a rota `/gestao/<area>/` na moldura do Dokan: enquetes (`…-painel-enquetes.php`) e categorias do fórum (`…-painel-foruns.php`) e campanhas da home (`…-painel-campanhas.php`), para Administrador e Moderador sem o `/wp-admin` |
+| `…/includes/class-reconectar-painel-gestao.php` | a rota `/gestao/<area>/` na moldura do Dokan: enquetes (`…-painel-enquetes.php`), categorias do fórum (`…-painel-foruns.php`), campanhas da home (`…-painel-campanhas.php`) e a fila de moderação de avaliações e do fórum (`…-painel-moderacao.php`), para Administrador e Moderador sem o `/wp-admin` |
 | `…/includes/painel-gestao/` | os templates das telas de gestão |
 | `…/includes/class-reconectar-servicos.php` | serviços no mercado: preço "A combinar", solicitação sem pagamento, resposta da loja |
 | `…/includes/class-reconectar-privacidade.php` | apagador e exportador nas ferramentas de privacidade do núcleo: votos, comentários da Incubadora, rastros do fórum, login social, loja |
@@ -50,7 +50,7 @@ aconteceu neste repositório, e vários custaram horas.
 | `…/assets/vendor/tinymce/8.9.2/` | o editor da Incubadora, vendorizado; origem e licença no `LEIAME.md` |
 | `scripts/verificar-incubadora.php` | operações da Incubadora por WP-CLI, chamado pelo `verificar-acessos.sh` |
 | `wp-content/themes/reconectar/bbpress/` | overrides de template do fórum |
-| `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A |
+| `wp-content/themes/reconectar/inc/forum/` | consultas, componentes e telas do Q&A; o menu "Moderar" no próprio tópico está em `reconectar_forum_moderacao()` |
 | `wp-content/themes/reconectar/buddypress/` | overrides do Nouveau: feed em três colunas, perfil com capa |
 | `wp-content/themes/reconectar/inc/comunidade.php` | colunas laterais e cartão "Sobre" da Comunidade; CSS em `assets/css/comunidade.css` |
 | `docs/STACKS.md` | as camadas da plataforma e por que cada uma existe |
@@ -90,7 +90,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-445 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+464 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.
@@ -815,6 +815,27 @@ leitura é em `$usuario->allcaps[$cap]` e não com `user_can()`, que reentraria 
 `keep_gate` continua fora de alcance de propósito: ele abre as Configurações do
 bbPress e a ferramenta de **redefinição**, que apaga fóruns, tópicos e respostas
 da instalação inteira.
+
+### `edit_comment` numa avaliação vira `edit_others_products`
+
+O núcleo mapeia `edit_comment` para a capacidade de edição do **post** ao qual o
+comentário pertence. Numa avaliação de produto, isso é `edit_others_products`,
+que o Moderador não tem e não deve ter. Conferir a moderação por
+`current_user_can( 'edit_comment', $id )` recusa o Moderador em toda avaliação,
+com a tela aparentemente certa e o botão devolvendo erro. A fila de
+`Reconectar_Painel_Moderacao` confere `moderate_comments` e o tipo do
+comentário. `rc_incubadora` fica de fora, porque já é moderado na Incubadora.
+
+### `.rc-botao` existe no tema **e** no plugin
+
+O `marketplace.css` do tema declara `.rc-botao` laranja, em (0,1,0), e carrega
+**depois** do `painel-empresas.css` do plugin. Com a mesma especificidade, o
+fundo do tema vence `.rc-botao--primario` e `.rc-botao--discreto`. Nas telas de
+`/gestao/`, todo botão saía laranja: "Desaprovar", "Spam" e "Lixeira" tinham o
+mesmo peso visual de "Aprovar". É de novo colisão de nome, e não há regra
+autoral errada no caminho. `painel-gestao.css` redeclara as variantes sob
+`.rc-painel-gestao`. Tela nova fora dessa classe, com o tema ativo, precisa do
+mesmo escopo.
 
 ### `promote_user` sem o papel de destino devolve `true`
 

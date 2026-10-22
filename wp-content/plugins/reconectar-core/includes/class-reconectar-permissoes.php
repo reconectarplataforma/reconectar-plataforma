@@ -176,6 +176,19 @@ class Reconectar_Permissoes {
 	const CAP_GERIR_INCUBADORA = 'reconectar_gerir_incubadora';
 
 	/**
+	 * Abrir a tela de moderação (`/gestao/moderacao/`).
+	 *
+	 * Primitiva própria, e não `moderate_comments`: o Dokan dá essa ao papel
+	 * `seller`, para que a loja aprove as avaliações dos próprios produtos.
+	 * Medido nesta instalação, `demo-atelie-raizes` responde "sim" a ela. Um
+	 * portão nela abriria a fila da plataforma inteira para toda loja.
+	 *
+	 * Ela só abre a porta. Cada ação ainda confere `moderate_comments`, ou
+	 * `moderate` sobre o tópico, e o tipo do item contra o que a tela lista.
+	 */
+	const CAP_MODERAR = 'reconectar_moderar';
+
+	/**
 	 * Todas as capacidades ligadas à administração de empresas.
 	 *
 	 * @var string[]
@@ -277,6 +290,7 @@ class Reconectar_Permissoes {
 		self::CAP_GERIR_CAMPANHAS,
 		self::CAP_GERIR_ENQUETES,
 		self::CAP_GERIR_INCUBADORA,
+		self::CAP_MODERAR,
 	);
 
 	/**
@@ -365,7 +379,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 8;
+	const VERSAO_CAPACIDADES = 9;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -472,6 +486,7 @@ class Reconectar_Permissoes {
 				$objeto->add_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->add_cap( self::CAP_GERIR_ENQUETES );
 				$objeto->add_cap( self::CAP_GERIR_INCUBADORA );
+				$objeto->add_cap( self::CAP_MODERAR );
 
 				continue;
 			}
@@ -483,13 +498,14 @@ class Reconectar_Permissoes {
 			}
 
 			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
-			// a lista completa. Para qualquer outro, estas quatro não fazem
+			// a lista completa. Para qualquer outro, estas cinco não fazem
 			// sentido nenhum — e uma concessão feita por engano sai aqui.
 			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
 				$objeto->remove_cap( self::CAP_ADMIN_WP );
 				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->remove_cap( self::CAP_GERIR_ENQUETES );
 				$objeto->remove_cap( self::CAP_GERIR_INCUBADORA );
+				$objeto->remove_cap( self::CAP_MODERAR );
 			}
 
 			foreach ( self::CAPS_DE_DESENVOLVIMENTO as $capacidade ) {
