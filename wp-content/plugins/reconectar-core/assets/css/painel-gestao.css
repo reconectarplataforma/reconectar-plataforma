@@ -1,0 +1,186 @@
+/**
+ * Telas de gestão (`/gestao/<area>/`): o que falta ao `painel-empresas.css`.
+ *
+ * Carregado depois dele, e só nesta rota. Sem `font-size` literal: os degraus
+ * vêm dos tokens `--rc-pe-*`, que trazem fallback porque o plugin não pode
+ * exigir tema.
+ *
+ * @package reconectar-core
+ */
+
+/* Tabelas
+   ------------------------------------------------------------------------- */
+
+/* `position: relative` não é enfeite: um scroll container só clipa descendente
+   absoluto cujo containing block seja ele. Sem isso, um `.screen-reader-text`
+   dentro da tabela sobe até o viewport e faz o documento rolar na horizontal —
+   e no celular a barra inferior some. */
+.rc-painel-gestao__rolagem {
+	position: relative;
+	overflow-x: auto;
+	margin-bottom: 2rem;
+}
+
+.rc-painel-gestao__rolagem .rc-tabela {
+	margin-bottom: 0;
+}
+
+/* Cor declarada, e não herdada: fora da moldura do Dokan o link cai no teal do
+   tema, que tem 2,30:1 sobre o branco e reprova o critério 1.4.3 da WCAG 2.1.
+   Medido na lista de categorias, antes desta regra. */
+.rc-painel-gestao .rc-tabela a {
+	color: var( --rc-pe-institucional );
+	font-weight: 600;
+}
+
+/* Campos que o `painel-empresas.css` não veste
+   ------------------------------------------------------------------------- */
+
+/* O Storefront veste `input[type="text"]` por seletor de atributo, em (0,1,1),
+   com fundo `#f2f2f2`: o campo da pergunta saía cinza ao lado de textareas
+   brancas, no mesmo formulário. A classe da área leva a regra a (0,2,1). */
+.rc-painel-gestao .rc-formulario__campo :is( input, textarea ) {
+	background: #fff;
+	font-family: inherit;
+}
+
+/* O tema pai declara `select { font-family: "Source Sans Pro" }`, que tira a
+   Poppins herdada; e `box-sizing` vai explícito pela mesma razão dos inputs. */
+.rc-painel-gestao select {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0.5rem 0.65rem;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 4px;
+	background: #fff;
+	font-family: inherit;
+	font-size: inherit;
+}
+
+.rc-painel-gestao :is( select, button ):focus-visible {
+	outline: 3px solid var( --rc-pe-institucional );
+	outline-offset: 2px;
+}
+
+.rc-painel-gestao__datas {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 220px, 1fr ) );
+	gap: 0 1rem;
+}
+
+/* A caixa de marcar herda o `width: 100%` dos inputs do campo, e sairia como
+   uma faixa da largura do formulário. */
+.rc-painel-gestao__marcar {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: 0.35rem 0.6rem;
+}
+
+.rc-painel-gestao__marcar input[type="checkbox"] {
+	width: 1.25rem;
+	height: 1.25rem;
+	margin: 0;
+}
+
+.rc-painel-gestao__marcar .rc-formulario__ajuda {
+	grid-column: 2;
+}
+
+/* Alternativas da enquete
+   ------------------------------------------------------------------------- */
+
+.rc-painel-gestao__alternativas {
+	position: relative;
+	min-width: 0;
+	margin: 0 0 1.5rem;
+	padding: 1rem;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 4px;
+}
+
+.rc-painel-gestao__alternativas legend {
+	padding: 0 0.35rem;
+	font-weight: 600;
+}
+
+.rc-painel-gestao__lista-alternativas {
+	margin: 1rem 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-painel-gestao__alternativa {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: end;
+	gap: 0.35rem 0.6rem;
+	margin: 0 0 0.85rem;
+	padding: 0;
+}
+
+.rc-painel-gestao__alternativa label {
+	grid-column: 1 / -1;
+	font-weight: 600;
+}
+
+.rc-painel-gestao__alternativa input[type="text"] {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	padding: 0.5rem 0.65rem;
+	border: 1px solid var( --rc-pe-borda );
+	border-radius: 4px;
+}
+
+/* Fora da tela e no leitor. Técnica própria, e não `.screen-reader-text`: essa
+   classe é do tema, e o painel não pode exigir tema. O fieldset é o ancestral
+   posicionado — sem ele o absoluto subiria até o viewport. */
+.rc-painel-gestao__anuncio {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset( 50% );
+	white-space: nowrap;
+}
+
+/* Resultados
+   ------------------------------------------------------------------------- */
+
+.rc-painel-gestao__resultados {
+	max-width: 620px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rc-painel-gestao__resultado {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 0.25rem 1rem;
+	margin: 0 0 1rem;
+}
+
+.rc-painel-gestao__resultado-numero {
+	color: var( --rc-pe-texto-suave );
+	font-size: var( --rc-pe-fonte-sm );
+	font-variant-numeric: tabular-nums;
+}
+
+.rc-painel-gestao__barra {
+	grid-column: 1 / -1;
+	display: block;
+	height: 0.5rem;
+	border-radius: 999px;
+	background: #eef1f3;
+	overflow: hidden;
+}
+
+.rc-painel-gestao__barra > span {
+	display: block;
+	height: 100%;
+	background: var( --rc-pe-institucional );
+}

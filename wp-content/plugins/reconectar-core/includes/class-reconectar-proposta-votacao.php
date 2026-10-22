@@ -871,6 +871,26 @@ class Reconectar_Proposta_Votacao {
 
 		$enviado = isset( $_POST['reconectar_enquete'] ) ? (array) wp_unslash( $_POST['reconectar_enquete'] ) : array();
 
+		self::gravar( $post_id, $enviado );
+	}
+
+	/**
+	 * Valida e grava período e alternativas de uma enquete.
+	 *
+	 * Público porque tem dois chamadores: o metabox do `/wp-admin` e a tela de
+	 * enquetes do painel (`Reconectar_Painel_Enquetes`). A validação mora aqui
+	 * uma vez só — duas cópias de `normalizar_opcoes()` divergiriam no primeiro
+	 * ajuste, e a que ficasse para trás reaproveitaria identificador de
+	 * alternativa removida.
+	 *
+	 * Quem chama confere nonce e `edit_post`; este método não lê `$_POST`.
+	 *
+	 * @param int   $post_id ID da enquete.
+	 * @param array $enviado Dados já sem barras: `inicio`, `fim` e
+	 *                       `opcoes[ i ][ id|texto ]`.
+	 * @return array[] As alternativas gravadas.
+	 */
+	public static function gravar( $post_id, array $enviado ) {
 		update_post_meta(
 			$post_id,
 			self::META_INICIO,
@@ -891,6 +911,8 @@ class Reconectar_Proposta_Votacao {
 		update_post_meta( $post_id, self::META_OPCOES, $opcoes );
 
 		self::podar_votos_orfaos( $post_id, $opcoes );
+
+		return $opcoes;
 	}
 
 	/**

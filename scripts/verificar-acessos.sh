@@ -638,6 +638,103 @@ fi
 [ -f "$JAR_CLIENTE" ]   && conferir_corpo "$JAR_CLIENTE"   "$MINHA_CONTA" "navigation-link--rc-modulos" "ausente" "o cliente não vê o item Módulos"
 [ -f "$JAR_ADMIN" ]     && conferir_corpo "$JAR_ADMIN"     "/dashboard/" '"rc-modulos"' "presente" "a barra do Super Administrador volta à tela"
 
+echo "Telas de gestão (/gestao/)"
+# O login vem antes do 404 em `proteger()`: um visitante que tente adivinhar
+# áreas recebe sempre o mesmo login, e a rota não revela quais existem.
+conferir "" "/gestao/enquetes/" "302 wp-login.php" "o visitante vai ao login"
+conferir "" "/gestao/xyz/"      "302 wp-login.php" "área inexistente não se revela ao visitante"
+for perfil_jar in "Administrador:$JAR_EMPRESAS" "Moderador:$JAR_MODERADOR"; do
+  perfil="${perfil_jar%%:*}"
+  jar="${perfil_jar#*:}"
+  [ -f "$jar" ] || continue
+  conferir "$jar" "/gestao/enquetes/"      "200" "o $perfil lista as enquetes"
+  conferir "$jar" "/gestao/enquetes/nova/" "200" "o $perfil abre a enquete nova"
+  conferir "$jar" "/gestao/foruns/"        "200" "o $perfil lista as categorias do fórum"
+  conferir "$jar" "/gestao/foruns/nova/"   "200" "o $perfil abre a categoria nova"
+  conferir "$jar" "/gestao/xyz/"           "404" "área inexistente é 404"
+  conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-enquetes"' "presente" "a barra do $perfil traz Enquetes"
+  conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-foruns"'   "presente" "a barra do $perfil traz Categorias do fórum"
+done
+for perfil_jar in "loja:$JAR_VENDEDOR" "cliente:$JAR_CLIENTE"; do
+  perfil="${perfil_jar%%:*}"
+  jar="${perfil_jar#*:}"
+  [ -f "$jar" ] || continue
+  conferir "$jar" "/gestao/enquetes/"      "403" "a $perfil não gere enquetes"
+  conferir "$jar" "/gestao/enquetes/nova/" "403" "a $perfil não cria enquete"
+  conferir "$jar" "/gestao/foruns/"        "403" "a $perfil não gere categorias"
+done
+[ -f "$JAR_VENDEDOR" ] && conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-gestao-enquetes"' "ausente" "a barra da loja não traz Enquetes"
+
+# O `_wpnonce` que antecede o `reconectar_acao` de uma ação, e não o primeiro da
+# página: a enquete aberta tem dois formulários — salvar e lixeira —, cada um
+# com nonce próprio, e a moldura do Dokan imprime outros.
+nonce_da_acao() {
+  curl -s -b "$1" "$BASE$2" | tr '<' '\n' |
+    awk -v acao="value=\"$3\"" '/name="_wpnonce"/ { n = $0 } /name="reconectar_acao"/ && index($0, acao) { print n; exit }' |
+    sed 's/.*value="//;s/".*//'
+}
+
+# Envia um formulário da gestão e devolve "código destino".
+enviar_gestao() {
+  local jar="$1" caminho="$2"
+  shift 2
+  local argumentos=()
+  for campo in "$@"; do
+    argumentos+=(--data-urlencode "$campo")
+  done
+  curl -s -b "$jar" -o /dev/null -w '%{http_code} %{redirect_url}' "${argumentos[@]}" "$BASE$caminho"
+}
+
+# Registra um caso cujo resultado foi medido fora de `conferir`.
+registrar() {
+  local ok="$1" rotulo="$2" descricao="$3"
+  total=$((total + 1))
+  if [ "$ok" = "sim" ]; then
+    [ "$verboso" = "sim" ] && printf '  ok    %-24s %s\n' "$rotulo" "$descricao"
+  else
+    printf '  FALHA %-24s %s\n' "$rotulo" "$descricao"
+    falhas=$((falhas + 1))
+  fi
+}
+
+# O caminho feliz só roda contra o banco local: cada caso cria um registro, e é
+# por WP-CLI que ele sai no fim. Contra outro servidor, sobraria lixo lá.
+if banco_alcancavel && [ -f "$JAR_MODERADOR" ] && [ -f "$JAR_EMPRESAS" ]; then
+  nonce="$(nonce_da_acao "$JAR_MODERADOR" "/gestao/enquetes/nova/" "enquete_salvar")"
+  resposta="$(enviar_gestao "$JAR_MODERADOR" "/gestao/enquetes/nova/" \
+    "reconectar_acao=enquete_salvar" "_wpnonce=$nonce" \
+    "titulo=Verificação automática $(date +%s)" "opcoes[0][texto]=Sim" "opcoes[1][texto]=Não" "estado=draft")"
+  id_enquete="$(printf '%s' "$resposta" | sed -n 's#.*/gestao/enquetes/\([0-9]*\)/?aviso=salva.*#\1#p')"
+  registrar "$([ -n "$id_enquete" ] && echo sim || echo nao)" "enquete nova" "o Moderador cria a enquete em rascunho (veio: $resposta)"
+
+  if [ -n "$id_enquete" ]; then
+    # A recusa vem antes do nonce de quem tem o direito: a loja nem abre a tela
+    # para obter um, e o POST dela sem nonce bate na capacidade primeiro.
+    resposta="$(enviar_gestao "$JAR_VENDEDOR" "/gestao/enquetes/$id_enquete/" \
+      "reconectar_acao=enquete_lixeira" "_wpnonce=invalido")"
+    registrar "$([ "${resposta%% *}" = "403" ] && echo sim || echo nao)" "enquete da loja" "a loja não manda enquete para a lixeira (veio: $resposta)"
+
+    nonce="$(nonce_da_acao "$JAR_MODERADOR" "/gestao/enquetes/$id_enquete/" "enquete_lixeira")"
+    resposta="$(enviar_gestao "$JAR_MODERADOR" "/gestao/enquetes/$id_enquete/" \
+      "reconectar_acao=enquete_lixeira" "_wpnonce=$nonce")"
+    registrar "$([[ "$resposta" == 302*"/gestao/enquetes/?aviso=na-lixeira"* ]] && echo sim || echo nao)" "enquete na lixeira" "o Moderador manda a enquete para a lixeira (veio: $resposta)"
+    conferir "$JAR_MODERADOR" "/gestao/enquetes/$id_enquete/" "403" "enquete na lixeira não se edita"
+    wp_eval "wp_delete_post( $id_enquete, true );" >/dev/null
+  fi
+
+  nonce="$(nonce_da_acao "$JAR_EMPRESAS" "/gestao/foruns/nova/" "forum_salvar")"
+  resposta="$(enviar_gestao "$JAR_EMPRESAS" "/gestao/foruns/nova/" \
+    "reconectar_acao=forum_salvar" "_wpnonce=$nonce" \
+    "nome=Verificação automática $(date +%s)" "descricao=Categoria criada por verificar-acessos.sh." "ordem=99")"
+  id_forum="$(printf '%s' "$resposta" | sed -n 's#.*/gestao/foruns/\([0-9]*\)/?aviso=criada.*#\1#p')"
+  registrar "$([ -n "$id_forum" ] && echo sim || echo nao)" "categoria nova" "o Administrador cria a categoria (veio: $resposta)"
+
+  if [ -n "$id_forum" ]; then
+    conferir_corpo "$JAR_VENDEDOR" "/forums/" "$(wp_eval "echo get_the_title( $id_forum );")" "presente" "a categoria nova aparece no fórum"
+    wp_eval "wp_delete_post( $id_forum, true );" >/dev/null
+  fi
+fi
+
 # O endpoint de voto não tem URL de leitura: só responde a POST, e por isso não
 # cabe em `conferir`. O caso abaixo prova a primeira das duas travas — o nonce.
 # A segunda, a capacidade, vai por WP-CLI mais adiante: um nonce válido não pode
