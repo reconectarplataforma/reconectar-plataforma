@@ -105,6 +105,11 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-navegacao-da-loja
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-visao-geral-da-loja.php';
 // A escolha de módulo depois do login, para quem trabalha na plataforma.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-modulos.php';
+// Telas de gestão no painel do Dokan: enquetes e categorias do fórum, que
+// Administrador e Moderador operavam no `/wp-admin`.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-gestao.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-enquetes.php';
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-painel-foruns.php';
 // Apagador e exportador das ferramentas de privacidade do núcleo: o que a
 // página de exclusão de dados promete e só esta plataforma grava. Por último
 // porque lê as constantes do fórum, da Incubadora, das enquetes e do comprovante.
@@ -149,6 +154,7 @@ function reconectar_core_init() {
 	Reconectar_Navegacao_Da_Loja::init();
 	Reconectar_Visao_Geral_Da_Loja::init();
 	Reconectar_Modulos::init();
+	Reconectar_Painel_Gestao::init();
 	// Depois de `Reconectar_Permissoes`, de quem `Reconectar_Forum` lê as
 	// capacidades da comunidade.
 	Reconectar_Forum::init();

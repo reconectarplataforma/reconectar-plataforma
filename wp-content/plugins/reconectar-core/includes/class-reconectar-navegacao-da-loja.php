@@ -104,7 +104,9 @@ class Reconectar_Navegacao_Da_Loja {
 	/**
 	 * Chave do item do painel que corresponde à tela corrente, ou vazio.
 	 *
-	 * Vazio para Administrador e cliente, que seguem vendo as três áreas na
+	 * As telas do painel de empresas e as de gestão vêm primeiro, porque o
+	 * Administrador as abre na moldura sem ser loja nem Moderador. Fora delas,
+	 * vazio para Administrador e cliente, que seguem vendo as três áreas na
 	 * moldura da vitrine; a loja e o Moderador as veem na do painel. O reconhecimento repete o de
 	 * `Reconectar_Permissoes::requisicao_e_de_comunidade()` — os post types do
 	 * bbPress, o componente do BuddyPress e a página `comunidade`, que na raiz
@@ -121,6 +123,15 @@ class Reconectar_Navegacao_Da_Loja {
 	public static function area_corrente() {
 		if ( self::painel_de_empresas_na_moldura() ) {
 			return 'rc-' . Reconectar_Painel_Empresas::secao_corrente();
+		}
+
+		// As telas de gestão vêm antes do teste de papel: o Administrador não é
+		// loja nem Moderador, e mesmo assim as abre na moldura. Dois `if`, pela
+		// mesma razão do da Incubadora, logo abaixo.
+		if ( class_exists( 'Reconectar_Painel_Gestao' ) ) {
+			if ( Reconectar_Painel_Gestao::na_moldura() ) {
+				return 'rc-gestao-' . Reconectar_Painel_Gestao::area();
+			}
 		}
 
 		if ( ! self::mora_no_painel() && ! self::modera_no_painel() ) {
@@ -178,7 +189,17 @@ class Reconectar_Navegacao_Da_Loja {
 	 * @return bool
 	 */
 	private static function moldura_de_quem_nao_e_loja() {
-		return self::painel_de_empresas_na_moldura() || ( self::modera_no_painel() && '' !== self::area_corrente() );
+		if ( self::painel_de_empresas_na_moldura() ) {
+			return true;
+		}
+
+		if ( class_exists( 'Reconectar_Painel_Gestao' ) ) {
+			if ( Reconectar_Painel_Gestao::na_moldura() ) {
+				return true;
+			}
+		}
+
+		return self::modera_no_painel() && '' !== self::area_corrente();
 	}
 
 	/**
@@ -208,9 +229,11 @@ class Reconectar_Navegacao_Da_Loja {
 
 		$conta = function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'edit-account' ) : '';
 
-		$config['vendor']['name'] = self::painel_de_empresas_na_moldura()
-			? get_bloginfo( 'name' )
-			: __( 'Moderação', 'reconectar-core' );
+		// Pelo papel, e não pela tela: as telas de gestão são abertas pelos dois
+		// perfis, e o Administrador numa delas não está "na Moderação".
+		$config['vendor']['name'] = self::modera_no_painel()
+			? __( 'Moderação', 'reconectar-core' )
+			: get_bloginfo( 'name' );
 
 		if ( '' !== $conta ) {
 			$config['editUrl'] = $conta;
@@ -528,7 +551,35 @@ class Reconectar_Navegacao_Da_Loja {
 			);
 		}
 
-		// Campanhas, enquetes, publicações e comentários são moderados no
+		// Enquetes e categorias do fórum, que os dois perfis operavam no
+		// `/wp-admin`. Logo depois da Incubadora do Moderador (155) e antes das
+		// ferramentas da comunidade. Sem `#content`: `/gestao/enquetes/` é
+		// prefixo de `/gestao/enquetes/12/`, e ali é o prefixo que deve acender
+		// o item — o mesmo caso das telas de empresas.
+		if ( class_exists( 'Reconectar_Painel_Gestao' ) ) {
+			$nav['rc-gestao-enquetes'] = array(
+				'title'      => __( 'Enquetes', 'reconectar-core' ),
+				'icon'       => '<i class="fas fa-poll"></i>',
+				'icon_name'  => 'Vote',
+				'url'        => Reconectar_Painel_Gestao::url( Reconectar_Painel_Enquetes::AREA ),
+				'pos'        => 156,
+				'permission' => Reconectar_Permissoes::CAP_GERIR_ENQUETES,
+			);
+
+			// Sem o bbPress a área responde 404, e o item seria um link para ela.
+			if ( function_exists( 'bbp_get_forum_post_type' ) ) {
+				$nav['rc-gestao-foruns'] = array(
+					'title'      => __( 'Categorias do fórum', 'reconectar-core' ),
+					'icon'       => '<i class="fas fa-folder"></i>',
+					'icon_name'  => 'FolderTree',
+					'url'        => Reconectar_Painel_Gestao::url( Reconectar_Painel_Foruns::AREA ),
+					'pos'        => 157,
+					'permission' => 'edit_forums',
+				);
+			}
+		}
+
+		// Campanhas, publicações e comentários ainda são moderados no
 		// `/wp-admin`, e o item é a saída explícita para lá. Sai da moldura, e o
 		// rótulo diz isso: um nome de tela ("Comentários") prometeria que ela
 		// abre aqui.

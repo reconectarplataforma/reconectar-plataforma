@@ -4708,3 +4708,37 @@ de demonstração desenha texto nas imagens com o GD, que só lê TTF.
 Medido na home a 1280px: quatro pesos baixados, todos `.woff2`, com cerca de
 48 KB cada, e o corpo em Poppins. A Thoge segue em `.otf`: a licença dela não
 foi conferida, e a conversão fica para quando for.
+
+---
+
+## 2026-10-22 — Enquetes e categorias do fórum fora do `/wp-admin`
+
+Primeira de quatro etapas para que só o Super Administrador opere no
+`/wp-admin`. O Administrador e o Moderador passam a criar enquetes e categorias
+do fórum em `/gestao/enquetes/` e `/gestao/foruns/`, dentro da moldura do
+painel do Dokan, com os itens "Enquetes" e "Categorias do fórum" na barra
+lateral.
+
+A rota é própria (`Reconectar_Painel_Gestao`), no molde de `/modulos/`. Cada
+área é uma classe que diz quem abre a lista, quem abre cada item, o que fazer
+com o POST e qual template desenhar; as próximas etapas (campanhas e moderação)
+entram como áreas novas, sem rota nova. O login é conferido antes do 404, para
+que um visitante não descubra quais áreas existem.
+
+A enquete grava pelo mesmo `Reconectar_Proposta_Votacao::gravar()` que o
+metabox do `/wp-admin` passou a usar: duas gravações paralelas divergiriam na
+primeira correção feita em só uma. Publicar exige duas alternativas
+preenchidas; o rascunho aceita menos. Exclusão vai para a lixeira, porque os
+votos são registro público de uma consulta. A categoria do fórum não tem
+exclusão: fechar é o que se quer quando ela deixa de servir, sem apagar as
+respostas que já deu.
+
+Medido: o `verificar-acessos.sh` foi de 400 para 429 casos, sem falha,
+incluindo criar e mandar para a lixeira uma enquete e criar uma categoria por
+HTTP, com limpeza por WP-CLI ao fim. No navegador, a 1600px e a 375px, nos dois
+perfis: moldura certa, só o item da tela acendendo, `scrollX` em 0. A enquete
+publicada aparece na flutuante e na Transparência, e some delas ao ser
+despublicada; a categoria fechada aparece no fórum com o selo "Fechada" na
+lista. Dois defeitos achados na medição e corrigidos no `painel-gestao.css`: o
+link das tabelas no teal do tema (2,30:1) e o campo de texto cinza do
+Storefront ao lado de textareas brancas.
