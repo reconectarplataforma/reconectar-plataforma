@@ -4742,3 +4742,39 @@ despublicada; a categoria fechada aparece no fórum com o selo "Fechada" na
 lista. Dois defeitos achados na medição e corrigidos no `painel-gestao.css`: o
 link das tabelas no teal do tema (2,30:1) e o campo de texto cinza do
 Storefront ao lado de textareas brancas.
+
+---
+
+## 2026-10-22 — Campanhas da home fora do `/wp-admin`
+
+Segunda das quatro etapas. As campanhas da faixa da home passam a ser criadas
+em `/gestao/campanhas/`, com o item "Campanhas" na barra lateral, para quem tem
+`CAP_GERIR_CAMPANHAS`. É uma área nova da rota de gestão: nenhuma regra de
+reescrita mudou, e por isso não houve migração nem flush.
+
+A gravação das metas saiu do metabox para `Reconectar_Campanha::gravar()`, que
+as duas telas chamam. O texto alternativo é obrigatório na tela nova, e
+publicar exige a arte: uma campanha publicada sem imagem não entra na faixa, e
+a lista diz isso no selo, em vez de deixá-la parecer no ar.
+
+A arte é validada antes de o post existir e recebida antes de criá-lo. Uma
+recusa no meio deixaria rascunho ou anexo órfão a cada tentativa. Aceita JPG,
+PNG e WebP. GIF fica de fora porque animação sem controle de pausa reprova o
+critério 2.2.2 da WCAG 2.1, e SVG porque carrega script.
+
+Corpo acima de `post_max_size` chega com o `$_POST` vazio, nonce inclusive. A
+rota de gestão confere `CONTENT_LENGTH` antes de ler a ação e responde com o
+limite legível, em vez do "formulário expirou", que faria a pessoa recarregar
+e perder o que tinha escrito.
+
+Medido: o `verificar-acessos.sh` foi de 429 para 445 casos, sem falha. Os casos
+novos cobrem:
+
+- recusa de publicar sem arte;
+- recusa de um SVG renomeado para `.png`;
+- publicação com arte, com o texto alternativo aparecendo na home;
+- 403 para a loja ao tentar mandar a campanha para a lixeira;
+- lixeira pelo Moderador, com a campanha saindo da home.
+
+No navegador, a 1600px e a 375px, nos dois perfis: moldura certa, item ativo,
+`scrollX` em 0.
