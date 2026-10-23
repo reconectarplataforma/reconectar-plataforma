@@ -4778,3 +4778,57 @@ novos cobrem:
 
 No navegador, a 1600px e a 375px, nos dois perfis: moldura certa, item ativo,
 `scrollX` em 0.
+
+---
+
+## 2026-10-22 — Moderação fora do `/wp-admin`
+
+Terceira das quatro etapas. `/gestao/moderacao/` traz duas abas: "Avaliações de
+produto", com Pendentes, Aprovadas, Spam e Lixeira, e "Fórum", com perguntas e
+respostas aguardando aprovação, em spam ou na lixeira. Cada linha leva um botão
+por decisão, sem `<select>`. O item "Moderação" entra na barra lateral para
+quem tem a capacidade nova `reconectar_moderar` (`CAP_MODERAR`). Ela não é
+`moderate_comments`, que o Dokan dá a toda loja para aprovar as avaliações dos
+próprios produtos. Um portão nela abriria a fila da plataforma inteira a
+qualquer loja. Comentários da Incubadora (`rc_incubadora`)
+ficam fora da fila, porque já são moderados na própria Incubadora, e a recusa
+deles é conferida no servidor, não só na consulta.
+
+A conferência é `moderate_comments`, e não `edit_comment`. O núcleo mapeia
+`edit_comment` de uma avaliação para `edit_others_products`, que o Moderador
+não tem: a trava "mais estrita" recusaria o Moderador em toda avaliação.
+
+No fórum, a moderação acontece no próprio tópico. Para quem tem `moderate`, a
+pergunta e cada resposta ganham um menu "Moderar" com estas ações:
+
+- editar;
+- aprovar;
+- fechar ou reabrir para respostas;
+- marcar como spam ou desfazer;
+- mandar para a lixeira ou restaurar.
+
+O menu é um `<details>` fechado. As URLs são as alternâncias do próprio bbPress
+(`bbp_toggle_*`, por GET com nonce), sem handler novo. Não há "fixar", porque a
+lista ordena por votos e um tópico fixo furaria a ordem. Uma faixa diz a
+situação do item (pendente, spam, lixeira, fechado), para o moderador saber que
+está vendo algo que o público não vê.
+
+Defeito achado na medição e corrigido no `painel-gestao.css`: o `.rc-botao` do
+tema carrega depois do plugin e pintava de laranja todo botão das telas de
+gestão, inclusive os das etapas anteriores. As variantes foram redeclaradas sob
+`.rc-painel-gestao`, e a armadilha está no `CLAUDE.md`.
+
+Medido: o `verificar-acessos.sh` foi de 445 para 464 casos, sem falha. Os casos
+novos cobrem:
+
+- Moderador aprovando uma avaliação, conferida no banco;
+- a mesma decisão repetida, recusada;
+- Administrador desaprovando a avaliação;
+- 403 para a loja com nonce inválido;
+- 403 para um comentário da Incubadora com nonce válido;
+- tópico pendente aprovado pela fila;
+- tópico fechado pelo link do menu, lido do HTML;
+- a loja sem o menu no tópico e sem o item na barra.
+
+No navegador, a 1600px e a 375px, nos dois perfis: moldura certa, item ativo,
+`scrollX` em 0, e o menu aberto dentro da coluna no celular.

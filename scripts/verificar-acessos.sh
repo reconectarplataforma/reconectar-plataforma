@@ -643,6 +643,7 @@ echo "Telas de gestão (/gestao/)"
 # áreas recebe sempre o mesmo login, e a rota não revela quais existem.
 conferir "" "/gestao/enquetes/" "302 wp-login.php" "o visitante vai ao login"
 conferir "" "/gestao/xyz/"      "302 wp-login.php" "área inexistente não se revela ao visitante"
+conferir "" "/gestao/moderacao/" "302 wp-login.php" "o visitante não abre a moderação"
 for perfil_jar in "Administrador:$JAR_EMPRESAS" "Moderador:$JAR_MODERADOR"; do
   perfil="${perfil_jar%%:*}"
   jar="${perfil_jar#*:}"
@@ -657,6 +658,9 @@ for perfil_jar in "Administrador:$JAR_EMPRESAS" "Moderador:$JAR_MODERADOR"; do
   conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-enquetes"' "presente" "a barra do $perfil traz Enquetes"
   conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-foruns"'   "presente" "a barra do $perfil traz Categorias do fórum"
   conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-campanhas"' "presente" "a barra do $perfil traz Campanhas"
+  conferir "$jar" "/gestao/moderacao/"           "200" "o $perfil abre a fila de avaliações"
+  conferir "$jar" "/gestao/moderacao/?aba=forum" "200" "o $perfil abre a fila do fórum"
+  conferir_corpo "$jar" "/gestao/enquetes/" '"rc-gestao-moderacao"' "presente" "a barra do $perfil traz Moderação"
 done
 for perfil_jar in "loja:$JAR_VENDEDOR" "cliente:$JAR_CLIENTE"; do
   perfil="${perfil_jar%%:*}"
@@ -666,8 +670,10 @@ for perfil_jar in "loja:$JAR_VENDEDOR" "cliente:$JAR_CLIENTE"; do
   conferir "$jar" "/gestao/enquetes/nova/" "403" "a $perfil não cria enquete"
   conferir "$jar" "/gestao/foruns/"        "403" "a $perfil não gere categorias"
   conferir "$jar" "/gestao/campanhas/"     "403" "a $perfil não gere campanhas"
+  conferir "$jar" "/gestao/moderacao/"     "403" "a $perfil não modera"
 done
 [ -f "$JAR_VENDEDOR" ] && conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-gestao-enquetes"' "ausente" "a barra da loja não traz Enquetes"
+[ -f "$JAR_VENDEDOR" ] && conferir_corpo "$JAR_VENDEDOR" "/dashboard/" '"rc-gestao-moderacao"' "ausente" "a barra da loja não traz Moderação"
 
 # O `_wpnonce` que antecede o `reconectar_acao` de uma ação, e não o primeiro da
 # página: a enquete aberta tem dois formulários — salvar e lixeira —, cada um
@@ -795,6 +801,70 @@ if banco_alcancavel && [ -f "$JAR_MODERADOR" ] && [ -f "$JAR_EMPRESAS" ]; then
     registrar "$([[ "$resposta" == 302*"/gestao/campanhas/?aviso=na-lixeira"* ]] && echo sim || echo nao)" "campanha na lixeira" "o Moderador manda a campanha para a lixeira (veio: $resposta)"
     conferir_corpo "" "/" "$alt_campanha" "ausente" "a campanha na lixeira sai da home"
     wp_eval "\$a = get_post_thumbnail_id( $id_campanha ); if ( \$a ) { wp_delete_attachment( \$a, true ); } wp_delete_post( $id_campanha, true );" >/dev/null
+  fi
+
+  # Moderação: uma avaliação pendente criada aqui, aprovada pelo Moderador e
+  # desaprovada pelo Administrador. Cada decisão confere o status gravado, e o
+  # caso de repetição prova isso: aprovar de novo o que já foi aprovado volta
+  # com erro, como na disputa entre dois moderadores na mesma fila.
+  #
+  # O nonce é um só para a lista inteira, e só sai impresso quando há linha na
+  # tela. Os casos que esperam recusa por outra razão — repetição, tipo errado —
+  # reaproveitam um nonce colhido antes: com a fila vazia, a recusa viria do
+  # nonce ausente e o caso passaria sem ter medido nada.
+  moderar() {
+    local jar="$1" aba="$2" situacao="$3" alvo="$4" decisao="$5" nonce="${6:-}"
+    [ -n "$nonce" ] || nonce="$(nonce_da_acao "$jar" "/gestao/moderacao/?aba=$aba&situacao=$situacao" "moderar")"
+    enviar_gestao "$jar" "/gestao/moderacao/?aba=$aba&situacao=$situacao" \
+      "reconectar_acao=moderar" "_wpnonce=$nonce" \
+      "aba=$aba" "situacao=$situacao" "pagenum=1" "alvo=$alvo" "decisao=$decisao"
+  }
+
+  id_review="$(wp_eval '$p = get_posts( array( "post_type" => "product", "numberposts" => 1, "fields" => "ids" ) ); if ( $p ) { $c = wp_insert_comment( array( "comment_post_ID" => $p[0], "comment_type" => "review", "comment_approved" => 0, "comment_author" => "Verificação automática", "comment_author_email" => "verificacao@exemplo.invalid", "comment_content" => "Avaliação criada por verificar-acessos.sh." ) ); update_comment_meta( $c, "rating", 4 ); echo $c; }')"
+  nonce_moderador=""
+  if [ -n "$id_review" ]; then
+    nonce_moderador="$(nonce_da_acao "$JAR_MODERADOR" "/gestao/moderacao/" "moderar")"
+    resposta="$(moderar "$JAR_MODERADOR" avaliacoes pendentes "$id_review" aprovar "$nonce_moderador")"
+    registrar "$([[ "$resposta" == 302*"/gestao/moderacao/"*"aviso=aprovado"* ]] && echo sim || echo nao)" "avaliação aprovada" "o Moderador aprova a avaliação pendente (veio: $resposta)"
+    registrar "$([ "$(wp_eval "echo wp_get_comment_status( $id_review );")" = "approved" ] && echo sim || echo nao)" "avaliação no banco" "a aprovação chega ao banco"
+
+    resposta="$(moderar "$JAR_MODERADOR" avaliacoes pendentes "$id_review" aprovar "$nonce_moderador")"
+    registrar "$([[ "$resposta" == 302*"aviso=erro"* ]] && echo sim || echo nao)" "avaliação repetida" "aprovar de novo volta com erro (veio: $resposta)"
+
+    resposta="$(moderar "$JAR_EMPRESAS" avaliacoes aprovados "$id_review" desaprovar)"
+    registrar "$([[ "$resposta" == 302*"aviso=desaprovado"* ]] && echo sim || echo nao)" "avaliação desaprovada" "o Administrador desaprova a avaliação (veio: $resposta)"
+
+    resposta="$(enviar_gestao "$JAR_VENDEDOR" "/gestao/moderacao/" \
+      "reconectar_acao=moderar" "_wpnonce=invalido" "aba=avaliacoes" "situacao=pendentes" "alvo=$id_review" "decisao=aprovar")"
+    registrar "$([ "${resposta%% *}" = "403" ] && echo sim || echo nao)" "avaliação da loja" "a loja não aprova avaliação (veio: $resposta)"
+    wp_eval "wp_delete_comment( $id_review, true );" >/dev/null
+  fi
+
+  # O comentário da Incubadora tem moderação própria, na página dele. A fila só
+  # lista avaliação de produto, e um `alvo` forjado com outro tipo é recusado.
+  id_comentario="$(wp_eval '$p = get_posts( array( "post_type" => "incubadora_pagina", "numberposts" => 1, "fields" => "ids", "post_status" => "any" ) ); if ( $p ) { echo wp_insert_comment( array( "comment_post_ID" => $p[0], "comment_type" => "rc_incubadora", "comment_approved" => 0, "comment_content" => "Comentário criado por verificar-acessos.sh." ) ); }')"
+  if [ -n "$id_comentario" ] && [ -n "$nonce_moderador" ]; then
+    resposta="$(moderar "$JAR_MODERADOR" avaliacoes pendentes "$id_comentario" aprovar "$nonce_moderador")"
+    registrar "$([ "${resposta%% *}" = "403" ] && echo sim || echo nao)" "comentário da Incubadora" "a fila não aprova comentário da Incubadora (veio: $resposta)"
+    wp_eval "wp_delete_comment( $id_comentario, true );" >/dev/null
+  fi
+
+  # Fórum: um tópico pendente aprovado pela fila e, já publicado, fechado pelo
+  # menu "Moderar" da própria página — pela URL do bbPress, com o nonce lido do
+  # HTML que o Moderador recebe.
+  id_topico_pendente="$(wp_eval '$f = get_posts( array( "post_type" => "forum", "numberposts" => 1, "fields" => "ids" ) ); if ( $f ) { echo bbp_insert_topic( array( "post_parent" => $f[0], "post_status" => "pending", "post_title" => "Verificação automática " . time(), "post_content" => "Pergunta criada por verificar-acessos.sh." ), array( "forum_id" => $f[0] ) ); }')"
+  if [ -n "$id_topico_pendente" ] && [ "$id_topico_pendente" != "0" ]; then
+    resposta="$(moderar "$JAR_MODERADOR" forum pendentes "$id_topico_pendente" aprovar)"
+    registrar "$([[ "$resposta" == 302*"aba=forum"* && "$resposta" == *"aviso=aprovado"* ]] && echo sim || echo nao)" "tópico aprovado" "o Moderador aprova o tópico pendente (veio: $resposta)"
+
+    caminho_topico="$(wp_eval "echo wp_make_link_relative( get_permalink( $id_topico_pendente ) );")"
+    fechar="$(curl -s -b "$JAR_MODERADOR" "$BASE$caminho_topico" | grep -o 'href="[^"]*bbp_toggle_topic_close[^"]*"' | head -1 | sed 's/^href="//;s/"$//;s/&#038;/\&/g')"
+    if [ -n "$fechar" ]; then
+      curl -s -b "$JAR_MODERADOR" -o /dev/null "$fechar"
+    fi
+    registrar "$([ "$(wp_eval "echo bbp_is_topic_closed( $id_topico_pendente ) ? 'sim' : 'nao';")" = "sim" ] && echo sim || echo nao)" "tópico fechado" "o Moderador fecha o tópico pelo menu da página"
+    conferir_corpo "$JAR_VENDEDOR" "$caminho_topico" "rc-forum-moderacao__menu" "ausente" "a loja não vê o menu Moderar"
+    wp_eval "wp_delete_post( $id_topico_pendente, true );" >/dev/null
   fi
 fi
 

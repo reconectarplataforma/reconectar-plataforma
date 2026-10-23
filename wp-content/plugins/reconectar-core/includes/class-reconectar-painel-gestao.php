@@ -3,7 +3,7 @@
  * As telas de gestão do Administrador e do Moderador — rota `/gestao/`.
  *
  * O que esses dois papéis faziam no `/wp-admin` (enquetes, categorias do fórum,
- * e nas etapas seguintes campanhas e moderação) passa a ter tela aqui, na
+ * campanhas e moderação) passa a ter tela aqui, na
  * moldura do painel do Dokan, para que o `/wp-admin` fique só com o Super
  * Administrador.
  *
@@ -73,6 +73,7 @@ class Reconectar_Painel_Gestao {
 			'enquetes'  => 'Reconectar_Painel_Enquetes',
 			'foruns'    => 'Reconectar_Painel_Foruns',
 			'campanhas' => 'Reconectar_Painel_Campanhas',
+			'moderacao' => 'Reconectar_Painel_Moderacao',
 		);
 	}
 
@@ -351,10 +352,13 @@ class Reconectar_Painel_Gestao {
 	 * @param string|int $item     Item de destino, ou vazio.
 	 * @param string     $aviso    Código do aviso.
 	 * @param string     $mensagem Mensagem livre, para o aviso `erro`.
+	 * @param array      $extras   Parâmetros da listagem a preservar — aba,
+	 *                             situação e página da moderação, que sem isto
+	 *                             voltaria à primeira aba depois de cada ação.
 	 * @return void
 	 */
-	public static function redirecionar( $area, $item, $aviso, $mensagem = '' ) {
-		$argumentos = array( 'aviso' => $aviso );
+	public static function redirecionar( $area, $item, $aviso, $mensagem = '', array $extras = array() ) {
+		$argumentos = array_merge( $extras, array( 'aviso' => $aviso ) );
 
 		if ( '' !== $mensagem ) {
 			$argumentos['motivo'] = rawurlencode( $mensagem );

@@ -3431,6 +3431,71 @@
   color: #0e6259;
 }
 
+/* Moderação no próprio tópico ---------------------------------------------
+
+   O menu abre no fluxo, empurrando o texto, e não por cima dele: um painel
+   absoluto pediria ancestral posicionado e, perto da borda direita do celular,
+   transbordaria — a armadilha do `overflow-x` registrada no `CLAUDE.md`.
+
+   A lista vai com o ID do bbPress no seletor porque a folha dele zera e
+   reestiliza `#bbpress-forums ul`, com especificidade de ID. */
+
+.rc-forum-moderacao {
+  margin-top: 8px;
+}
+
+.rc-forum-moderacao__situacao {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--reconectar-cor-destaque);
+  background: #fdf6e3;
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-sm);
+  line-height: var(--rc-entrelinha-compacta);
+}
+
+.rc-forum-moderacao__gatilho {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--rc-borda);
+  border-radius: 999px;
+  background: var(--rc-superficie);
+  color: var(--rc-texto);
+  font-size: var(--rc-fonte-xs);
+  font-weight: 600;
+  line-height: var(--rc-entrelinha-justa);
+  cursor: pointer;
+}
+
+#bbpress-forums .rc-forum-moderacao__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#bbpress-forums .rc-forum-moderacao__acoes a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--rc-raio);
+  background: #f3edf8;
+  color: var(--reconectar-cor-institucional);
+  font-size: var(--rc-fonte-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#bbpress-forums .rc-forum-moderacao__acoes a:hover,
+#bbpress-forums .rc-forum-moderacao__acoes a:focus-visible {
+  text-decoration: underline;
+}
+
 /* Trilha do bbPress ------------------------------------------------------- */
 
 /* A folha do plugin dá `float: left` à trilha (`#bbpress-forums div.bbp-breadcrumb`).

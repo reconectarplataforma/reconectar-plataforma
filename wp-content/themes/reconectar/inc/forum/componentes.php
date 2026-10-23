@@ -325,6 +325,132 @@ function reconectar_forum_melhor_resposta( $resposta_id, $topico_id ) {
 }
 
 /**
+ * Imprime o menu "Moderar" de uma pergunta ou resposta, e a faixa de situação.
+ *
+ * Só para quem tem `moderate` sobre o item. As ações são as do próprio bbPress
+ * — `bbp_toggle_topic_*` e `bbp_toggle_reply_*`, por GET com nonce, tratadas em
+ * `bbp_get_request` —, e por isso não há handler autoral: as URLs repetem os
+ * nomes de ação e de nonce de `bbp_get_topic_close_link()` e vizinhos. Os links
+ * prontos daquelas funções não servem aqui porque saem com o rótulo em inglês
+ * quando o pacote de idioma do plugin falta, e com o "Excluir permanentemente"
+ * ao lado da lixeira quando ela está desligada.
+ *
+ * Fixar não entra: a lista do fórum ordena por votos, e um tópico fixado no
+ * topo de uma ordenação que o ignora seria uma promessa que a tela não cumpre.
+ *
+ * O menu é um `<details>` fechado: abre por teclado e leitor de tela sem
+ * JavaScript, e no celular não ocupa a tela até ser pedido.
+ *
+ * @param int $post_id Pergunta ou resposta.
+ */
+function reconectar_forum_moderacao( $post_id ) {
+	if ( ! function_exists( 'bbp_get_topic_post_type' ) || ! current_user_can( 'moderate', $post_id ) ) {
+		return;
+	}
+
+	$post = get_post( $post_id );
+
+	if ( ! $post ) {
+		return;
+	}
+
+	$eh_topico = bbp_get_topic_post_type() === $post->post_type;
+	$tipo      = $eh_topico ? 'topic' : 'reply';
+	$topico_id = $eh_topico ? $post->ID : (int) bbp_get_reply_topic_id( $post->ID );
+	$base      = get_permalink( $topico_id );
+	$acoes     = array();
+
+	/*
+	 * Monta a URL de alternância no formato que `bbp_toggle_<tipo>_handler()`
+	 * confere: ação, id e nonce `<verbo>-<tipo>_<id>`.
+	 */
+	$url = function ( $verbo, array $extras = array() ) use ( $tipo, $post, $base ) {
+		$args = array_merge(
+			array(
+				'action'      => 'bbp_toggle_' . $tipo . '_' . $verbo,
+				$tipo . '_id' => $post->ID,
+			),
+			$extras
+		);
+
+		return add_query_arg( $args, $base );
+	};
+
+	$acoes[] = array(
+		'rotulo' => __( 'Editar', 'reconectar' ),
+		'url'    => $eh_topico ? bbp_get_topic_edit_url( $post->ID ) : bbp_get_reply_edit_url( $post->ID ),
+	);
+
+	if ( bbp_get_pending_status_id() === $post->post_status ) {
+		$acoes[] = array(
+			'rotulo' => __( 'Aprovar', 'reconectar' ),
+			'url'    => wp_nonce_url( $url( 'approve' ), 'approve-' . $tipo . '_' . $post->ID ),
+		);
+	}
+
+	if ( $eh_topico && bbp_get_trash_status_id() !== $post->post_status ) {
+		$acoes[] = array(
+			'rotulo' => bbp_is_topic_open( $post->ID ) ? __( 'Fechar para respostas', 'reconectar' ) : __( 'Reabrir para respostas', 'reconectar' ),
+			'url'    => wp_nonce_url( $url( 'close' ), 'close-topic_' . $post->ID ),
+		);
+	}
+
+	$eh_spam = bbp_get_spam_status_id() === $post->post_status;
+
+	if ( bbp_get_trash_status_id() !== $post->post_status ) {
+		$acoes[] = array(
+			'rotulo' => $eh_spam ? __( 'Não é spam', 'reconectar' ) : __( 'Marcar como spam', 'reconectar' ),
+			'url'    => wp_nonce_url( $url( 'spam' ), 'spam-' . $tipo . '_' . $post->ID ),
+		);
+	}
+
+	// A lixeira tem guarda própria no bbPress, `delete_topic`/`delete_reply`,
+	// e o link só sai para quem passaria por ela.
+	if ( current_user_can( 'delete_' . $tipo, $post->ID ) && bbp_get_trash_days( $post->post_type ) ) {
+		$na_lixeira = bbp_get_trash_status_id() === $post->post_status;
+		$acoes[]    = array(
+			'rotulo' => $na_lixeira ? __( 'Restaurar da lixeira', 'reconectar' ) : __( 'Mandar para a lixeira', 'reconectar' ),
+			'url'    => wp_nonce_url(
+				$url( 'trash', array( 'sub_action' => $na_lixeira ? 'untrash' : 'trash' ) ),
+				( $na_lixeira ? 'untrash-' : 'trash-' ) . $post->post_type . '_' . $post->ID
+			),
+		);
+	}
+
+	$situacoes = array(
+		bbp_get_pending_status_id() => __( 'Aguardando aprovação: só a moderação vê.', 'reconectar' ),
+		bbp_get_spam_status_id()    => __( 'Marcada como spam: só a moderação vê.', 'reconectar' ),
+		bbp_get_trash_status_id()   => __( 'Na lixeira: só a moderação vê.', 'reconectar' ),
+	);
+	$situacao  = isset( $situacoes[ $post->post_status ] ) ? $situacoes[ $post->post_status ] : '';
+
+	if ( '' === $situacao && $eh_topico && bbp_is_topic_closed( $post->ID ) ) {
+		$situacao = __( 'Fechada para novas respostas.', 'reconectar' );
+	}
+	?>
+	<div class="rc-forum-moderacao">
+		<?php if ( '' !== $situacao ) : ?>
+			<p class="rc-forum-moderacao__situacao"><?php echo esc_html( $situacao ); ?></p>
+		<?php endif; ?>
+
+		<details class="rc-forum-moderacao__menu">
+			<summary class="rc-forum-moderacao__gatilho">
+				<?php esc_html_e( 'Moderar', 'reconectar' ); ?>
+				<span class="screen-reader-text">
+					<?php echo esc_html( $eh_topico ? __( 'esta pergunta', 'reconectar' ) : __( 'esta resposta', 'reconectar' ) ); ?>
+				</span>
+			</summary>
+			<ul class="rc-forum-moderacao__acoes">
+				<?php foreach ( $acoes as $acao ) : ?>
+					<li><a href="<?php echo esc_url( $acao['url'] ); ?>"><?php echo esc_html( $acao['rotulo'] ); ?></a></li>
+				<?php endforeach; ?>
+			</ul>
+		</details>
+	</div>
+	<?php
+}
+
+/**
  * Imprime a pergunta na sua própria página.
  *
  * @param WP_Post $topico Pergunta.
@@ -340,6 +466,8 @@ function reconectar_forum_pergunta( $topico ) {
 			<h1 class="rc-forum-pergunta__titulo"><?php echo esc_html( get_the_title( $topico ) ); ?></h1>
 
 			<?php reconectar_forum_assinatura( (int) $topico->post_author, $topico->post_date_gmt ); ?>
+
+			<?php reconectar_forum_moderacao( $topico->ID ); ?>
 
 			<div class="rc-forum-pergunta__texto">
 				<?php
@@ -386,6 +514,8 @@ function reconectar_forum_resposta( $resposta, $topico_id ) {
 
 		<div class="rc-forum-resposta__corpo">
 			<?php reconectar_forum_assinatura( (int) $resposta->post_author, $resposta->post_date_gmt ); ?>
+
+			<?php reconectar_forum_moderacao( $resposta->ID ); ?>
 
 			<div class="rc-forum-resposta__texto">
 				<?php
