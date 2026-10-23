@@ -129,7 +129,8 @@ class Reconectar_Proposta_Votacao {
 	 * As capacidades são **declaradas**, e essa é a correção central deste
 	 * arquivo. Sem `capability_type` o WordPress cai no padrão `post`, e o
 	 * Moderador de Conteúdo administrava enquete por acidente — pelas
-	 * `edit_posts`/`publish_posts` que `CAPS_DE_CONTEUDO` dá para post e página.
+	 * `edit_posts`/`publish_posts` que `CAPS_DE_CONTEUDO` então dava para post e
+	 * página (o papel as perdeu na versão 10 das capacidades).
 	 * Medido antes da correção:
 	 *
 	 *     moderador      edit_post( proposta ) → true   (por acidente)
@@ -179,13 +180,21 @@ class Reconectar_Proposta_Votacao {
 				'rewrite'      => array( 'slug' => 'enquete' ),
 				'map_meta_cap' => true,
 				'capabilities' => array(
-					'edit_posts'         => $capacidade,
-					'edit_others_posts'  => $capacidade,
-					'delete_posts'       => $capacidade,
-					'delete_others_posts' => $capacidade,
-					'publish_posts'      => $capacidade,
-					'read_private_posts' => $capacidade,
-					'create_posts'       => $capacidade,
+					'edit_posts'             => $capacidade,
+					'edit_others_posts'      => $capacidade,
+					'delete_posts'           => $capacidade,
+					'delete_others_posts'    => $capacidade,
+					'publish_posts'          => $capacidade,
+					'read_private_posts'     => $capacidade,
+					'create_posts'           => $capacidade,
+					// Pedidas por `map_meta_cap()` para a enquete publicada ou
+					// privada. Fora do mapa, caem na primitiva de post homônima,
+					// que os papéis perderam: editar ou excluir enquete no ar
+					// passaria a responder 403.
+					'edit_published_posts'   => $capacidade,
+					'edit_private_posts'     => $capacidade,
+					'delete_published_posts' => $capacidade,
+					'delete_private_posts'   => $capacidade,
 				),
 			)
 		);

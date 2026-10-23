@@ -25,19 +25,22 @@ Entre como Super Administrador em `/wp-admin/`. O papel `administrator` aparece
 na tela com esse nome — foi renomeado pelo plugin autoral, e é ele que acumula
 os dois lados: administra a tecnologia e, por consequência, também a operação.
 
-O trabalho acontece em **duas áreas distintas**, e confundir uma com a outra é o
+O trabalho acontece em **três áreas distintas**, e confundir uma com a outra é o
 erro mais comum deste roteiro:
 
-| Área | URL | O que se faz ali |
-| --- | --- | --- |
-| Administração do WordPress | `/wp-admin/` | perfis (usuários) e categorias de produto |
-| Painel de Empresas | `/painel-empresas/` | empresas e lojas |
+| Área | URL | Quem entra | O que se faz ali |
+| --- | --- | --- | --- |
+| Administração do WordPress | `/wp-admin/` | Super Administrador | cadastro de usuários, categorias de produto |
+| Painel de Empresas | `/painel-empresas/` | Super Administrador e Administrador | empresas e lojas |
+| Telas de Gestão | `/gestao/<area>/` | Administrador e Moderador de Conteúdo | enquetes, campanhas, fórum, moderação |
 
 O Painel de Empresas **não tem item de menu no `/wp-admin/`** — ele é uma rota
 de front-end, fora da administração. O caminho pela interface é o botão
 **"Painel de Empresas"** no canto direito do cabeçalho do site, que aparece para
 quem está logado com permissão de acessá-lo. Digitar `/painel-empresas/` na
-barra de endereços dá no mesmo.
+barra de endereços dá no mesmo. As telas de gestão nascem na moldura do painel
+do Dokan, com um menu "Gestão" que aparece para Administrador e Moderador de
+Conteúdo.
 
 ## A ordem importa
 
@@ -70,8 +73,8 @@ importam:
 | Rótulo na tela | Papel | O que administra | Onde trabalha |
 | --- | --- | --- | --- |
 | Super Administrador | `administrator` | tudo | `/wp-admin/` e `/painel-empresas/` |
-| Administrador | `company_admin` | as empresas do escopo dele, e as lojas delas | `/painel-empresas/` |
-| Moderador de Conteúdo | `content_moderator` | posts, páginas, comentários e o fórum | `/wp-admin/` |
+| Administrador | `company_admin` | as empresas do escopo dele, e as lojas delas | `/painel-empresas/` e `/gestao/` |
+| Moderador de Conteúdo | `content_moderator` | enquetes, campanhas, Incubadora, comentários e o fórum | `/gestao/` e Incubadora |
 | Vendor | `seller` | a própria loja | `/dashboard/` (painel do Dokan) |
 | Customer | `customer` | a própria conta | `/my-account/` |
 
@@ -88,7 +91,7 @@ se registra sozinho em `/my-account/`. O autocadastro de **loja**, ao contrário
 
 ## 1.2 Cadastrar um Administrador (`company_admin`)
 
-`/wp-admin/user-new.php` — **Usuários → Adicionar novo**.
+Super Administrador → `/wp-admin/user-new.php` — **Usuários → Adicionar novo**.
 
 | Campo | O que preencher |
 | --- | --- |
@@ -107,9 +110,9 @@ se registra sozinho em `/my-account/`. O autocadastro de **loja**, ao contrário
 
 ## 1.3 O escopo: o passo que falta
 
-Um Administrador recém-criado **não vê empresa nenhuma**. O painel dele abre
-dizendo *"Nenhuma empresa sob sua gestão ainda"*, mesmo que a plataforma já tenha
-dezenas cadastradas.
+Um Administrador recém-criado **não vê empresa nenhuma**. O painel de empresas
+dele abre dizendo *"Nenhuma empresa sob sua gestão ainda"*, mesmo que a
+plataforma já tenha dezenas cadastradas.
 
 Isso é intencional: o vínculo entre Administrador e empresa é N:N e explícito,
 gravado na user meta `_reconectar_empresas_geridas`. Só o Super Administrador
@@ -155,11 +158,12 @@ docker compose run --rm wpcli wp user meta get 7 _reconectar_empresas_geridas --
 
 Mesmo formulário da seção 1.2, com **Função: Moderador de Conteúdo**.
 
-Ele trabalha dentro do `/wp-admin/`, mas com uma administração podada: publica e
-edita posts e páginas, modera comentários e administra o fórum. Não alcança
-produtos, pedidos, plugins, temas nem configurações — quem administra o produto
-é a loja dona dele. A matriz completa está em
-[PERFIS_E_PERMISSOES.md](PERFIS_E_PERMISSOES.md).
+Ele opera pelas telas de gestão (`/gestao/enquetes/`, `/gestao/foruns/`,
+`/gestao/campanhas/`, `/gestao/moderacao/`) e escreve na Incubadora (`/incubadora/`).
+Modera comentários e avaliações, administra o fórum, publica enquetes e campanhas
+e gerencia a wiki interna. Não alcança produtos, pedidos, plugins, temas,
+configurações nem contas de usuário — quem administra o produto é a loja dona
+dele. A matriz completa está em [PERFIS_E_PERMISSOES.md](PERFIS_E_PERMISSOES.md).
 
 Ao contrário do Administrador, este perfil **não tem escopo a definir**: está
 pronto assim que a conta é criada.
@@ -306,8 +310,10 @@ de definição de senha** para você repassar à pessoa responsável.
 > **Ele aparece uma única vez.** Copie antes de sair da tela.
 
 Perdido o link, o caminho é a pessoa usar "Perdi minha senha" na tela de acesso
-— o que só funciona quando o envio de e-mail existir — ou o Super Administrador
-definir a senha à mão em **Usuários → Editar**.
+— o que só funciona quando o envio de e-mail existir — ou voltar à ficha da loja
+e clicar em **"Enviar link de redefinição de senha"**. Reenviam o Super
+Administrador e o Administrador que tenha no escopo a empresa dona da loja. Se o
+e-mail não sair, a ficha mostra o link uma vez, para ser repassado à mão.
 
 O link expira como qualquer redefinição de senha do WordPress.
 
@@ -399,10 +405,11 @@ Para a home não exibir nenhum bloco vazio:
   de Super Administrador por desenho.
 - **Configuração de pagamento.** É por loja, e tem documento próprio:
   [PAGAMENTOS.md](PAGAMENTOS.md).
-- **Conteúdo editorial** — posts, páginas, fórum, campanhas da home e as
-  páginas da Incubadora. É o território do Moderador de Conteúdo, e a
-  Incubadora se escreve pelo próprio site, em `/incubadora/`, sem o
-  `/wp-admin`: veja a seção 4.6 de [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md). A
+- **Conteúdo editorial** — enquetes, campanhas da home, fórum e páginas da
+  Incubadora. É o território do Moderador de Conteúdo. A Incubadora se escreve
+  pelo próprio site, em `/incubadora/`, e as outras áreas pelas telas de gestão
+  em `/gestao/enquetes/`, `/gestao/campanhas/` e `/gestao/foruns/`, sem o
+  `/wp-admin`: veja a seção 4.5 de [ROTEIRO_PERFIS.md](ROTEIRO_PERFIS.md). A
   página âncora e o item de menu nascem do `provision.sh`; as páginas, não —
   uma instalação nova abre a Incubadora com o botão "Criar a primeira página".
 - **Envio de e-mail.** A instalação não tem SMTP, e todo passo deste roteiro foi

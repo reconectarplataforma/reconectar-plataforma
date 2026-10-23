@@ -334,6 +334,10 @@ class Reconectar_Painel_Empresas {
 			case 'loja_alternar':
 				self::acao_loja_alternar( $campos );
 				break;
+
+			case 'loja_enviar_senha':
+				self::acao_loja_enviar_senha( $campos );
+				break;
 		}
 	}
 
@@ -482,6 +486,48 @@ class Reconectar_Painel_Empresas {
 		}
 
 		self::redirecionar( 'loja/' . $loja_id, $ativa ? 'loja-ativada' : 'loja-desativada' );
+	}
+
+	/**
+	 * Envia à loja o link de redefinição de senha.
+	 *
+	 * Quando o `wp_mail()` recusa, a tela não diz "enviado": gera um link novo e
+	 * o mostra para ser repassado, pelo mesmo transient do cadastro. O link novo
+	 * invalida a chave do envio que falhou, e não há perda nisso — aquele e-mail
+	 * não saiu. Quando o envio é aceito, o aviso diz só isso: que o servidor
+	 * aceitou, e para qual endereço. Entrega na caixa de entrada nenhum código
+	 * daqui sabe confirmar.
+	 *
+	 * @param array $campos Dados do POST.
+	 * @return void
+	 */
+	private static function acao_loja_enviar_senha( $campos ) {
+		$loja_id = isset( $campos['loja_id'] ) ? (int) $campos['loja_id'] : 0;
+
+		if ( ! Reconectar_Empresa::pode_gerir_loja( $loja_id ) ) {
+			self::recusar();
+		}
+
+		$resultado = Reconectar_Lojas::enviar_link_de_senha( $loja_id );
+
+		if ( true === $resultado ) {
+			self::redirecionar( 'loja/' . $loja_id, 'senha-enviada' );
+		}
+
+		if ( is_wp_error( $resultado ) && 'reconectar_sem_permissao' === $resultado->get_error_code() ) {
+			self::recusar();
+		}
+
+		set_transient(
+			self::chave_do_aviso_de_senha(),
+			array(
+				'loja_id' => $loja_id,
+				'link'    => Reconectar_Lojas::link_de_definicao_de_senha( $loja_id ),
+			),
+			5 * MINUTE_IN_SECONDS
+		);
+
+		self::redirecionar( 'loja/' . $loja_id, 'senha-nao-enviada' );
 	}
 
 	/**
@@ -914,6 +960,8 @@ class Reconectar_Painel_Empresas {
 			'loja-salva'         => __( 'Dados da loja atualizados.', 'reconectar-core' ),
 			'loja-ativada'       => __( 'Loja ativada.', 'reconectar-core' ),
 			'loja-desativada'    => __( 'Loja desativada.', 'reconectar-core' ),
+			'senha-enviada'      => __( 'O servidor de e-mail aceitou o envio do link de redefinição de senha para o endereço cadastrado da loja.', 'reconectar-core' ),
+			'senha-nao-enviada'  => __( 'O e-mail com o link de redefinição de senha não pôde ser enviado. Repasse o link abaixo à pessoa responsável pela loja.', 'reconectar-core' ),
 		);
 
 		if ( 'erro' === $codigo ) {

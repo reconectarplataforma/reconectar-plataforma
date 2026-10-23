@@ -9,8 +9,8 @@ a regra é aplicada**. Implementação em
 | Ator | Papel WP | Onde trabalha |
 | --- | --- | --- |
 | **Super Administrador** | `administrator` | `/wp-admin` |
-| **Administrador** | `company_admin` | `/wp-admin` e `/painel-empresas/` |
-| **Moderador de Conteúdo** | `content_moderator` | moldura do painel do Dokan (Incubadora, Fórum, Comunidade) e `/wp-admin` |
+| **Administrador** | `company_admin` | `/painel-empresas/` e `/gestao/<area>/` |
+| **Moderador de Conteúdo** | `content_moderator` | `/gestao/<area>/`, Incubadora e Fórum |
 | **Vendedor** | `seller` | painel do Dokan, no front-end |
 | **Usuário Comum** | `customer` | loja e "Minha conta" |
 
@@ -30,25 +30,28 @@ rótulo, por `renomear_papel()` — remover e recriar o `administrator` seria
 irreversível se algo falhasse no meio.
 
 **Administrador.** Cadastra empresas e lojas, configura as contas das lojas,
-modera o conteúdo da plataforma e cria menus. Não tem nenhuma capacidade de
-desenvolvimento: **não instala plugin nem tema, não edita arquivo, não atualiza
-o núcleo**. É a evolução do antigo Administrador de Empresas — mesmo papel,
-mesma chave `company_admin`, competências novas.
+gere as campanhas e enquetes da plataforma, administra o fórum. Não tem nenhuma
+capacidade de desenvolvimento: **não instala plugin nem tema, não edita arquivo,
+não atualiza o núcleo**. Não entra no `/wp-admin` — toda a gestão passa por
+telas de front-end no painel de empresas e nas áreas de `/gestao/<area>/`.
+É a evolução do antigo Administrador de Empresas — mesmo papel, mesma chave
+`company_admin`, competências novas.
 
-**Moderador de Conteúdo.** Publica e modera post, página e comentário, gere as
-campanhas da home, cria menus e participa do fórum. Não administra empresa, não
-configura conta de usuário e não toca em produto nem em pedido.
+**Moderador de Conteúdo.** Gere as enquetes e as campanhas da home, escreve e
+publica na Incubadora, modera comentários, avaliações e o fórum. Não administra
+empresa, não configura conta de usuário e não toca em produto nem em pedido.
+Não entra no `/wp-admin` — toda a moderação passa por telas de front-end nas
+áreas de `/gestao/<area>/`.
 
 A Incubadora, o Fórum e a Comunidade abrem para ele na moldura do painel do
 Dokan, sem cabeçalho nem menu do mercado, com "Moderação" no topo da barra
-lateral. A barra traz Incubadora, Comunidade, Fórum e "Painel do WordPress", a
-saída para campanhas, enquetes, publicações e comentários. No topo, "Ir ao mercado"
-leva de volta ao catálogo. O login dele — por
-"Minha conta" ou por `wp-login.php` — leva à Incubadora, a menos que um destino
-explícito tenha sido pedido, e `/dashboard/` também. A razão é de orientação: na
-casca da vitrine ele não tinha como saber que tinha saído do mercado. Não há
-capacidade nova — a moldura é só a casca; quem decide é
-`Reconectar_Navegacao_Da_Loja::modera_no_painel()`, pelo papel.
+lateral. A barra traz Módulos, Incubadora, Comunidade, Fórum e as telas de
+gestão: Enquetes (com Categorias do fórum), Campanhas e Moderação, em
+`/gestao/<area>/`. No topo, "Ir ao mercado" leva de volta ao catálogo. O login
+dele — por "Minha conta" ou por `wp-login.php` — leva à tela de módulos
+(`/modulos/`), e `/dashboard/` também. Não há capacidade nova — a moldura é só a
+casca; quem decide é `Reconectar_Navegacao_Da_Loja::modera_no_painel()`, pelo
+papel, e cada item da barra declara a capacidade da tela a que leva.
 
 **Vendedor.** Uma loja própria e isolada: produtos, estoque, pedidos,
 pagamentos, entrega. Participa dos fóruns, mas não os administra. **Nunca**
@@ -78,38 +81,37 @@ capacidade; quem concede sabe dos papéis.
 `sincronizar_capacidades()` roda em `init`, não na ativação do plugin: o papel
 `seller` é criado pelo **Dokan**, e se o `reconectar-core` for ativado antes
 dele o papel ainda não existe — a concessão se perderia em silêncio. Uma
-constante de versão (`VERSAO_CAPACIDADES`, hoje em **4**) evita reescrever as
+constante de versão (`VERSAO_CAPACIDADES`, hoje em **10**) evita reescrever as
 capacidades a cada carregamento; para forçar a ressincronização, incremente-a.
 É ela que faz uma instalação provisionada meses atrás receber os papéis novos
 sozinha, no primeiro `init` depois da atualização.
 
-### Por que o acesso ao `/wp-admin` não passa por `manage_options`
+### Por que só o Super Administrador entra no `/wp-admin`
 
-Este é o ponto que decide o desenho inteiro, e é contraintuitivo.
+Até a versão 9 das capacidades, o Administrador e o Moderador trabalhavam no
+`/wp-admin`: enquetes, campanhas, categorias do fórum, moderação, posts, páginas
+e menus. A versão 10 levou o que eles fazem para telas de front-end —
+`/painel-empresas/` e `/gestao/<area>/` — e fechou o painel técnico aos dois.
 
-`restringir_gestao_da_tecnologia()` barra as capacidades de plugin e tema
-**acrescentando `manage_options` ao conjunto exigido**. E
-`eh_administracao_tecnica()` é exatamente `manage_options || manage_woocommerce`.
-Dar `manage_options` ao Administrador para que ele entrasse no painel devolveria
-a ele, pela mesma linha, a instalação de plugins — precisamente o que a
-especificação proíbe.
+Há duas razões. A primeira é o **escopo por empresa**: as listagens do
+`/wp-admin` mostram toda loja, todo produto e todo pedido da instalação, sem
+filtro. No `/painel-empresas/` o Administrador vê cadastro e situação, não
+produto nem pedido; no painel técnico veria tudo, com edição, desfazendo em
+silêncio a regra de que quem administra o produto é a loja dona dele. A segunda é
+a **escalada**: a gestão de contas do núcleo (`edit_users`, `promote_users`)
+alcança o `administrator` em single-site — a seção sobre `edit_users`, adiante.
 
-`manage_woocommerce` abriria a porta sem quebrar a trava de plugin, mas tem
-outro preço: os menus de WooCommerce e Dokan aparecem, e **as listagens do
-`/wp-admin` não têm escopo por empresa**. O Administrador alcança todas as
-empresas e lojas no `/painel-empresas/`, mas lá vê cadastro e situação — não
-produto nem pedido. No painel técnico veria produtos e pedidos de todas as
-lojas, com edição, desfazendo em silêncio a regra de que quem administra o
-produto é a loja dona dele.
+O portão continua sendo uma capacidade própria, `CAP_ADMIN_WP`
+(`reconectar_acessar_wp_admin`), que hoje **só o `administrator` tem**.
+`entra_no_painel_wp()` responde `eh_administracao_tecnica() || CAP_ADMIN_WP`, e
+quem responde "não" é levado por `destino_fora_do_painel()` à área dele.
 
-A porta é uma capacidade própria, `CAP_ADMIN_WP`
-(`reconectar_acessar_wp_admin`), consultada **só** em
-`bloquear_area_administrativa()` e `ocultar_barra_administrativa()`, como
-terceira alternativa ao lado de `eh_administracao_tecnica()`.
-`eh_administracao_tecnica()` **não mudou**: os outros dois lugares que a
-consultam — `restringir_por_vendedor()` e `restringir_listagens_do_vendedor()` —
-falam de isolamento entre vendedores, e ali a resposta certa para os papéis
-novos continua sendo "não é administração técnica".
+E a porta não pode ser `manage_options`, mesmo que um dia algum desses papéis
+volte ao painel. `restringir_gestao_da_tecnologia()` barra plugin e tema
+**acrescentando `manage_options` ao conjunto exigido**: dar `manage_options` a
+quem não é Super Administrador devolveria a ele, pela mesma linha, a instalação
+de plugins. `eh_administracao_tecnica()` não muda pela mesma razão — os outros
+lugares que a consultam falam de isolamento entre vendedores.
 
 ### O portão do isolamento
 
@@ -143,16 +145,18 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Acessar `/painel-empresas/` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Cadastrar empresa e loja | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Ver todas as empresas e lojas, com ou sem vínculo | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Enviar link de redefinição de senha da loja | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **Conteúdo** | | | | | |
-| Publicar e editar post e página | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Publicar e editar post e página | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Moderar comentários | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Publicar e programar campanhas da home | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Criar e editar menus de navegação | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Criar e editar menus de navegação | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Enviar arquivos para a biblioteca de mídia | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Comunidade** | | | | | |
 | Ler e participar de fóruns | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Votar em pergunta ou resposta | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Marcar a melhor resposta | ✅ | ✅ | ✅ | só nas próprias perguntas | ❌ |
+| Administrar fóruns (criar categorias, moderar) | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Incubadora** | | | | | |
 | Ler as páginas publicadas | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Ver rascunhos, histórico e versões antigas | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -160,11 +164,11 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Restaurar versão antiga | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Enviar imagem e PDF para uma página | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Contas** | | | | | |
-| Listar, criar e editar contas de loja | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Listar, criar e editar contas de loja | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Editar a conta de um Super Administrador | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Promover alguém a um papel acima do seu | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Plataforma** | | | | | |
-| Acessar `/wp-admin` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Acessar `/wp-admin` | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Instalar, ativar, atualizar ou remover plugins | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Instalar, trocar, atualizar ou editar temas | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Editar arquivo, atualizar o núcleo | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -192,7 +196,9 @@ Super Adm. = `administrator`; Adm. = `company_admin`; Moder. = `content_moderato
 | Entrega arquivo da Incubadora só a quem lê a Incubadora | `Reconectar_Incubadora_Arquivos::entregar()` | `admin_post_reconectar_incubadora_arquivo` |
 | Só a loja dona responde a solicitação de serviço | `Reconectar_Servicos::responder()`, por `loja_pode()` | `admin_post_reconectar_responder_servico` |
 | Mantém quem não tem `CAP_ADMIN_WP` fora do painel | `bloquear_area_administrativa()` | `admin_init` |
+| Leva quem foi barrado à área de trabalho dele | `destino_fora_do_painel()` | chamado por `bloquear_area_administrativa()` |
 | Esconde a barra administrativa do site, para todos os perfis | `ocultar_barra_administrativa()` | `show_admin_bar` |
+| Dá o cartão "Painel Admin" só ao `administrator` | `Reconectar_Modulos::cartoes()` | tela `/modulos/` |
 
 **Interface e backend são camadas distintas, e ambas existem.** Esconder o link
 da comunidade no menu é usabilidade — oferecer um link que devolve 403 é defeito
@@ -257,15 +263,20 @@ uma rota autoral que exige login.
 
 ## A escalada que `edit_users` abre
 
-"Configura os usuários das lojas" exige `edit_users`. Em single-site, quem tem
-`edit_users` **pode editar um `administrator`** — trocar a senha dele e entrar
-com a conta. E `promote_users` permite promover a si mesmo. As duas juntas
-transformariam o Administrador restrito no Super Administrador em dois cliques,
-e a proibição de acesso de desenvolvedor viraria decoração. Nada na tela
-pareceria quebrado.
+Em single-site, quem tem `edit_users` **pode editar um `administrator`** — trocar
+a senha dele e entrar com a conta. E `promote_users` permite promover a si mesmo.
+As duas juntas transformariam o Administrador restrito no Super Administrador em
+dois cliques, e a proibição de acesso de desenvolvedor viraria decoração. Nada na
+tela pareceria quebrado.
 
-`negar_gestao_de_usuarios_superiores()`, em `map_meta_cap`, fecha essa porta com
-duas regras:
+Até a versão 9, o Administrador tinha essas capacidades para configurar as contas
+das lojas. A versão 10 as tirou — o cadastro de loja nunca dependeu delas, e toda
+a configuração da conta se faz agora pela ficha da loja em `/painel-empresas/loja/<id>/`,
+que oferece um botão para enviar o link de redefinição de senha.
+
+`negar_gestao_de_usuarios_superiores()`, em `map_meta_cap`, fica como defesa em
+profundidade. Se um plugin conceder `edit_users` a um papel autoral, este filtro
+fecha a porta com duas regras:
 
 - `edit_user`, `delete_user` e `promote_user` sobre um alvo que tenha
   `manage_options` recebem `do_not_allow`, salvo se quem age também a tiver.
@@ -273,47 +284,26 @@ duas regras:
   não possua. Isso cobre a promoção a `administrator` e qualquer papel futuro
   que alguém crie por cima.
 
-O filtro decide **caso a caso, com alvo**, e é por isso que a lista
-`CAPS_DE_USUARIOS` continua concedida: as primitivas estão lá de propósito, e a
-meta capacidade é que nega. O contorno também é testado — sobre a própria conta
-e sobre uma loja, as mesmas capacidades precisam continuar funcionando, ou o
-filtro teria fechado o perfil inteiro.
+O filtro decide **caso a caso, com alvo**. A primeira camada é a lista de
+capacidades, que já não concede as primitivas; o filtro só volta a decidir algo
+no dia em que alguém as devolver.
 
-## Aparência → Temas responde 200, e isso não é trava frouxa
+## Menus de navegação ficaram com o Super Administrador
 
-`edit_theme_options` é a **única** capacidade que o WordPress oferece para
-editar menus de navegação, e ela vem grudada ao Customizer e aos widgets. Não há
-granularidade menor no núcleo: ou o moderador cria menus e alcança essas telas,
-ou não cria menus. A amplitude é do WordPress, não uma escolha nossa.
+Até a versão 9, o Administrador e o Moderador tinham `edit_theme_options` para
+criar menus. `edit_theme_options` é a **única** capacidade que o WordPress oferece
+para editar menus de navegação, e ela vem grudada ao Customizer e aos widgets. Não
+há granularidade menor no núcleo — tê-la abre as três telas.
 
-`wp-admin/themes.php` abre para quem tem `switch_themes` **ou**
-`edit_theme_options`, então a tela responde 200 para os dois papéis restritos.
-Ela fica **só de leitura**, e isso foi medido: o JSON que o núcleo imprime nela
-traz `"activate":null`, `"delete":null` e `"autoupdate":null` para cada tema, e
-`theme-editor.php` responde 403.
+Por isso ela abria também **Aparência → Temas**, em leitura: o JSON que o núcleo
+imprime naquela tela trazia `"activate":null`, `"delete":null` e
+`"autoupdate":null` para cada tema. A tela abria, mas a capacidade de trocar,
+instalar ou editar tema não estava lá.
 
-`theme-install.php` também nega — "Sem permissão para instalar temas neste site"
-—, mas com status **500**, e vale registrar por quê, porque é a diferença entre
-uma negação e um erro de servidor aos olhos de qualquer verificação automatizada.
-As duas negações são do núcleo, em pontos distintos:
-
-| Tela | Onde morre | Status |
-| --- | --- | --- |
-| `plugins.php`, `options-general.php`, `edit.php?post_type=product` | `wp-admin/includes/menu.php:384`, `wp_die( …, 403 )` | `403` |
-| `theme-install.php` | `wp-admin/theme-install.php:16`, `wp_die()` **sem status** | `500` |
-
-`user_can_access_admin_page()` reprova a página inteira no primeiro grupo. O
-`theme-install.php` **passa** por esse portão, porque pendura em `themes.php`, que
-o perfil pode abrir — e só então encontra a verificação de `install_themes` do
-próprio arquivo. Como essa chamada de `wp_die()` não passa argumento de status, o
-padrão de `_default_wp_die_handler()` entra em cena e é **500**. Esperar 403 em
-toda negação faria um verificador acusar falha onde a trava está funcionando.
-
-Fechá-la à força custaria mais do que resolve — seria um desvio por tela em
-`admin_init`, e `nav-menus.php`, a tela que o perfil existe para usar, depende
-exatamente da mesma capacidade. **A trava que vale é a da lista de capacidades,
-não a da URL**, e é por isso que o script de acessos confere `switch_themes` e
-`install_themes` por WP-CLI em vez de se contentar com o código HTTP.
+A versão 10 tirou `edit_theme_options` dos dois papéis, junto com o acesso ao
+`/wp-admin`. Menu, widgets do rodapé e páginas institucionais ficaram com o
+Super Administrador, por decisão de projeto, e `nav-menus.php` e `widgets.php`
+respondem 403 aos dois.
 
 ## O isolamento entre vendedores
 
@@ -354,14 +344,13 @@ um vendedor logado — ele também é comprador.
 
 `negar_escrita_ao_admin_de_empresas()` monitora `edit_post`, `delete_post` e
 `publish_post` genéricos e libera **só** os tipos que o ator pode escrever —
-empresa, post, página, campanha e os do bbPress. Produto e pedido ficam de fora
-de propósito: quem administra o produto é a loja dona dele, e a negação se
+empresa, campanha, enquete, Incubadora e os do bbPress. Produto e pedido ficam de
+fora de propósito: quem administra o produto é a loja dona dele, e a negação se
 mantém mesmo que um plugin de terceiro conceda `edit_products` por papel.
 
-Essa allowlist é recente e substituiu a exceção invertida, que liberava apenas o
-CPT de empresa. Com o Administrador passando a moderar conteúdo, a versão antiga
-teria negado post e página — o sintoma clássico deste repositório: código no
-lugar certo que impede em silêncio.
+Post e página foram removidos da allowlist na versão 10, quando saíram dos papéis
+restritos — o `negar_escrita_ao_admin_de_empresas()` continua ali de propósito,
+como segunda camada, caso um plugin de terceiro as devolva.
 
 ## Detalhes que não são óbvios
 
@@ -371,8 +360,9 @@ front-end, inclusive as do carrinho e as do painel do Dokan. Por isso
 quebraria a loja para as duas pessoas que o método protege.
 
 **O redirecionamento tem destino útil.** Vendedor barrado no `/wp-admin` vai
-para o painel do Dokan; cliente, para "Minha conta". Despejar alguém na home
-seria tecnicamente correto e inútil.
+para o painel do Dokan; Administrador e Moderador, para a tela de módulos;
+cliente, para "Minha conta". Despejar alguém na home seria tecnicamente correto
+e inútil.
 
 **Visitante deslogado na comunidade vai para o login, com retorno** — pode
 simplesmente não ter entrado ainda. Só quem está logado *e* sem a capacidade
@@ -397,14 +387,16 @@ Administrador, Moderador e Super Administrador entram por `/modulos/`
 (`Reconectar_Modulos`), uma tela com os três módulos do edital — Mercado,
 Incubadora e Praça — a cada login. A Loja e o Super Administrador recebem um
 quarto cartão, de trabalho: "Painel", que leva ao `/dashboard/` do Dokan, e
-"Painel Admin", que leva ao `/wp-admin`. O destino de cada cartão depende do perfil: o Mercado é a vitrine
-da própria loja (`/store/<loja>/`) para a Loja, o painel de empresas para o
-Administrador e a vitrine geral para o Moderador — o painel da loja fica no
-ícone da conta e no item "Painel" da barra lateral. A tela não concede nada: cada botão leva a uma rota que tem as suas
-próprias travas. O desvio só troca o destino **padrão** do login (vazio,
-`/wp-admin`, "Minha conta" ou o painel do Dokan); um `redirect_to` explícito
-vence, para que quem entrou por um link não perca o caminho. O cliente não passa
-por ela: vai à conta, e recebe `302` se abrir a rota à mão.
+"Painel Admin", que leva ao `/wp-admin`. Administrador e Moderador ficam com os
+três: as telas de gestão estão na barra lateral da moldura.
+
+O destino do Mercado depende do perfil: a vitrine da própria loja
+(`/store/<loja>/`) para a Loja, o painel de empresas para o Administrador e a
+vitrine geral para o Moderador e o Super Administrador. A tela não concede nada:
+cada botão leva a uma rota que tem as suas próprias travas. O desvio só troca o
+destino **padrão** do login; um `redirect_to` explícito vence, para que quem
+entrou por um link não perca o caminho. O cliente não passa por ela: vai à conta,
+e recebe `302` se abrir a rota à mão.
 
 ## Como verificar
 
@@ -412,7 +404,7 @@ por ela: vai à conta, e recebe `302` se abrir a rota à mão.
 ./scripts/verificar-acessos.sh -v
 ```
 
-Verifica 400 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
+Verifica 512 casos, a maior parte por HTTP: faz login como cliente, vendedor, moderador,
 administrador e super administrador e bate em cada URL restrita, conferindo o
 código de resposta. Sai com status 1 se algum falhar.
 
@@ -438,21 +430,24 @@ loja que o oferece, como no produto.
 
 Respostas medidas nesta instalação:
 
-| Perfil | `/wp-admin/` | `plugins.php` | `users.php` | `nav-menus.php` | `/painel-empresas/` | `/dashboard/` | `/comunidade/` | `/modulos/` |
+| Perfil | `/wp-admin/` | `users.php` | `nav-menus.php` | `edit.php` | `plugins.php` | `/painel-empresas/` | `/dashboard/` | `/modulos/` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Deslogado | — | — | — | — | `302` → login | — | `302` → login | `302` → login |
-| Cliente | `302` → `/my-account/` | — | — | — | `403` | `302` | `403` | `302` |
-| Vendedor | `302` → `/dashboard/` | `403` | — | — | `403` | `200` | `200` | `200` |
-| Moderador | `200` | `403` | `403` | `200` | `403` | `302` → módulos | `200` | `200` |
-| Administrador | `200` | `403` | `200` | `200` | `200` | `302` | `200` | `200` |
-| Super Administrador | `200` | `200` | — | — | `200` | — | `200` | `200` |
+| Deslogado | — | — | — | — | — | `302` → login | — | `302` → login |
+| Cliente | `302` → `/my-account/` | — | — | — | — | `403` | `302` | `302` |
+| Vendedor | `302` → `/dashboard/` | — | — | — | `403` | `403` | `200` | `200` |
+| Moderador | `302` → `/modulos/` | `302` → `/modulos/` | `403` | `403` | `403` | `403` | `302` → `/modulos/` | `200` |
+| Administrador | `302` → `/modulos/` | `302` → `/modulos/` | `403` | `403` | `403` | `200` | `302` | — |
+| Super Administrador | `200` | — | — | — | `200` | `200` | — | `200` |
 
 Cada célula preenchida é um caso do script, e o travessão marca o que ele não
 cobre — não uma permissão indefinida.
 
-Note a diferença entre as duas primeiras colunas do vendedor: `/wp-admin/`
-redireciona — ele tem para onde ir — e `plugins.php` nega. São travas distintas,
-e o código de resposta mostra qual delas agiu.
+Os códigos de resposta contam uma história em duas camadas. O **302 → `/modulos/`**
+para Administrador e Moderador é o portão `bloquear_area_administrativa()` em
+ação: ele confere `CAP_ADMIN_WP`, não a encontra e redireciona. O **403** em
+`nav-menus.php`, `edit.php` e `plugins.php` vem de `wp-admin/includes/menu.php`,
+que reprova a página inteira por capacidade **antes** de o portão rodar. O 403
+prova que a capacidade saiu do papel; só o 302 prova que o portão está de pé.
 
 Capacidades efetivas de cada papel:
 
@@ -460,9 +455,8 @@ Capacidades efetivas de cada papel:
 docker compose run --rm wpcli wp eval 'foreach(array("seller","customer","content_moderator","company_admin","administrator") as $p){$o=wp_roles()->get_role($p); if(!$o){printf("%-18s ausente\n",$p);continue;} $c=array_keys(array_filter($o->capabilities)); printf("%-18s manage_options=%s manage_woocommerce=%s install_plugins=%s wp_admin=%s total=%d\n",$p,in_array("manage_options",$c,true)?"SIM":"nao",in_array("manage_woocommerce",$c,true)?"SIM":"nao",in_array("install_plugins",$c,true)?"SIM":"nao",in_array("reconectar_acessar_wp_admin",$c,true)?"SIM":"nao",count($c));}'
 ```
 
-Resultado esperado: `SIM` nas três primeiras colunas **só** para
-`administrator`; `company_admin` e `content_moderator` com `SIM` apenas em
-`wp_admin`; `customer` com `nao` em tudo e `total=1`.
+Resultado esperado: `SIM` nas quatro colunas **só** para `administrator`; os
+outros quatro papéis com `nao` em tudo, e `customer` com `total=1`.
 
 Um vendedor consegue editar produto de outro?
 
@@ -473,14 +467,21 @@ docker compose run --rm wpcli wp eval '$a=get_user_by("login","demo-sabor-da-ter
 O Administrador consegue promover a si mesmo?
 
 ```bash
-docker compose run --rm wpcli wp eval '$a=get_user_by("login","demo-admin-nosso-chao")->ID; $s=get_user_by("login","admin")->ID; wp_set_current_user($a); printf("editar o super admin: %s\npromover a si mesmo a administrator: %s\n", current_user_can("edit_user",$s)?"PERMITIDO (FALHA)":"negado (ok)", current_user_can("promote_user",$a,"administrator")?"PERMITIDO (FALHA)":"negado (ok)");'
+docker compose run --rm wpcli wp eval '$a=get_user_by("login","demo-admin-nosso-chao")->ID; $s=get_user_by("login","admin")->ID; $l=get_user_by("login","demo-sabor-da-terra")->ID; wp_set_current_user($a); printf("editar o super admin: %s\neditar a conta de uma loja: %s\npromover a si mesmo a administrator: %s\n", current_user_can("edit_user",$s)?"PERMITIDO (FALHA)":"negado (ok)", current_user_can("edit_user",$l)?"PERMITIDO (FALHA)":"negado (ok)", current_user_can("promote_user",$a,"administrator")?"PERMITIDO (FALHA)":"negado (ok)");'
 ```
 
+A versão 10 tirou `edit_users` e `promote_users` do papel, então a primeira camada
+já nega. `negar_gestao_de_usuarios_superiores()` fica como segunda camada para o
+dia em que alguém as devolver por plugin.
+
 **O papel de destino é argumento, e omiti-lo inverte a resposta.**
-`current_user_can( "promote_user", $id )` sem ele devolve `true` — corretamente,
-porque promover *a alguma coisa* é uma capacidade que o perfil tem; o que o
-filtro nega é promover **a um papel acima do seu**, e sem o destino não há o que
-comparar. Quem só rodar a forma curta vai achar que encontrou um buraco.
+Para um papel que tenha `promote_users`, `current_user_can( "promote_user", $id )`
+sem ele devolve `true` — corretamente, porque promover *a alguma coisa* é uma
+capacidade que o papel tem; o que o filtro nega é promover **a um papel acima do
+seu**, e sem o destino não há o que comparar. Hoje nenhum papel autoral tem
+`promote_users`, então a forma curta responde "não" pela primeira camada e não
+exercita o filtro; no dia em que a capacidade voltar, quem só rodar a forma curta
+vai achar que encontrou um buraco.
 
 Na tela, o destino chega por dois campos diferentes: `role` no `user-edit.php` e
 `new_role` na ação em massa do `users.php`. O filtro lê os dois, e o script de
@@ -506,10 +507,6 @@ Em especial, nada dispara alarme se um plugin novo conceder
 `reconectar_gerir_incubadora` edita, move e exclui qualquer página, e quem lê a
 Incubadora lê qualquer página publicada. Uma área restrita a um grupo exigiria
 outro desenho, não um ajuste deste.
-
-**Aparência → Temas continua acessível de leitura** aos dois papéis restritos,
-pelo motivo explicado acima. A capacidade de trocar, instalar ou editar tema
-está negada; a tela, não.
 
 **`restringir_listagens_do_vendedor()` filtra apenas `product`.** Listagem de
 pedidos não passa por ela: hoje o vendedor não entra no `/wp-admin`, e a coleção

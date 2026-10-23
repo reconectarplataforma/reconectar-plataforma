@@ -124,6 +124,26 @@ $senha      = Reconectar_Painel_Empresas::link_de_senha_pendente();
 		</button>
 	</form>
 
+	<form method="post" class="rc-formulario--linha"
+		action="<?php echo esc_url( Reconectar_Painel_Empresas::url( 'loja/' . $loja_id ) ); ?>">
+		<?php wp_nonce_field( 'reconectar_painel_loja_enviar_senha' ); ?>
+		<input type="hidden" name="reconectar_acao" value="loja_enviar_senha">
+		<input type="hidden" name="loja_id" value="<?php echo esc_attr( $loja_id ); ?>">
+		<button type="submit" class="rc-botao rc-botao--discreto"
+			aria-describedby="rc-loja-senha-ajuda">
+			<?php esc_html_e( 'Enviar link de redefinição de senha', 'reconectar-core' ); ?>
+		</button>
+		<span id="rc-loja-senha-ajuda" class="rc-formulario__ajuda">
+			<?php
+			printf(
+				/* translators: %s: e-mail cadastrado da loja. */
+				esc_html__( 'Vai para %s. A senha atual continua valendo até a pessoa definir outra.', 'reconectar-core' ),
+				esc_html( $usuario->user_email )
+			);
+			?>
+		</span>
+	</form>
+
 <?php endif; ?>
 
 <h2 class="rc-painel-empresas__secao"><?php esc_html_e( 'Produtos', 'reconectar-core' ); ?></h2>
