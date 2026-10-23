@@ -90,7 +90,7 @@ Apaga só os dados de demonstração, preservando a instalação.
 ./scripts/verificar-acessos.sh
 ```
 
-464 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
+512 casos de permissão, nos cinco perfis: a maior parte por HTTP, e as
 operações da Incubadora por `scripts/verificar-incubadora.php`, que ele chama.
 Sai com status 1 se algum falhar. **Rode depois de mexer em qualquer coisa de
 RBAC** — as travas não têm teste automatizado além deste.
@@ -898,6 +898,14 @@ quando o HPOS está desligado — é ali que o 403 acontece. Um verificador que
 espere 403 em toda negação acusa falha onde não há, e um que leia só o primeiro
 código lê 301 como sucesso.
 
+Para o Administrador e o Moderador, que desde a versão 10 das capacidades não
+entram no `/wp-admin`, as negações saem em **dois** códigos, e os dois são
+certos. Tela que o papel não alcança por capacidade — `edit.php`, `nav-menus.php`,
+`widgets.php`, `edit-comments.php` — morre no `menu.php` com 403, **antes** do
+portão. Tela que o papel ainda alcançaria — `users.php`, `upload.php`, o fórum,
+as campanhas — passa por ali e sai em 302 para `/modulos/`, pelo portão. O 403
+prova que a capacidade saiu; só o 302 prova que o portão está de pé.
+
 ### O menu "Produtos" pode apontar para as avaliações
 
 Para um papel com `moderate_comments` e sem `edit_products`, o item de menu
@@ -915,16 +923,33 @@ conta; com `promote_users`, pode promover a si mesmo. As duas juntas transformam
 o Administrador restrito em Super Administrador com dois cliques, e a proibição
 de instalar plugin vira decoração.
 
-`Reconectar_Permissoes::negar_gestao_de_usuarios_superiores()` barra as duas
-rotas em `map_meta_cap`. Ao conferir, lembre que `promote_user` **exige o papel
-de destino como terceiro argumento** — a armadilha registrada acima.
+Desde a versão 10 das capacidades as primitivas de usuário saíram do papel — a
+senha da loja se manda pela ficha dela, no `/painel-empresas/` —, e
+`Reconectar_Permissoes::negar_gestao_de_usuarios_superiores()` ficou como
+segunda camada, em `map_meta_cap`, para o dia em que alguém as devolver. Ao
+conferir, lembre que `promote_user` **exige o papel de destino como terceiro
+argumento** — a armadilha registrada acima.
+
+### Post type com capacidade própria mapeia também as de **publicado**
+
+`map_meta_cap()` pede `edit_published_posts` e `delete_published_posts` para o
+post publicado, e `edit_private_posts`/`delete_private_posts` para o privado.
+Fora do array `capabilities` do `register_post_type()`, essas quatro caem na
+primitiva de **post** homônima — e funcionavam por acidente enquanto o papel
+tinha capacidade de post.
+
+Quando o Administrador e o Moderador perderam as de post, mandar uma campanha
+no ar para a lixeira passou a responder 403, com rascunho funcionando
+normalmente: o defeito só aparece no conteúdo publicado. Campanha e enquete
+mapeiam as onze; ao criar post type com capacidade própria, declare as onze
+também, como faz `Reconectar_Incubadora`.
 
 ### `negar_escrita_ao_admin_de_empresas()` monitora `edit_post` genérico
 
 O filtro vigia `edit_post`, `delete_post` e `publish_post` para qualquer post, e
 a exceção é uma **allowlist de post types**. Quando o papel ganhou capacidade de
-conteúdo, o filtro passou a negar a edição de post e de página sem uma linha de
-mudança: o código estava no lugar certo, correto para o que fora escrito, e
+conteúdo — post e página, até a versão 9 das capacidades —, o filtro passou a
+negar a edição deles sem uma linha de mudança: o código estava no lugar certo, correto para o que fora escrito, e
 impedia em silêncio o que a especificação nova pedia.
 
 Ao dar capacidade de escrita nova a um desses papéis, acrescente o post type à

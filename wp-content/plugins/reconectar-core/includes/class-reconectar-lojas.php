@@ -249,6 +249,46 @@ class Reconectar_Lojas {
 		return true;
 	}
 
+	/**
+	 * Envia à loja o e-mail de redefinição de senha do WordPress.
+	 *
+	 * Existe para que o Administrador atenda "esqueci a senha" sem abrir a ficha
+	 * do usuário no `/wp-admin`, que ficou só com o Super Administrador. Usa o
+	 * próprio `retrieve_password()` do núcleo, e não um e-mail autoral: o texto,
+	 * o filtro de título e a expiração da chave são os mesmos que a pessoa
+	 * receberia pedindo em "Perdeu a senha?" — e os mesmos que o Super
+	 * Administrador dispara pela lista de usuários.
+	 *
+	 * Só alcança conta de loja. Uma conta de outro papel com o mesmo e-mail não
+	 * é alvo: mandar link de senha de um Moderador seria entregar a conta dele a
+	 * quem lê a caixa, e quem decide isso é o Super Administrador.
+	 *
+	 * @param int $loja_id ID da loja.
+	 * @return true|WP_Error `WP_Error` quando não há permissão, quando o alvo não
+	 *                       é loja ou quando o `wp_mail()` recusou o envio.
+	 */
+	public static function enviar_link_de_senha( $loja_id ) {
+		$loja_id = (int) $loja_id;
+
+		if ( ! Reconectar_Permissoes::eh_vendedor( $loja_id ) ) {
+			return new WP_Error(
+				'reconectar_dados_invalidos',
+				__( 'Esta conta não é de uma loja.', 'reconectar-core' )
+			);
+		}
+
+		if ( ! self::pode_gerir( Reconectar_Empresa::empresa_da_loja( $loja_id ) ) ) {
+			return new WP_Error(
+				'reconectar_sem_permissao',
+				__( 'Você não tem permissão para alterar esta loja.', 'reconectar-core' )
+			);
+		}
+
+		$usuario = get_userdata( $loja_id );
+
+		return retrieve_password( $usuario->user_login );
+	}
+
 	/* ---------------------------------------------------------------------
 	 * Apoio
 	 * ------------------------------------------------------------------ */

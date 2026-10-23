@@ -66,8 +66,8 @@ class Reconectar_Permissoes {
 	/**
 	 * Papel do Moderador de Conteúdo.
 	 *
-	 * Cuida do que a plataforma publica — conteúdo da comunidade, campanhas na
-	 * home, menus de navegação — e do fórum. Não toca em loja, em empresa, em
+	 * Cuida do que a plataforma publica — enquetes, campanhas na home, a
+	 * Incubadora — e do fórum. Não toca em loja, em empresa, em
 	 * produto, em pedido nem em conta de usuário.
 	 *
 	 * A chave fica em inglês por simetria com `company_admin`, que estabeleceu a
@@ -98,6 +98,15 @@ class Reconectar_Permissoes {
 	 * `ocultar_barra_administrativa()`). `eh_administracao_tecnica()` não a
 	 * conhece: nos outros dois lugares que a consultam — o isolamento entre
 	 * vendedores — a resposta certa para estes perfis continua sendo "não".
+	 *
+	 * **Desde a versão 10 das capacidades, só o `administrator` a tem.** O
+	 * Administrador e o Moderador de Conteúdo entravam por ela para criar
+	 * enquetes, cadastrar categorias do fórum, gerir campanhas e moderar — e cada
+	 * uma dessas tarefas ganhou tela em `/gestao/<area>/`, na moldura do Dokan.
+	 * Com as telas de pé, a porta deixou de ter motivo, e o `/wp-admin` voltou a
+	 * ser a área do Super Administrador. A capacidade sobrevive porque o nó acima
+	 * continua valendo: no dia em que outro perfil precisar entrar, é por ela,
+	 * e não por `manage_options`.
 	 */
 	const CAP_ADMIN_WP = 'reconectar_acessar_wp_admin';
 
@@ -156,7 +165,8 @@ class Reconectar_Permissoes {
 	 * Mesma forma de `CAP_GERIR_CAMPANHAS`, e pela mesma razão. Antes dela o
 	 * Moderador de Conteúdo administrava enquete **por acidente**: o post type
 	 * nunca declarou `capability_type`, caiu no padrão `post`, e as primitivas de
-	 * post que `CAPS_DE_CONTEUDO` dá para post e página abriam a tela de tabela.
+	 * post que `CAPS_DE_CONTEUDO` então dava para post e página abriam a tela de
+	 * tabela.
 	 * O Administrador de empresas, que tem as mesmas primitivas, esbarrava em
 	 * `negar_escrita_ao_admin_de_empresas()` e via a tela sem conseguir salvar.
 	 *
@@ -204,17 +214,17 @@ class Reconectar_Permissoes {
 	/**
 	 * A fatia de *operação* do papel `company_admin`.
 	 *
-	 * Deixou de ser a lista completa do papel: hoje ela é um dos três blocos que
-	 * `capacidades_do_administrador()` soma — este, o do Moderador de Conteúdo e
-	 * o `CAPS_DE_USUARIOS`. O nome sobrevive porque é ele que a documentação e o
+	 * Deixou de ser a lista completa do papel: hoje ela é um dos dois blocos que
+	 * `capacidades_do_administrador()` soma — este e o do Moderador de Conteúdo.
+	 * O nome sobrevive porque é ele que a documentação e o
 	 * diário citam.
 	 *
 	 * O que continua **fora** importa tanto quanto o que está dentro:
 	 * `manage_options`, `manage_woocommerce`, `dokandar` e qualquer
 	 * `CAPS_DE_DESENVOLVIMENTO`. As duas primeiras abririam o `/wp-admin` inteiro
 	 * com os menus do WooCommerce e do Dokan, cujas listagens não têm escopo por
-	 * empresa — o acesso ao painel vem de `CAP_ADMIN_WP`, justamente para não
-	 * passar por elas. `dokandar` é a capacidade que, para o Dokan, *define* que
+	 * empresa. (O acesso ao painel vinha de `CAP_ADMIN_WP`, justamente para não
+	 * passar por elas; desde a versão 10 este ator não entra no `/wp-admin`.) `dokandar` é a capacidade que, para o Dokan, *define* que
 	 * alguém é vendedor (`dokan_is_user_seller()` é literalmente
 	 * `user_can( $id, 'dokandar' )`): concedê-la faria este ator herdar em
 	 * silêncio tudo que o plugin liberar por ela daqui em diante.
@@ -237,84 +247,40 @@ class Reconectar_Permissoes {
 	/**
 	 * O que o Moderador de Conteúdo publica e modera.
 	 *
-	 * São capacidades nativas do WordPress de propósito: o que se modera aqui é
-	 * post, página e comentário do próprio núcleo, e inventar primitivas
-	 * autorais para eles só criaria um segundo vocabulário para a mesma coisa.
-	 * Produto e pedido ficam de fora — quem administra o produto é a loja dona
+	 * Quase tudo é primitiva autoral, uma por área, e cada uma é o portão de uma
+	 * tela em `/gestao/<area>/` ou da edição da Incubadora. As duas nativas são as
+	 * que o núcleo consulta por baixo das telas: `upload_files` no envio da arte
+	 * da campanha (`media_handle_upload()`), e `moderate_comments` em cada decisão
+	 * da fila de moderação.
+	 *
+	 * **Saíram na versão 10** as oito primitivas de post, as oito de página e
+	 * `edit_theme_options`. Elas só serviam ao `/wp-admin`, que este perfil não
+	 * abre mais: a plataforma não tem blog, as páginas institucionais, os menus e
+	 * o rodapé ficaram com o Super Administrador, e `edit_theme_options` — a
+	 * única capacidade do núcleo que edita menu — vinha grudada ao Customizer, aos
+	 * widgets e a **Aparência → Temas** em leitura. Nenhuma tela autoral as
+	 * consulta; os CPTs da plataforma declaram primitiva própria e não dependem
+	 * delas.
+	 *
+	 * Junto saiu `CAPS_DE_USUARIOS` (`list_users`, `create_users`, `edit_users`,
+	 * `delete_users`, `promote_users`), que o Administrador tinha para chegar à
+	 * tela de usuários. O cadastro de loja nunca dependeu delas — o painel de
+	 * empresas grava por `Reconectar_Lojas`, sob `CAP_GERIR_LOJAS` e o escopo por
+	 * empresa —, e `edit_users`, em single-site, alcança qualquer conta.
+	 *
+	 * Produto e pedido continuam de fora — quem administra o produto é a loja dona
 	 * dele, e `negar_escrita_ao_admin_de_empresas()` mantém a negação mesmo se
 	 * um plugin de terceiro conceder `edit_products` por papel.
-	 *
-	 * `edit_theme_options` merece a nota que o resto da lista não precisa: ela é
-	 * a **única** capacidade que o WordPress oferece para editar menus de
-	 * navegação, e vem grudada ao Customizer e aos widgets. Não há granularidade
-	 * menor no núcleo — ou o moderador cria menus e alcança essas duas telas, ou
-	 * não cria menus. A amplitude é do WordPress, não uma escolha nossa; o que
-	 * está ao nosso alcance é impedir que dali se chegue a instalar tema, e é o
-	 * que `CAPS_DE_DESENVOLVIMENTO` faz.
-	 *
-	 * A consequência visível é **Aparência → Temas abrindo com 200**, e ela não é
-	 * falha de trava: `wp-admin/themes.php` exige `switch_themes` *ou*
-	 * `edit_theme_options`, e a segunda é justamente a que os menus pedem. A tela
-	 * fica só de leitura, e isso foi medido, não deduzido — o JSON que o núcleo
-	 * imprime nela traz `"activate":null`, `"delete":null` e `"autoupdate":null`
-	 * para cada tema, `theme-install.php` cai no `wp_die()` de negação e
-	 * `theme-editor.php` responde 403.
-	 *
-	 * Fechá-la à força custaria mais do que resolve: seria um desvio por tela em
-	 * `admin_init`, e `nav-menus.php` — a tela que o perfil existe para usar —
-	 * depende exatamente da mesma capacidade. A trava que vale é a da lista de
-	 * capacidades, não a da URL.
 	 *
 	 * @var string[]
 	 */
 	const CAPS_DE_CONTEUDO = array(
 		'upload_files',
 		'moderate_comments',
-		'edit_posts',
-		'edit_others_posts',
-		'edit_published_posts',
-		'publish_posts',
-		'delete_posts',
-		'delete_others_posts',
-		'delete_published_posts',
-		'read_private_posts',
-		'edit_pages',
-		'edit_others_pages',
-		'edit_published_pages',
-		'publish_pages',
-		'delete_pages',
-		'delete_others_pages',
-		'delete_published_pages',
-		'read_private_pages',
-		'edit_theme_options',
 		self::CAP_GERIR_CAMPANHAS,
 		self::CAP_GERIR_ENQUETES,
 		self::CAP_GERIR_INCUBADORA,
 		self::CAP_MODERAR,
-	);
-
-	/**
-	 * Gestão das contas de usuário, exclusiva do Administrador.
-	 *
-	 * "Configura os usuários das lojas" exige `edit_users`, e em single-site
-	 * `edit_users` alcança **qualquer** conta, inclusive a do Super
-	 * Administrador: quem a tem pode trocar a senha de um `administrator` e
-	 * entrar com ela. `promote_users`, no mesmo golpe, permite promover a si
-	 * mesmo. As duas juntas transformariam este papel no topo em dois cliques, e
-	 * a promessa de não dar acesso de desenvolvedor viraria decoração.
-	 *
-	 * Quem fecha essa porta é `negar_gestao_de_usuarios_superiores()`, em
-	 * `map_meta_cap`. Sem aquele filtro, esta lista é insegura — e a falha seria
-	 * silenciosa, porque a tela funciona.
-	 *
-	 * @var string[]
-	 */
-	const CAPS_DE_USUARIOS = array(
-		'list_users',
-		'create_users',
-		'edit_users',
-		'delete_users',
-		'promote_users',
 	);
 
 	/**
@@ -343,11 +309,12 @@ class Reconectar_Permissoes {
 	 *
 	 * A especificação é taxativa quanto a plugins: apenas o Administrador
 	 * instala, ativa, desativa, atualiza, configura ou remove. A lista nasceu
-	 * com eles e precisou crescer quando o Moderador de Conteúdo ganhou
-	 * `edit_theme_options` — a única capacidade do núcleo que edita menus.
-	 * `edit_theme_options` abre o menu **Aparência**, e dali se chega a instalar
-	 * e editar tema: barrar plugin e deixar tema livre seria fechar uma porta e
-	 * deixar a do lado aberta, já que um tema também executa PHP arbitrário.
+	 * com eles e cresceu quando o Moderador de Conteúdo ganhou
+	 * `edit_theme_options` — a única capacidade do núcleo que edita menus, e que
+	 * abre o menu **Aparência**, de onde se chega a instalar e editar tema. Ele a
+	 * perdeu na versão 10, e os temas ficam na lista assim mesmo: barrar plugin e
+	 * deixar tema livre seria fechar uma porta e deixar a do lado aberta, já que
+	 * um tema também executa PHP arbitrário.
 	 *
 	 * `edit_files` e `update_core` entram pela mesma razão: as duas editam ou
 	 * substituem código da instalação.
@@ -379,7 +346,7 @@ class Reconectar_Permissoes {
 	 * sincronização só roda quando este número muda — incremente-o ao alterar
 	 * `sincronizar_capacidades()`.
 	 */
-	const VERSAO_CAPACIDADES = 9;
+	const VERSAO_CAPACIDADES = 10;
 
 	/**
 	 * Nome da opção que guarda a versão aplicada.
@@ -497,11 +464,16 @@ class Reconectar_Permissoes {
 				}
 			}
 
+			// Fora do `administrator` ninguém entra no `/wp-admin` por ela — nem
+			// os dois papéis autorais, que nascem de `add_role()` sem ela. O
+			// `remove_cap` aqui desfaz uma concessão feita a dedo, ou por outro
+			// plugin, a um papel de terceiro.
+			$objeto->remove_cap( self::CAP_ADMIN_WP );
+
 			// Os dois papéis autorais acabaram de nascer de `add_role()`, já com
-			// a lista completa. Para qualquer outro, estas cinco não fazem
+			// a lista completa. Para qualquer outro, estas quatro não fazem
 			// sentido nenhum — e uma concessão feita por engano sai aqui.
 			if ( self::PAPEL_ADMIN_EMPRESAS !== $papel && self::PAPEL_MODERADOR !== $papel ) {
-				$objeto->remove_cap( self::CAP_ADMIN_WP );
 				$objeto->remove_cap( self::CAP_GERIR_CAMPANHAS );
 				$objeto->remove_cap( self::CAP_GERIR_ENQUETES );
 				$objeto->remove_cap( self::CAP_GERIR_INCUBADORA );
@@ -566,7 +538,7 @@ class Reconectar_Permissoes {
 	 */
 	private static function capacidades_do_moderador() {
 		return array_merge(
-			array( 'read', self::CAP_COMUNIDADE, self::CAP_ADMIN_WP ),
+			array( 'read', self::CAP_COMUNIDADE ),
 			self::CAPS_DE_ESCRITA_NO_FORUM,
 			self::CAPS_DE_CONTEUDO
 		);
@@ -575,17 +547,21 @@ class Reconectar_Permissoes {
 	/**
 	 * As capacidades do Administrador.
 	 *
-	 * Tudo do Moderador de Conteúdo, mais a operação e a gestão de contas. A
-	 * herança é deliberada e está na especificação: quem administra a plataforma
-	 * também modera o que ela publica.
+	 * Tudo do Moderador de Conteúdo, mais a operação. A herança é deliberada e
+	 * está na especificação: quem administra a plataforma também modera o que ela
+	 * publica.
+	 *
+	 * A gestão de contas do núcleo saiu na versão 10 (ver `CAPS_DE_CONTEUDO`): o
+	 * que ela servia — cadastrar loja, editar os dados dela, mandar o link de
+	 * senha — o painel de empresas faz sem ela. Excluir conta e gerir conta que
+	 * não é de loja ficaram com o Super Administrador.
 	 *
 	 * @return string[]
 	 */
 	private static function capacidades_do_administrador() {
 		return array_merge(
 			self::capacidades_do_moderador(),
-			self::CAPS_DO_ADMIN_DE_EMPRESAS,
-			self::CAPS_DE_USUARIOS
+			self::CAPS_DO_ADMIN_DE_EMPRESAS
 		);
 	}
 
@@ -674,9 +650,13 @@ class Reconectar_Permissoes {
 	 * Em single-site o WordPress não gradua `edit_users`: quem a tem edita
 	 * **qualquer** conta, inclusive a de um `administrator` — e trocar a senha de
 	 * um administrador é entrar com ela. `promote_users`, no mesmo golpe, deixa
-	 * promover a si mesmo. O Administrador precisa das duas para configurar as
-	 * contas das lojas, que é o que a especificação pede, e sem esta trava as
-	 * duas juntas o levariam ao topo em dois cliques.
+	 * promover a si mesmo. O Administrador as tinha para configurar as contas das
+	 * lojas pelo `/wp-admin`, e sem esta trava as duas juntas o levariam ao topo
+	 * em dois cliques.
+	 *
+	 * Desde a versão 10 nenhum papel autoral as tem — a conta da loja é gerida no
+	 * painel de empresas. A trava fica como defesa em profundidade: basta um
+	 * plugin conceder `edit_users` a um papel para a porta reabrir.
 	 *
 	 * São duas regras:
 	 *
@@ -782,11 +762,11 @@ class Reconectar_Permissoes {
 	 * tem nenhuma das duas capacidades e, portanto, não passa: ele administra a
 	 * operação, não a tecnologia.
 	 *
-	 * Ele **entra** no `/wp-admin` assim mesmo, e sem passar por aqui: as duas
-	 * travas de interface administrativa aceitam `CAP_ADMIN_WP` como alternativa.
-	 * As outras duas — o isolamento entre vendedores — continuam consultando só
-	 * este método, porque ali a resposta certa para os perfis novos permanece
-	 * "não": eles não devem ver os registros de todos os vendedores.
+	 * A porta do `/wp-admin` (`entra_no_painel_wp()`) aceita também
+	 * `CAP_ADMIN_WP`, que hoje só o `administrator` tem. O isolamento entre
+	 * vendedores consulta só este método, porque ali a resposta certa para os
+	 * perfis autorais é "não": eles não devem ver os registros de todos os
+	 * vendedores.
 	 *
 	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
 	 * @return bool
@@ -833,7 +813,7 @@ class Reconectar_Permissoes {
 	 * (`edit_post`, `delete_post`, `publish_post`) são as meta caps genéricas de
 	 * *qualquer* post type, e enquanto este ator não escrevia conteúdo bastava
 	 * abrir uma fresta para o CPT de empresa. Quando ele ganhou a moderação de
-	 * conteúdo, a mesma linha passou a negar post, página, campanha e fórum — o
+	 * conteúdo, a mesma linha passou a negar campanha, enquete e fórum — o
 	 * sintoma pior deste repositório, o da tela que funciona e da ação que
 	 * silenciosamente não acontece. Post type que ele administra entra na lista;
 	 * produto e pedido continuam de fora, que é a razão de a trava existir.
@@ -889,8 +869,6 @@ class Reconectar_Permissoes {
 			Reconectar_Campanha::POST_TYPE,
 			Reconectar_Proposta_Votacao::POST_TYPE,
 			Reconectar_Incubadora::POST_TYPE,
-			'post',
-			'page',
 			'forum',
 			'topic',
 			'reply',
@@ -1595,12 +1573,12 @@ class Reconectar_Permissoes {
 	 * ------------------------------------------------------------------ */
 
 	/**
-	 * Mantém clientes e vendedores fora do `/wp-admin`.
+	 * Mantém fora do `/wp-admin` todo perfil que não seja o Super Administrador.
 	 *
-	 * O vendedor trabalha no painel do Dokan, no front-end; o Administrador de
-	 * Empresas, no painel de empresas; e o cliente, na área "Minha conta".
-	 * Nenhum dos três tem o que fazer no painel do WordPress, e a especificação
-	 * lista a área administrativa como exclusiva do Administrador.
+	 * A loja trabalha no painel do Dokan; o Administrador e o Moderador de
+	 * Conteúdo, nas telas de `/gestao/<area>/` e no painel de empresas, a que a
+	 * tela de módulos leva; e o cliente, na área "Minha conta". Nenhum deles tem
+	 * o que fazer no painel do WordPress.
 	 */
 	public static function bloquear_area_administrativa() {
 		// `admin-ajax.php` mora dentro de `/wp-admin` e atende requisições do
@@ -1647,9 +1625,14 @@ class Reconectar_Permissoes {
 	/**
 	 * O usuário passa pela porta do `/wp-admin`?
 	 *
-	 * Uma resposta só para as decisões que dependem dela — o bloqueio e o link do
-	 * painel em "Minha conta". Se divergissem, a tela ofereceria um link que o
-	 * bloqueio devolve com um redirecionamento.
+	 * Uma resposta só para as decisões que dependem dela — o bloqueio, o link do
+	 * painel em "Minha conta" e a saída da tela de módulos. Se divergissem, a tela
+	 * ofereceria um link que o bloqueio devolve com um redirecionamento.
+	 *
+	 * Desde a versão 10 das capacidades, na instalação intacta, só o
+	 * `administrator` responde "sim". `manage_woocommerce` segue abrindo a porta
+	 * porque é a capacidade do `shop_manager` do WooCommerce, papel que esta
+	 * plataforma não usa, mas que, concedido, espera o painel.
 	 *
 	 * @param int $usuario_id Usuário a avaliar; 0 usa o usuário atual.
 	 * @return bool
@@ -1665,8 +1648,11 @@ class Reconectar_Permissoes {
 	/**
 	 * Para onde mandar quem foi barrado na porta do `/wp-admin`.
 	 *
-	 * A ordem das três tentativas é a da especificidade: cada ator tem uma área
-	 * própria de trabalho, e devolvê-lo a ela é mais útil que um 403. O
+	 * Cada ator tem uma área própria de trabalho, e devolvê-lo a ela é mais útil
+	 * que um 403. A loja vai ao painel dela, e não aos módulos, porque é lá que
+	 * trabalha. O Administrador e o Moderador vão à tela de módulos: o trabalho
+	 * deles se divide entre mercado, Incubadora, Praça e gestão, e nenhum desses
+	 * é a casa óbvia de quem seguiu um link antigo para o `/wp-admin`. O
 	 * `home_url()` do fim é o caso em que nenhum dos plugins está de pé.
 	 *
 	 * @return string URL absoluta.
@@ -1674,16 +1660,12 @@ class Reconectar_Permissoes {
 	private static function destino_fora_do_painel() {
 		$usuario_id = get_current_user_id();
 
-		if ( user_can( $usuario_id, self::CAP_PAINEL_EMPRESAS ) ) {
-			$painel = Reconectar_Painel_Empresas::url();
-
-			if ( '' !== $painel ) {
-				return $painel;
-			}
-		}
-
 		if ( self::eh_vendedor( $usuario_id ) && function_exists( 'dokan_get_navigation_url' ) ) {
 			return dokan_get_navigation_url();
+		}
+
+		if ( Reconectar_Modulos::escolhe_modulo( $usuario_id ) ) {
+			return Reconectar_Modulos::url();
 		}
 
 		return function_exists( 'wc_get_page_permalink' )

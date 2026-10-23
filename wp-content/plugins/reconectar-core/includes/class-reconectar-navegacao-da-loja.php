@@ -599,20 +599,6 @@ class Reconectar_Navegacao_Da_Loja {
 			);
 		}
 
-		// Publicações ainda se editam no `/wp-admin`, e o item é a saída
-		// explícita para lá. Sai da moldura, e o rótulo diz isso: um nome de
-		// tela ("Publicações") prometeria que ela abre aqui.
-		if ( $moderador ) {
-			$nav['rc-painel-wp'] = array(
-				'title'      => __( 'Painel do WordPress', 'reconectar-core' ),
-				'icon'       => '<i class="fab fa-wordpress"></i>',
-				'icon_name'  => 'LayoutDashboard',
-				'url'        => admin_url(),
-				'pos'        => 170,
-				'permission' => Reconectar_Permissoes::CAP_ADMIN_WP,
-			);
-		}
-
 		return $nav;
 	}
 

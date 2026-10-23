@@ -503,3 +503,10 @@
 	background: #f0e2dc;
 	color: #7d2d13;
 }
+
+/* A ajuda do envio de senha diz para qual endereço o link vai: fica abaixo do
+   botão, e não ao lado, para não empurrá-lo para fora da linha no celular. */
+.rc-formulario--linha .rc-formulario__ajuda {
+	display: block;
+	margin-top: 0.35rem;
+}

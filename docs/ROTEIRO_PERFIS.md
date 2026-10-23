@@ -197,7 +197,9 @@ Uma loja própria, completa e isolada.
 
 ### 2.1 O painel
 
-Entre e vá para http://localhost:8090/dashboard/ — o painel do Dokan, no
+Entre. O login leva à tela de módulos, http://localhost:8090/modulos/, onde a
+loja tem quatro cartões — Mercado (a vitrine dela), Incubadora, Praça e
+**Painel**. O Painel abre http://localhost:8090/dashboard/ — o painel do Dokan, no
 front-end. O vendedor trabalha aqui, nunca no `/wp-admin`.
 
 Percorra: **Produtos**, **Pedidos**, **Retiradas**, **Relatórios**,
@@ -318,14 +320,16 @@ plugins.
 **Duração:** ~12 min
 
 Quem administra a operação não necessariamente administra a tecnologia. Este
-perfil cadastra empresas e lojas, configura as contas de loja, modera conteúdo,
-cria menus — e **não instala plugin, não troca tema, não edita arquivo e não
-atualiza o núcleo**.
+perfil cadastra empresas e lojas, configura as senhas das contas de loja,
+modera conteúdo — e **não entra no `/wp-admin`, não instala plugin, não troca
+tema, não edita arquivo e não atualiza o núcleo**.
 
 > **O que mudou desde a versão anterior deste roteiro.** Ele se chamava
-> "Administrador de Empresas" e não entrava no `/wp-admin`; hoje entra, com uma
-> capacidade própria (`reconectar_acessar_wp_admin`) e um painel podado. A seção
-> 3.9 é nova e demonstra essa parte.
+> "Administrador de Empresas" e não entrava no `/wp-admin`. A partir da versão
+> 10 das capacidades, continua sem entrar: o painel técnico ficou só com o
+> Super Administrador. O que o Administrador fazia no `/wp-admin` — enquetes,
+> fóruns, campanhas, moderação — passa a ter tela própria em `/gestao/<area>/`,
+> na moldura do painel do Dokan.
 
 > **Duas palavras para a mesma conta.** Deste roteiro em diante, o painel de
 > empresas chama de **Loja** a conta que o WordPress registra com o papel
@@ -335,14 +339,15 @@ atualiza o núcleo**.
 
 ### 3.1 O painel
 
-Entre e vá para http://localhost:8090/painel-empresas/. O atalho **Painel de
+Entre. O login leva à tela de módulos, http://localhost:8090/modulos/, e o
+cartão **Mercado** dela abre http://localhost:8090/painel-empresas/. O atalho **Painel de
 Empresas** também aparece no cabeçalho do site, no lugar onde o vendedor vê o
 link para o painel dele.
 
 A tela abre **na moldura do painel do Dokan**: a barra lateral à esquerda e a
-barra do topo, as mesmas que a loja vê. A barra lateral traz **Empresas**,
-**Lojas**, **Comunidade** e **Fórum** — nenhum item de venda —, e marca a seção
-corrente. No topo, "Minha conta" leva à conta dela no site, e "Visitar loja",
+barra do topo, as mesmas que a loja vê. A barra lateral traz **Módulos**,
+**Empresas**, **Lojas**, **Comunidade**, **Fórum**, **Incubadora** e as telas de
+gestão da seção 3.9 — nenhum item de venda —, e marca a seção corrente. No topo, "Minha conta" leva à conta dela no site, e "Visitar loja",
 que para quem não é loja não teria destino, leva ao catálogo.
 
 A rota, porém, continua nossa: o que vem do Dokan é só a casca. O painel dele é
@@ -398,6 +403,30 @@ abaixo. A diferença entre as duas colunas é a demonstração.
 
 Clique em **Sabor da Terra**. A ficha mostra dados de contato, os produtos com
 preço e estoque, os pedidos recentes e os ganhos liberados.
+
+#### 3.3.1 Enviar link de redefinição de senha
+
+Na ficha, há um botão **Enviar link de redefinição de senha**, com o endereço de
+destino escrito embaixo. Clique nele. O que a tela responde depende do servidor
+de e-mail, e ela diz qual dos dois casos aconteceu:
+
+- **O servidor aceitou o envio:** "O servidor de e-mail aceitou o envio do link
+  de redefinição de senha para o endereço cadastrado da loja." Nenhum link
+  aparece na tela — ele está no e-mail.
+- **O envio falhou:** "O e-mail com o link de redefinição de senha não pôde ser
+  enviado. Repasse o link abaixo à pessoa responsável pela loja." O link aparece
+  **uma vez**, e some ao recarregar.
+
+"Aceitou o envio" é o que o servidor sabe dizer, não "e-mail entregue": os
+endereços da demonstração são `@exemplo.invalid`, e com SMTP ligado o envio é
+aceito e a mensagem volta como devolução. A senha atual continua valendo até a
+pessoa definir outra.
+
+O botão só alcança a loja que o Administrador pode gerir
+(`Reconectar_Empresa::pode_gerir_loja()`), e essa conferência vem antes do
+envio.
+
+#### 3.3.2 Dados de operação
 
 Tente editar um produto: **não há como**. Não é botão escondido — o alcance
 decidido para este ator é **consulta**. Ele acompanha a operação, quem conduz a
@@ -479,19 +508,40 @@ painel: o Moderador não a tem e continua recebendo 403 em `/painel-empresas/`.
 | `/painel-empresas/loja/` | `200` |
 | `/painel-empresas/empresa/<Nosso Chão>/` | `200` |
 | `/painel-empresas/empresa/<Bem Viver>/` | `200` — alcança todas, veja 3.7 |
-| `/comunidade/` | `200` |
-| `/wp-admin/` | `200` — mas veja 3.9 |
-| `/wp-admin/users.php` | `200` |
-| `/wp-admin/nav-menus.php` | `200` |
+| `/gestao/enquetes/` | `200` |
+| `/gestao/foruns/` | `200` |
+| `/gestao/campanhas/` | `200` |
+| `/gestao/moderacao/` | `200` |
+| `/comunidade/` | `302` → `/activity/` |
+| `/wp-admin/` | `302` → `/modulos/` |
+| `/wp-admin/users.php` | `302` → `/modulos/` |
+| `/wp-admin/upload.php` | `302` → `/modulos/` |
+| `/wp-admin/edit.php` | `403` |
+| `/wp-admin/post-new.php?post_type=page` | `403` |
+| `/wp-admin/nav-menus.php` | `403` |
+| `/wp-admin/widgets.php` | `403` |
+| `/wp-admin/edit-comments.php` | `403` |
 | `/wp-admin/plugins.php` | `403` |
 | `/wp-admin/theme-editor.php` | `403` |
 | `/wp-admin/options-general.php` | `403` |
 | `/wp-admin/edit.php?post_type=product` | `403` |
+| `/wp-admin/edit.php?post_type=forum` | `302` → `/modulos/` |
+| `/wp-admin/edit.php?post_type=topic` | `302` → `/modulos/` |
+| `/wp-admin/user-edit.php?user_id=<loja>` | `302` → `/modulos/` |
 | `/dashboard/` | `302` — não é vendedor |
 
 E o `/painel-empresas/` responde **403** para o cliente e para quem toca uma
 loja: vender não é administrar a empresa. Vale também para a listagem de lojas —
 `/painel-empresas/loja/` é do painel gerencial, e uma loja não lista as outras.
+
+**Os dois códigos de negação acima não são incoerência.** As telas que
+`menu.php` reprova por capacidade — posts, menus, rodapé, comentários — morrem
+num `wp_die( …, 403 )` **antes** de o portão rodar: o 403 prova que a
+capacidade saiu do papel (desde a versão 10 das capacidades, o Administrador não
+tem nenhuma delas). As que o papel ainda alcançaria — usuários, mídia — passam
+por ali e saem em 302 para `/modulos/`: é o que prova que o portão de
+admissão está de pé. Esperar um código só nas duas listas daria falha onde não
+há, ou um verde que não mede o portão.
 
 As capacidades por trás disso, sem passar por URL nenhuma:
 
@@ -499,121 +549,63 @@ As capacidades por trás disso, sem passar por URL nenhuma:
 docker compose run --rm wpcli wp eval '$u=get_user_by("login","demo-admin-nosso-chao"); wp_set_current_user($u->ID); foreach(array("manage_options","manage_woocommerce","dokandar","activate_plugins","install_plugins","switch_themes","install_themes","edit_themes","edit_files","update_core") as $c){printf("%-20s %s\n",$c,current_user_can($c)?"CONCEDIDA (FALHA)":"negada (ok)");}'
 ```
 
-Todas negadas. `edit_users`, `create_users` e `promote_users` ficaram **fora**
-desta lista de propósito: elas são concedidas — é assim que ele configura as
-contas de loja — e quem as limita é uma meta capacidade, com alvo, demonstrada
-em 3.9.
+Todas negadas. `reconectar_acessar_wp_admin` — a capacidade que autoriza a
+entrada no `/wp-admin` — também não está aqui de propósito: foi revogada na
+versão 10, porque o painel técnico ficou só com o Super Administrador. O que
+o Administrador fazia ali cabe agora em telas que a plataforma desenhou para
+ele.
 
-A distinção entre as duas colunas da tabela importa: `plugins.php` responde 403
-porque a capacidade não existe no papel; `/wp-admin/` responde 200 porque uma
-capacidade autoral o autoriza, sem lhe dar nada do WooCommerce. Uma regressão
-que concedesse `manage_woocommerce` ao papel abriria o painel técnico inteiro
-sem que uma única URL mudasse de código, e é por isso que o
-`verificar-acessos.sh` confere as duas coisas.
+### 3.9 As telas de gestão — `/gestao/<area>/`
 
-### 3.9 O painel administrativo — podado
+A operação — enquetes, fóruns, campanhas, moderação — deixou de viver no
+`/wp-admin` e ganhou telas próprias em `/gestao/`, na moldura do painel do
+Dokan. Teresa acessa cada uma por:
 
-Vá para http://localhost:8090/wp-admin/. O painel abre, e o menu lateral é a
-demonstração. Medido, item por item:
+- **Enquetes:** http://localhost:8090/gestao/enquetes/
+- **Fóruns:** http://localhost:8090/gestao/foruns/
+- **Campanhas:** http://localhost:8090/gestao/campanhas/
+- **Moderação:** http://localhost:8090/gestao/moderacao/
 
-| Item | Destino | Resposta |
-| --- | --- | --- |
-| Painel | `index.php` | `200` |
-| Posts | `edit.php` | `200` |
-| Mídia | `upload.php` | `200` |
-| Páginas | `edit.php?post_type=page` | `200` |
-| Campanhas | `edit.php?post_type=reconectar_campanha` | `200` |
-| Comentários | `edit-comments.php` | `200` |
-| Produtos | `admin.php?page=product-reviews` | `200` |
-| Propostas de Votação | `edit.php?post_type=proposta_votacao` | `200` |
-| Empresas | `edit.php?post_type=reconectar_empresa` | `200` |
-| Fóruns | `edit.php?post_type=forum` | `200` |
-| Tópicos | `edit.php?post_type=topic` | `200` |
-| Respostas | `edit.php?post_type=reply` | `200` |
-| Aparência | `themes.php` | `200` |
-| Usuários | `users.php` | `200` |
-| Ferramentas | `tools.php` | `200` |
+Ou pelos itens da barra lateral: Módulos, Empresas, Lojas, Comunidade, Fórum,
+Incubadora, Enquetes (com o subitem Categorias do fórum), Campanhas e Moderação.
+Cada item declara a capacidade da tela a que leva, e a barra só mostra o que o
+perfil alcança.
 
-Não há **Plugins**, não há **Configurações**, não há **WooCommerce** e não há
-**Dokan** — as quatro entradas que carregariam a plataforma inteira.
+#### 3.9.1 A moldura
 
-> **"Produtos" não é o catálogo.** O item existe, mas aponta para
-> `admin.php?page=product-reviews`: são as **avaliações** de produto, que o
-> WooCommerce registra sob o menu Produtos e libera por `moderate_comments`.
-> Moderar avaliação é moderação de conteúdo, e é por isso que o item fica. O
-> catálogo em si — `edit.php?post_type=product` — responde **403**, e nenhum item
-> de menu leva até lá. Quem vir "Produtos" na lateral e concluir que o perfil
-> administra o catálogo terá lido o rótulo, não o destino.
+A moldura é a casca visual do painel do Dokan — a barra lateral à esquerda, a
+barra de topo com o nome do módulo. O que vem dentro é autoral: a plataforma
+desenhou cada tela segundo suas necessidades, e não herda nada do painel do
+vendedor além da casca e do portão. É por isso que o painel técnico do
+WordPress não aparece em lado nenhum — o portão nunca abre para Teresa.
 
-**Ferramentas** abre em `200` porque `tools.php` é uma casca: a tela lista o que
-o usuário pode usar, e para este perfil não sobra nada acionável. As telas de
-verdade por trás dela — `export.php`, `import.php`, `site-health.php`,
-`erase-personal-data.php`, `export-personal-data.php` — respondem todas **403**.
+#### 3.9.2 Por que não no `/wp-admin`
 
-Em **Usuários**, Teresa lista e edita as contas de loja. Agora tente a escalada,
-que é o caso que não se confere por leitura de código:
+A página do Dokan barra quem não tem `dokandar`, e conceder essa capacidade ao
+Administrador o faria herdar, em silêncio, tudo que o plugin liberar por ela
+daqui em diante. Teresa não tem `dokandar` — `/dashboard/` continua respondendo
+302 para ela. É o mesmo motivo que a barra lateral não traz ícone nem link de
+venda: a operação está numa moldura emprestada, o operador não é vendedor, e o
+painel técnico da plataforma virou tela nova de propósito.
 
-1. Abra a ficha do usuário `admin` — `/wp-admin/users.php`, clique no nome.
-   A tela recusa: quem tem `edit_users` em single-site poderia trocar a senha de
-   um `administrator` e entrar com a conta dele.
-2. Na própria ficha dela, tente mudar o papel para **Super Administrador**. O
-   seletor não oferece a opção; forçada pelo formulário, a ação é negada.
-3. Abra a ficha de `demo-sabor-da-terra` e mude alguma coisa. **Funciona** — é
-   o contorno que prova que o filtro não fechou o perfil inteiro.
+### 3.10 Conferir as travas
 
-Em **Aparência**, o submenu tem **Menus** (`nav-menus.php`, `200`) e não tem
-Editor de Temas (`theme-editor.php`, `403`). A tela **Temas** abre, e abre de
-propósito: `edit_theme_options` é a única capacidade que o WordPress oferece para
-editar menus, e ela arrasta Temas, Personalizar, Widgets e Fontes junto — não há
-granularidade menor no núcleo. Repare que os temas não têm botão de ativar nem de
-excluir: sem `switch_themes` e sem `delete_themes`, a tela é de leitura.
+Abra as URLs da tabela 3.8, uma a uma. Duas famílias de resposta:
 
-> **`theme-install.php` responde `500`, não `403`, e a diferença não é defeito
-> nosso.** As duas negações são do núcleo, em lugares diferentes. `plugins.php`
-> morre em `wp-admin/includes/menu.php:384`, num `wp_die( …, 403 )` explícito,
-> porque `user_can_access_admin_page()` reprova a página inteira. Já
-> `theme-install.php` **passa** por esse portão — ele pendura em `themes.php`, que
-> o perfil pode abrir — e só então bate na própria verificação do arquivo
-> (`theme-install.php:16`), um `wp_die()` **sem argumento de status**; o padrão de
-> `_default_wp_die_handler()` é 500. A tela diz "Sem permissão para instalar temas
-> neste site" nos dois casos. Um script de verificação que espere 403 em toda
-> negação vai acusar falha onde não há.
+1. **Tela que o papel não alcança por capacidade** (posts, páginas, menus,
+   rodapé, comentários, plugins) → `403`, vindo de `wp-admin/includes/menu.php`.
+   A capacidade não existe no papel do Administrador desde a versão 10.
+2. **Tela que o papel ainda alcançaria** (usuários, mídia, fórum, a ficha de
+   uma conta) → `302` para `/modulos/`. É o portão
+   `bloquear_area_administrativa()`, que só deixa passar quem tem
+   `reconectar_acessar_wp_admin` — hoje, só o Super Administrador.
 
-Em **Produtos** ou **Pedidos** digitados à mão
-(`/wp-admin/edit.php?post_type=product`), a resposta é 403: quem administra o
-produto é a loja dona dele.
-
-Em **Fóruns**, **Tópicos** e **Respostas** o perfil administra: as três
-listagens abrem em `200`, e `post-new.php?post_type=forum` também — "criar
-fóruns" é literal na especificação. Os três links do widget **Em resumo** da
-tela inicial levam a essas listagens.
-
-> **Isso não veio de graça, e o defeito era do tipo mais caro deste
-> repositório.** O bbPress mantém uma segunda camada de papéis — `bbp_keymaster`,
-> `bbp_moderator`, `bbp_participant` — gravada como papel **adicional** do
-> usuário, e ela se sobrepõe ao papel do WordPress. Os dois perfis novos nasciam
-> com o `bbp_participant` que todo cadastro recebe, então as capacidades de
-> moderação declaradas no papel eram escritas, aplicadas e perdidas adiante.
->
-> E uma delas não se resolvia nem com o papel certo. Medido, com o papel
-> declarando a capacidade:
->
-> ```
-> allcaps[edit_forums] = true
-> map_meta_cap( 'edit_forums' ) = do_not_allow
-> ```
->
-> `bbp_map_forum_meta_caps()` reserva `edit_forums` e `edit_others_forums` a quem
-> tem `keep_gate` — isto é, ao keymaster. `publish_forums`, essa o bbPress mapeia
-> para `moderate` e passa; a assimetria é dele. Quem devolve as duas é
-> `Reconectar_Permissoes::restaurar_gestao_de_foruns()`, em `map_meta_cap`
-> **prioridade 11**, e só para quem o papel do WordPress já tinha autorizado.
->
-> `keep_gate` continua fora de alcance, de propósito: ele abre as Configurações
-> do bbPress e a ferramenta de **redefinição**, a que apaga fóruns, tópicos e
-> respostas da instalação inteira. Confira —
-> `options-general.php?page=bbpress` e `tools.php?page=bbp-repair` respondem
-> **403** para os dois perfis.
+A escalada é o caso que não se confere por leitura de código. Abra
+`/wp-admin/user-edit.php?user_id=<id do Super Administrador>`: `302` para
+`/modulos/`, sem chegar à ficha. Trocar a senha de outra conta não tem tela —
+a única que o Administrador alcança é o envio de link da seção 3.3.1, e só para
+lojas no escopo dele. O teste de mesa equivalente está em
+[PERFIS_E_PERMISSOES.md](PERFIS_E_PERMISSOES.md).
 
 ---
 
@@ -622,46 +614,41 @@ tela inicial levam a essas listagens.
 **Perfil:** `demo-moderador` · `reconectar-demo`
 **Duração:** ~6 min
 
-O perfil mais novo da plataforma, e o de desenho mais delicado: ele entra no
-`/wp-admin` — coisa que nem o Vendedor nem o Usuário Comum fazem — e ainda
-assim não toca em nada da operação comercial nem da tecnologia. Conteúdo,
-comunidade e campanha; nada além.
+O perfil mais novo da plataforma: ele trabalha na plataforma — conteúdo,
+comunidade, fórum, campanhas, enquetes — e **não entra no `/wp-admin`, não
+toca em loja, em empresa, em produto, em pedido nem em conta de usuário**. E
+**não instala plugin, não troca tema, não edita arquivo e não atualiza o
+núcleo**.
 
-### 4.1 O painel — o que existe e o que não existe
+Desde a versão 10 das capacidades, assim como o Administrador, o Moderador
+não entra no `/wp-admin`. O que ele faz tem tela própria em `/gestao/`.
 
-Entre em http://localhost:8090/wp-admin/. Medido, item por item:
+### 4.1 As telas de gestão — `/gestao/<area>/`
 
-| Item | Destino | Resposta |
-| --- | --- | --- |
-| Painel | `index.php` | `200` |
-| Posts | `edit.php` | `200` |
-| Mídia | `upload.php` | `200` |
-| Páginas | `edit.php?post_type=page` | `200` |
-| Campanhas | `edit.php?post_type=reconectar_campanha` | `200` |
-| Comentários | `edit-comments.php` | `200` |
-| Produtos | `admin.php?page=product-reviews` | `200` |
-| Propostas de Votação | `edit.php?post_type=proposta_votacao` | `200` |
-| Fóruns | `edit.php?post_type=forum` | `200` |
-| Tópicos | `edit.php?post_type=topic` | `200` |
-| Respostas | `edit.php?post_type=reply` | `200` |
-| Aparência | `themes.php` | `200` |
-| Perfil | `profile.php` | `200` |
-| Ferramentas | `tools.php` | `200` |
+O login leva à tela de módulos, http://localhost:8090/modulos/, com três
+cartões: Mercado, Incubadora e Praça. As telas de gestão estão na barra lateral
+da moldura — Enquetes (com o subitem Categorias do fórum), Campanhas e
+Moderação —, ou direto pelo endereço:
 
-A comparação com a tabela do Roteiro 3 é a demonstração inteira: são as mesmas
-entradas, **menos duas**. Onde o Administrador tem **Empresas**, o Moderador não
-tem nada (`edit.php?post_type=reconectar_empresa` responde **403**); e onde o
-Administrador tem **Usuários**, o Moderador tem **Perfil** — o item existe, mas
-aponta para `profile.php`, a ficha dele mesmo. `users.php` e `user-new.php`
-respondem **403**: moderar conteúdo não é gerir contas.
+- **Enquetes:** http://localhost:8090/gestao/enquetes/
+- **Categorias do fórum:** http://localhost:8090/gestao/foruns/
+- **Campanhas:** http://localhost:8090/gestao/campanhas/
+- **Moderação:** http://localhost:8090/gestao/moderacao/
 
-Vale aqui a mesma advertência do Roteiro 3: **"Produtos" não é o catálogo.** O
-destino é `admin.php?page=product-reviews`, as avaliações, que entram por
-`moderate_comments`. `edit.php?post_type=product` responde **403**.
+`/gestao/` sem área não é tela: responde 404.
 
-### 4.2 Campanhas na tela inicial
+#### 4.1.1 A moldura
 
-Vá em **Campanhas**. Há duas, e o par é proposital:
+A moldura é a casca visual do painel do Dokan — a barra lateral à esquerda e a
+barra de topo. O que vem dentro é autoral. A barra do Moderador traz Módulos,
+Comunidade, Fórum, Incubadora, Enquetes, Campanhas e Moderação; não traz
+Empresas nem Lojas, que pedem o portão do painel de empresas, nem item de venda.
+E não há atalho para o `/wp-admin` em lado nenhum.
+
+### 4.2 Campanhas e enquetes
+
+Clique em **Campanhas** na barra lateral — http://localhost:8090/gestao/campanhas/. Há
+duas campanhas, e o par é proposital:
 
 | Campanha | Vigência | Na home |
 | --- | --- | --- |
@@ -681,67 +668,59 @@ Para ver a outra metade da regra, despublique a Feira da Safra e recarregue a
 home: a seção **some inteira** — nem título, nem moldura vazia. Campo vazio é
 melhor que placeholder; é a regra de honestidade de dados do projeto.
 
-### 4.3 Conteúdo e comunidade
+As enquetes vivem em **Enquetes**, na mesma barra — http://localhost:8090/gestao/enquetes/.
 
-Em **Posts**, **Páginas** e **Comentários** o perfil publica, edita o que é dos
-outros e modera — é o núcleo da função. Em **Fóruns**, **Tópicos** e
-**Respostas** ele administra o Q&A: as três listagens abrem em `200` e
-`post-new.php?post_type=forum` também.
+### 4.3 Fórum — administração e moderação
 
-A trava do bbPress que precisou ser contornada para isso está explicada em
-detalhe na seção 3.9, e vale igual aqui. O limite também: `keep_gate` não é
-concedido, então `options-general.php?page=bbpress` (Configurações do bbPress) e
-`tools.php?page=bbp-repair` (a ferramenta de **redefinição**, que apagaria o
-fórum inteiro da instalação) respondem **403**.
+Em **Enquetes → Categorias do fórum** — http://localhost:8090/gestao/foruns/ —
+o Moderador cria, edita, fecha e reabre as categorias. Não há exclusão: uma
+categoria com tópicos os levaria junto, e ela é só fechada.
 
-`/comunidade/` e `/forums/` abrem em `200` no front-end.
+A moderação de tópicos e respostas acontece em dois lugares. No próprio tópico,
+o menu **Moderar** traz fechar, fixar, spam, lixeira e editar para quem tem o
+direito. Em **Moderação** — http://localhost:8090/gestao/moderacao/ — fica a
+fila: avaliações de produto e o que está pendente ou em spam no fórum.
 
-### 4.4 Menus
+A trava do bbPress que precisou ser contornada — `edit_forums` reservado ao
+`keep_gate` — está em [PERFIS_E_PERMISSOES.md](PERFIS_E_PERMISSOES.md). O limite: `keep_gate` não é concedido, então as
+**Configurações do bbPress** e a ferramenta de **redefinição** (que apagaria o
+fórum inteiro da instalação) respondem **403** na tentativa de URL direta.
 
-Em **Aparência → Menus** (`nav-menus.php`, `200`) o perfil cria e reordena menus
-— pedido explícito da especificação.
+### 4.4 Os limites — o que o Moderador **não** consegue
 
-> **Por que Aparência abre inteira.** `edit_theme_options` é a **única**
-> capacidade que o WordPress oferece para editar menus, e ela vem grudada ao
-> Customizer (`customize.php`, `200`) e aos Widgets (`widgets.php`, `200`). Não
-> há granularidade menor no núcleo: ou o Moderador cria menus e alcança essas
-> telas, ou não cria menus. A amplitude é do WordPress, não uma escolha nossa.
->
-> O que **não** vem junto: **Editor de Temas** (`theme-editor.php`, `403`) e
-> instalar tema (`theme-install.php`, `500` — ver a nota da seção 3.9 sobre por
-> que esta negação sai com 500 e não 403). A tela **Temas** abre em leitura: sem
-> `switch_themes` e sem `delete_themes`, não há botão de ativar nem de excluir.
+| URL | Resultado medido |
+| --- | --- |
+| `/wp-admin/` | `302` → `/modulos/` |
+| `/wp-admin/nav-menus.php` | `403` |
+| `/wp-admin/widgets.php` | `403` |
+| `/wp-admin/edit.php` | `403` |
+| `/wp-admin/post-new.php?post_type=page` | `403` |
+| `/wp-admin/edit-comments.php` | `403` |
+| `/wp-admin/edit.php?post_type=reconectar_campanha` | `302` → `/modulos/` |
+| `/wp-admin/users.php` | `302` → `/modulos/` |
+| `/wp-admin/edit.php?post_type=forum` | `302` → `/modulos/` |
+| `/wp-admin/edit.php?post_type=topic` | `302` → `/modulos/` |
+| `/wp-admin/edit.php?post_type=product` | `403` |
+| `/wp-admin/plugins.php` | `403` |
+| `/wp-admin/theme-editor.php` | `403` |
+| `/wp-admin/options-general.php` | `403` |
+| `/painel-empresas/` | `403` |
+| `/dashboard/` | `302` → `/modulos/` |
 
-### 4.5 Os limites — o que o Moderador **não** consegue
+**Os dois códigos de negação acima não são incoerência.** As telas que
+`menu.php` reprova por capacidade — menus, rodapé, comentários — morrem num
+`wp_die( …, 403 )` **antes** de o portão rodar: o 403 prova que a capacidade
+saiu do papel (desde a versão 10 das capacidades, o Moderador não tem nenhuma
+delas). As que o papel ainda alcançaria — campanhas, fórum, usuários — passam
+por ali e saem em 302 para `/modulos/`: é o que prova que o portão de
+admissão está de pé. Esperar um código só nas duas listas daria falha onde não
+há, ou um verde que não mede o portão.
 
-| Tentativa | URL | Resposta |
-| --- | --- | --- |
-| Instalar ou ativar plugin | `/wp-admin/plugins.php` | `403` |
-| Editar arquivo de tema | `/wp-admin/theme-editor.php` | `403` |
-| Instalar tema | `/wp-admin/theme-install.php` | `500` (ver 3.9) |
-| Configurações do WordPress | `/wp-admin/options-general.php` | `403` |
-| Catálogo de produtos | `/wp-admin/edit.php?post_type=product` | `403` |
-| Pedidos do WooCommerce | `/wp-admin/admin.php?page=wc-orders` | `301` → `403` |
-| Painel do Dokan | `/wp-admin/admin.php?page=dokan` | `403` |
-| Gerir contas | `/wp-admin/users.php` | `403` |
-| Criar conta | `/wp-admin/user-new.php` | `403` |
-| Empresas | `/wp-admin/edit.php?post_type=reconectar_empresa` | `403` |
-| Painel de empresas | `/painel-empresas/` | `403` |
-| Painel do vendedor | `/dashboard/` | `302` para a home |
-| Exportar conteúdo | `/wp-admin/export.php` | `403` |
-| Saúde do site | `/wp-admin/site-health.php` | `403` |
+O princípio em uma frase: **o Moderador trabalha nas telas que a plataforma
+desenhou para ele — `/gestao/`, Incubadora, Comunidade, Fórum — e nunca no
+painel técnico do WordPress.**
 
-> **O `301` dos pedidos não é exceção.** `admin.php?page=wc-orders` é o endereço
-> do armazenamento em tabelas próprias (HPOS); com ele desligado nesta
-> instalação, o WooCommerce redireciona para a tela clássica —
-> `edit.php?post_type=shop_order` —, e é ali que a negação acontece. Seguindo o
-> redirecionamento, a resposta final é **403**. Conferir só o primeiro código
-> leria `301` como sucesso.
-
-O princípio em uma frase: **o Moderador entra no painel para cuidar do que se
-lê, nunca do que se vende nem do que se instala.**
-
-### 4.6 A Incubadora — escrever sem entrar no `/wp-admin`
+### 4.5 A Incubadora — escrever sem entrar no `/wp-admin`
 
 A Incubadora é a wiki interna da plataforma, e tudo nela acontece no próprio
 site. Abra http://localhost:8090/incubadora/.
@@ -807,7 +786,9 @@ Visão e controle sobre a plataforma inteira.
 
 ### 5.1 O painel
 
-Entre em http://localhost:8090/wp-admin/.
+Entre. O login leva à tela de módulos, como nos outros perfis de trabalho, e o
+quarto cartão, **Painel Admin**, abre http://localhost:8090/wp-admin/. Só este
+perfil o recebe.
 
 ### 5.2 Visão total
 
@@ -820,9 +801,10 @@ Entre em http://localhost:8090/wp-admin/.
 | **Usuários** | admin, 3 Administradores, 1 Moderador, 5 contas de loja, 3 clientes |
 
 O contraste com os roteiros 2 e 3 é o ponto: o vendedor via 3 produtos, Teresa
-via as empresas e as lojas sem ver produto nem pedido, o Super Administrador vê os 15 produtos e as duas
-empresas. E só ele chega a **estas** telas — o Administrador e o Moderador entram
-no painel, mas nenhum dos dois abre Produtos, Pedidos ou Dokan.
+via as empresas e as lojas sem ver produto nem pedido (fora do painel técnico),
+o Super Administrador vê os 15 produtos e as duas empresas. E só ele chega a
+**estas** telas — o Administrador e o Moderador não entram no painel técnico
+(seção 5.4).
 
 ### 5.3 O fluxo de status
 
@@ -830,17 +812,23 @@ Abra um pedido. No seletor de status aparecem **"Em preparação"** e
 **"Enviado"**, entre os nativos do WooCommerce. Confira também nas **ações em
 massa** da listagem.
 
-### 5.4 Gestão de plugins — exclusiva
+### 5.4 O `/wp-admin` — exclusivo do Super Administrador
 
-Vá em **Plugins**. Ativos: WooCommerce, Dokan Lite, BuddyPress, bbPress e
-Reconectar Core.
+Desde a versão 10 das capacidades, o painel técnico é só do Super Administrador.
+Administrador e Moderador não entram — um redirecionamento os devolve a
+`/modulos/` (a tela de escolha de módulos).
 
-Esta tela é inacessível a qualquer outro perfil, o Administrador e o Moderador
-de Conteúdo incluídos — os dois entram no `/wp-admin` e mesmo assim recebem
-`403` aqui. É ela que dá nome ao princípio: quem administra a operação não
-administra a tecnologia. A revogação é dupla: as capacidades são removidas do
-papel **e** verificadas de novo no momento da decisão — porque uma capacidade
-pode ser concedida direto a um usuário, ou por outro plugin.
+**Gestão de plugins.** Vá em **Plugins**. Ativos: WooCommerce, Dokan Lite,
+BuddyPress, bbPress e Reconectar Core.
+
+Esta tela é inacessível a qualquer outro perfil. É ela que dá nome ao
+princípio: quem administra a operação não administra a tecnologia.
+
+**Gestão de temas, usuários e configurações.** Em **Aparência**, o Super
+Administrador gerencia todos os temas da instalação — ativa, desativa, edita
+arquivos, instala novos. Em **Usuários**, lê todas as contas e edita qualquer
+uma, inclusive a sua própria. Em **Configurações**, acessa o painel geral do
+WordPress — aqui moram as variáveis da plataforma que o `provision.sh` grava.
 
 ### 5.5 Comunidade
 
@@ -861,24 +849,23 @@ Esperado:
 ```
 customer           manage_options=nao manage_woocommerce=nao wp_admin=nao comunidade=nao total=1
 seller             manage_options=nao manage_woocommerce=nao wp_admin=nao comunidade=SIM total=67
-content_moderator  manage_options=nao manage_woocommerce=nao wp_admin=SIM comunidade=SIM total=31
-company_admin      manage_options=nao manage_woocommerce=nao wp_admin=SIM comunidade=SIM total=40
-administrator      manage_options=SIM manage_woocommerce=SIM wp_admin=SIM comunidade=SIM total=166
+content_moderator  manage_options=nao manage_woocommerce=nao wp_admin=nao comunidade=SIM total=16
+company_admin      manage_options=nao manage_woocommerce=nao wp_admin=nao comunidade=SIM total=21
+administrator      manage_options=SIM manage_woocommerce=SIM wp_admin=SIM comunidade=SIM total=169
 ```
 
 As duas primeiras colunas do `seller` são o que sustenta o isolamento inteiro:
 as travas liberam quem tem `manage_woocommerce`, e ele não tem. Se um plugin
 novo conceder essa capacidade ao vendedor, tudo cai — sem erro e sem aviso.
 
-A coluna `wp_admin` é a leitura mais importante da tabela. Os dois perfis novos
-entram no painel por `reconectar_acessar_wp_admin`, uma capacidade **autoral**,
-e não por `manage_options`. A diferença não é cosmética: `manage_options` é
-exatamente o que `restringir_gestao_da_tecnologia()` acrescenta ao conjunto
-exigido para instalar plugin e editar tema. Dar `manage_options` a eles para que
-o painel abrisse devolveria, pela mesma linha, a instalação de plugins — o
-oposto do que a especificação pede. O alcance da capacidade nova é mínimo de
-propósito: dois pontos do código, o portão do `/wp-admin` e a barra
-administrativa.
+A coluna `wp_admin` é a leitura mais importante da tabela, e mudou na versão
+10. O Administrador e o Moderador **não têm `reconectar_acessar_wp_admin` mais**
+— a capacidade foi revogada porque o painel técnico virou exclusividade do Super
+Administrador, e o que eles faziam lá ganhou tela própria em `/gestao/`. O
+número total de capacidades caiu para os dois porque saíram as primitivas de
+post, página, menu, rodapé, comentário e usuário. A diminuição de sete capacidades
+do Moderador (de 31 para 24, com arredondamento na tela) é porque perdeu
+`upload_files` junto — a mídia chega pelas telas de gestão.
 
 `reconectar_gerir_todas_as_empresas` fica **fora** do papel `company_admin` de
 propósito: é concedida usuário a usuário, como acontece com a Clara. Alcance
@@ -1056,11 +1043,12 @@ As travas de acesso têm verificação automática:
 Faz login de verdade nos cinco perfis, bate em cada URL restrita e compara o
 código HTTP com o esperado — incluindo o isolamento entre lojas e entre
 empresas, nas duas direções, a escrita no fórum, a administração do fórum pelos
-dois perfis novos, as telas que continuam fora do alcance deles e as travas da
-Incubadora — leitura, escrita, histórico, busca e arquivos. São **274 casos**;
-o script sai com status 1 se algum falhar. Rode antes de apresentar.
+dois perfis novos, o redirecionamento de `/wp-admin` para os dois perfis novos,
+as telas que continuam fora do alcance deles e as travas da Incubadora —
+leitura, escrita, histórico, busca e arquivos. São **512 casos**; o script sai
+com status 1 se algum falhar. Rode antes de apresentar.
 
-Isso cobre os itens 3, 4, 7, 8, 9, 12, 15, 16, 17, 20, 23, 24, 25, 33 e 34 da tabela
+Isso cobre os itens 3, 4, 7, 8, 9, 12, 14, 15, 16, 17, 20, 23, 24, 25, 33 e 34 da tabela
 abaixo. O restante é visual e precisa de olho humano:
 
 | # | O que demonstrar | Evidência |
@@ -1078,19 +1066,19 @@ abaixo. O restante é visual e precisa de olho humano:
 | 11 | Super Admin vê tudo | 15 produtos, todos os pedidos, 5 lojas |
 | 12 | Só o Super Admin gere plugins | tela de Plugins |
 | 13 | Carrinho multi-vendedor com split | pedido de R$ 157,70 e seus 3 filhos |
-| 14 | Administrador opera fora do `/wp-admin` | `/painel-empresas/` na moldura do Dokan, sem `dokandar` |
+| 14 | Administrador e Moderador não entram em `/wp-admin` | redirect para `/modulos/`, seções 3.8/3.10 e 4.4 |
 | 15 | Administrador alcança todas as empresas | 200 na empresa sem vínculo |
 | 16 | A barra lateral não traz venda ao Administrador | Empresas, Lojas, Comunidade e Fórum |
 | 17 | Vendedor e cliente fora do painel de empresas | 403 em `/painel-empresas/` e em `/painel-empresas/loja/` |
-| 18 | Cadastro de loja com link de senha | link exibido uma única vez |
+| 18 | Cadastro de loja com link de senha | link exibido uma única vez, seção 3.5 |
 | 19 | Cascata de desativação preserva o individual | seção 3.6 |
 | 20 | Cliente não escreve no fórum | `publish_topics` negada, seção 2.7 |
 | 21 | Fórum ordena de verdade pelas três abas | Votos põe a de saldo 5 no topo |
 | 22 | Voto sem JavaScript, e sem votar em si | seção 2.7 |
-| 23 | Moderador entra no painel sem `manage_options` | seções 4.1 e 5.6 |
-| 24 | Moderador cria menus e não instala nada | `nav-menus.php` 200, `plugins.php` 403, seção 4.4 |
-| 25 | Administrador e Moderador administram o fórum, sem `keep_gate` | seção 3.9 |
-| 26 | Escalada de privilégio negada | seção 3.9, os três passos |
+| 23 | Administrador e Moderador trabalham em telas de `/gestao/` | enquetes, fóruns, campanhas, moderação, seções 3.9 e 4.1 |
+| 24 | Moderador não tem `manage_options` | seções 4.1 e 5.6 |
+| 25 | Administrador e Moderador administram o fórum, sem `keep_gate` | seções 3.9 e 4.3 |
+| 26 | Escalada de privilégio negada | seção 3.10 |
 | 27 | Campanha vigente aparece, expirada não | seção 4.2 |
 | 28 | Sem campanha vigente a seção some inteira | seção 4.2 |
 | 29 | Meio de pagamento é a interseção do carrinho | seção 7.4 |
@@ -1098,9 +1086,9 @@ abaixo. O restante é visual e precisa de olho humano:
 | 31 | Uma instrução de pagamento por loja, com o valor do sub-pedido | seção 7.5 |
 | 32 | BR Code reconhecido por um app de banco real | seção 7.6 |
 | 33 | Incubadora fechada ao visitante e ao cliente, sem edição para a loja | seção 1.6 |
-| 34 | Rascunho da Incubadora invisível a quem só lê | 404 em "Atas e decisões", seção 4.6 |
-| 35 | Editar, mover e restaurar sem o `/wp-admin` | seção 4.6 |
-| 36 | Vídeo sem contato com o provedor antes do clique | seção 4.6 |
+| 34 | Rascunho da Incubadora invisível a quem só lê | 404 em "Atas e decisões", seção 4.5 |
+| 35 | Editar, mover e restaurar sem o `/wp-admin` | seção 4.5 |
+| 36 | Vídeo sem contato com o provedor antes do clique | seção 4.5 |
 
 ## Recomeçar
 
