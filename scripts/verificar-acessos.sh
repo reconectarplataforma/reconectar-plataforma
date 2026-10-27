@@ -417,17 +417,17 @@ ID_BEM_VIVER="$(wp_eval '$p = get_page_by_path( "bem-viver", OBJECT, "reconectar
 ID_SUPER="$(wp_eval '$u = get_user_by( "login", "admin" ); echo $u ? $u->ID : "";')"
 ID_LOJA_SABOR="$(wp_eval '$u = get_user_by( "login", "demo-sabor-da-terra" ); echo $u ? $u->ID : "";')"
 
-# O papel `company_admin` entra no `/wp-admin` desde que ganhou `CAP_ADMIN_WP`, e
-# os dois primeiros casos deste bloco são o retrato invertido do que eram: antes
-# o painel técnico o devolvia ao `/painel-empresas/`, e a listagem de usuários
-# vinha junto na negação. Hoje ele administra as contas das lojas por ali, que é
-# o que "configura os usuários das lojas" pede.
+# Desde a versão 10 das capacidades, o `/wp-admin` é só do Super Administrador.
+# O Administrador e o Moderador operam pelo `/painel-empresas/` e pelas telas de
+# `/gestao/<area>/`, e o portão os devolve à tela de módulos.
 #
-# `themes.php` responder 200 não é trava frouxa: o núcleo abre a tela a quem tem
-# `switch_themes` **ou** `edit_theme_options`, e a segunda é a única capacidade
-# que edita menus. A tela fica de leitura — quem prova isso são os casos de
-# capacidade mais abaixo, que negam `switch_themes` e `install_themes`. Conferir
-# aqui só a URL daria a impressão errada nos dois sentidos.
+# Os dois códigos de negação abaixo não são incoerência, e cada um prova uma
+# coisa. As telas que `menu.php` reprova por capacidade — posts, menus, rodapé,
+# comentários — morrem num `wp_die( …, 403 )` **antes** de o portão rodar: o 403
+# prova que a capacidade saiu do papel. As que o papel ainda alcançaria —
+# usuários, mídia, fórum, campanhas — passam por ali e saem em 302 para
+# `/modulos/`: é o que prova que o portão está de pé. Esperar um código só nas
+# duas listas daria falha onde não há, ou um verde que não mede o portão.
 echo "Administrador (demo-admin-nosso-chao)"
 JAR_EMPRESAS=/tmp/reconectar-acessos-empresas.txt
 if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
@@ -444,24 +444,27 @@ if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
   conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/" 'rc-painel-empresas__menu' "ausente" "o menu próprio sai, a barra do Dokan o substitui"
   conferir "$JAR_EMPRESAS" "/comunidade/"           "302 /activity/" "participa da comunidade, pelo diretório"
   conferir "$JAR_EMPRESAS" "/activity/"             "200" "participa da comunidade"
-  conferir "$JAR_EMPRESAS" "/wp-admin/"             "200" "entra no painel técnico"
-  conferir "$JAR_EMPRESAS" "/wp-admin/users.php"    "200" "configura as contas das lojas"
-  conferir "$JAR_EMPRESAS" "/wp-admin/nav-menus.php" "200" "cria menus"
+  conferir "$JAR_EMPRESAS" "/wp-admin/"             "302 /modulos/" "o painel técnico é só do Super Administrador"
+  conferir "$JAR_EMPRESAS" "/wp-admin/users.php"    "302 /modulos/" "a conta da loja se gere na ficha dela"
+  conferir "$JAR_EMPRESAS" "/wp-admin/upload.php"   "302 /modulos/" "a mídia chega pelas telas de gestão"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php"     "403" "não há post a escrever"
+  conferir "$JAR_EMPRESAS" "/wp-admin/post-new.php?post_type=page" "403" "página é do Super Administrador"
+  conferir "$JAR_EMPRESAS" "/wp-admin/nav-menus.php" "403" "menu é do Super Administrador"
+  conferir "$JAR_EMPRESAS" "/wp-admin/widgets.php"  "403" "rodapé é do Super Administrador"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit-comments.php" "403" "modera em /gestao/moderacao/"
   conferir "$JAR_EMPRESAS" "/wp-admin/plugins.php"  "403" "não gere plugins"
   conferir "$JAR_EMPRESAS" "/wp-admin/theme-editor.php" "403" "não edita arquivo de tema"
   conferir "$JAR_EMPRESAS" "/wp-admin/options-general.php" "403" "não configura a instalação"
   conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=product" "403" "produto é da loja, não dele"
   conferir "$JAR_EMPRESAS" "/dashboard/"            "302" "não é vendedor"
 
-  # "Criar fóruns" é literal na especificação, e o bbPress reserva `edit_forums`
-  # ao keymaster — a negação não vinha do papel e por isso não aparecia em
-  # nenhum caso de capacidade. As duas últimas linhas são o outro lado: o
-  # keymaster teria junto as Configurações e a ferramenta de **redefinição**,
-  # que apaga o fórum inteiro da instalação.
-  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=forum"     "200" "administra os fóruns"
-  conferir "$JAR_EMPRESAS" "/wp-admin/post-new.php?post_type=forum" "200" "cria fóruns"
-  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=topic"     "200" "modera os tópicos"
-  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=reply"     "200" "modera as respostas"
+  # O fórum se administra em `/gestao/foruns/` e se modera no próprio tópico; a
+  # capacidade continua no papel, e é o portão que fecha a porta do `/wp-admin`.
+  # As duas últimas linhas são o outro lado: o keymaster teria junto as
+  # Configurações e a ferramenta de **redefinição**, que apaga o fórum inteiro.
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=forum"     "302 /modulos/" "administra os fóruns pela gestão"
+  conferir "$JAR_EMPRESAS" "/wp-admin/post-new.php?post_type=forum" "302 /modulos/" "cria fóruns pela gestão"
+  conferir "$JAR_EMPRESAS" "/wp-admin/edit.php?post_type=topic"     "302 /modulos/" "modera os tópicos no fórum"
   conferir "$JAR_EMPRESAS" "/wp-admin/options-general.php?page=bbpress" "403" "não configura o bbPress"
   conferir "$JAR_EMPRESAS" "/wp-admin/tools.php?page=bbp-repair"    "403" "não redefine o fórum"
 
@@ -475,16 +478,13 @@ if autenticar "demo-admin-nosso-chao" "$SENHA_DEMO" "$JAR_EMPRESAS"; then
     echo "  --    carga de demonstração ausente; alcance sobre empresa sem vínculo não verificado por URL"
   fi
 
-  # A escalada de privilégio pela tela, e não só pela capacidade. Confere-se o
-  # corpo, não o status: `user-edit.php` nega com um `wp_die()` sem código, que
-  # sai como **500** — o mesmo número de um fatal de PHP. Esperar "500" daria um
-  # verde quando o arquivo estivesse quebrado, que é exatamente o caso que uma
-  # verificação de permissão precisa distinguir.
+  # A escalada de privilégio pela tela. Com `edit_users` fora do papel e o
+  # portão na frente, nenhuma ficha de usuário abre — nem a do Super
+  # Administrador, nem a de uma loja, cuja senha se manda pela ficha da loja.
   if [ -n "$ID_SUPER" ] && [ -n "$ID_LOJA_SABOR" ]; then
-    conferir_corpo "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_SUPER" \
-      "Sem permissão para editar este usuário" "presente" "não edita o Super Administrador"
-    conferir_corpo "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" \
-      "Sem permissão para editar este usuário" "ausente" "edita a conta de uma loja"
+    conferir "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_SUPER"      "302 /modulos/" "não edita o Super Administrador"
+    conferir "$JAR_EMPRESAS" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" "302 /modulos/" "não edita a conta da loja no /wp-admin"
+    conferir_corpo "$JAR_EMPRESAS" "/painel-empresas/loja/$ID_LOJA_SABOR/" 'value="loja_enviar_senha"' "presente" "a ficha da loja oferece o link de senha"
   else
     echo "  --    contas ausentes; escalada por URL não verificada"
   fi
@@ -499,19 +499,21 @@ fi
 echo "Moderador de Conteúdo (demo-moderador)"
 JAR_MODERADOR=/tmp/reconectar-acessos-moderador.txt
 if autenticar "demo-moderador" "$SENHA_DEMO" "$JAR_MODERADOR"; then
-  conferir "$JAR_MODERADOR" "/wp-admin/"              "200" "entra no painel técnico"
-  conferir "$JAR_MODERADOR" "/wp-admin/nav-menus.php" "200" "cria menus"
-  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reconectar_campanha" "200" "publica campanhas"
+  conferir "$JAR_MODERADOR" "/wp-admin/"              "302 /modulos/" "o painel técnico é só do Super Administrador"
+  conferir "$JAR_MODERADOR" "/wp-admin/nav-menus.php" "403" "menu é do Super Administrador"
+  conferir "$JAR_MODERADOR" "/wp-admin/widgets.php"   "403" "rodapé é do Super Administrador"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php"      "403" "não há post a escrever"
+  conferir "$JAR_MODERADOR" "/wp-admin/post-new.php?post_type=page" "403" "página é do Super Administrador"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit-comments.php" "403" "modera em /gestao/moderacao/"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reconectar_campanha" "302 /modulos/" "publica campanhas pela gestão"
   conferir "$JAR_MODERADOR" "/comunidade/"           "302 /activity/" "modera a comunidade, pelo diretório"
   conferir "$JAR_MODERADOR" "/activity/"             "200" "modera a comunidade"
   conferir "$JAR_MODERADOR" "/forums/"                "200" "tem acesso ao fórum"
-  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=forum"     "200" "administra os fóruns"
-  conferir "$JAR_MODERADOR" "/wp-admin/post-new.php?post_type=forum" "200" "cria fóruns"
-  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=topic"     "200" "modera os tópicos"
-  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=reply"     "200" "modera as respostas"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=forum"     "302 /modulos/" "administra os fóruns pela gestão"
+  conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=topic"     "302 /modulos/" "modera os tópicos no fórum"
   conferir "$JAR_MODERADOR" "/wp-admin/options-general.php?page=bbpress" "403" "não configura o bbPress"
   conferir "$JAR_MODERADOR" "/wp-admin/tools.php?page=bbp-repair"    "403" "não redefine o fórum"
-  conferir "$JAR_MODERADOR" "/wp-admin/users.php"     "403" "não configura usuários"
+  conferir "$JAR_MODERADOR" "/wp-admin/users.php"     "302 /modulos/" "não configura usuários"
   conferir "$JAR_MODERADOR" "/wp-admin/plugins.php"   "403" "não gere plugins"
   conferir "$JAR_MODERADOR" "/wp-admin/theme-editor.php" "403" "não edita arquivo de tema"
   conferir "$JAR_MODERADOR" "/wp-admin/edit.php?post_type=product" "403" "produto é da loja"
@@ -522,17 +524,14 @@ if autenticar "demo-moderador" "$SENHA_DEMO" "$JAR_MODERADOR"; then
   # o topo diz o nome do módulo. O nome sai em JSON, com os acentos escapados.
   conferir_corpo "$JAR_MODERADOR" "/forums/" "rc-no-painel-da-loja" "presente" "fórum na moldura de moderação"
   conferir_corpo "$JAR_MODERADOR" "/forums/" '"name":"Modera\u00e7\u00e3o"' "presente" "topo diz Moderação"
-  conferir_corpo "$JAR_MODERADOR" "/forums/" '"title":"Painel do WordPress"' "presente" "saída para o /wp-admin na barra"
+  conferir_corpo "$JAR_MODERADOR" "/forums/" '"rc-painel-wp"' "ausente" "a barra não leva mais ao /wp-admin"
   conferir_corpo "$JAR_MODERADOR" "/forums/" "rc-cabecalho" "ausente" "sem o cabeçalho do mercado"
   conferir_corpo "$JAR_MODERADOR" "/forums/" '"products"' "ausente" "a barra lateral não traz item de venda"
   # O rótulo sai do bundle React; o que o HTML traz é a tradução que o alimenta.
   conferir_corpo "$JAR_MODERADOR" "/forums/" '"Visit Store":["Ir ao mercado"]' "presente" "o topo diz Ir ao mercado"
 
-  # Pelo corpo, e não pelo status, pela razão registrada no bloco acima: o
-  # `wp_die()` de negação sai como 500 e um fatal de PHP sairia igual.
   if [ -n "$ID_LOJA_SABOR" ]; then
-    conferir_corpo "$JAR_MODERADOR" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" \
-      "Sem permissão para editar este usuário" "presente" "não edita conta de loja"
+    conferir "$JAR_MODERADOR" "/wp-admin/user-edit.php?user_id=$ID_LOJA_SABOR" "302 /modulos/" "não edita conta de loja"
   fi
 else
   falhas=$((falhas + 1))
@@ -866,6 +865,31 @@ if banco_alcancavel && [ -f "$JAR_MODERADOR" ] && [ -f "$JAR_EMPRESAS" ]; then
     conferir_corpo "$JAR_VENDEDOR" "$caminho_topico" "rc-forum-moderacao__menu" "ausente" "a loja não vê o menu Moderar"
     wp_eval "wp_delete_post( $id_topico_pendente, true );" >/dev/null
   fi
+fi
+
+# A senha da loja depois que `users.php` fechou: o Administrador manda o link de
+# redefinição pela ficha da loja. O aviso aceito é um dos dois, porque o que se
+# mede aqui é a permissão, não o servidor de e-mail — sem SMTP no ambiente o
+# `wp_mail()` devolve `false` e a ficha mostra o link para copiar. Com SMTP, o
+# envio é real e vai para o `exemplo.invalid` da carga, que volta como devolução.
+echo "Link de senha da loja (/painel-empresas/)"
+if [ -n "$ID_LOJA_SABOR" ] && [ -f "$JAR_EMPRESAS" ]; then
+  caminho="/painel-empresas/loja/$ID_LOJA_SABOR/"
+  nonce="$(nonce_da_acao "$JAR_EMPRESAS" "$caminho" "loja_enviar_senha")"
+  resposta="$(enviar_gestao "$JAR_EMPRESAS" "$caminho" \
+    "reconectar_acao=loja_enviar_senha" "_wpnonce=$nonce" "loja_id=$ID_LOJA_SABOR")"
+  registrar "$([[ "$resposta" == 302*"aviso=senha-enviada"* || "$resposta" == 302*"aviso=senha-nao-enviada"* ]] && echo sim || echo nao)" "senha da loja" "o Administrador manda o link de senha pela ficha (veio: $resposta)"
+
+  # Moderador e loja batem no portão do painel antes do nonce: nenhum dos dois
+  # abre a ficha para obter um.
+  for jar_recusado in "$JAR_MODERADOR" "$JAR_VENDEDOR"; do
+    [ -f "$jar_recusado" ] || continue
+    resposta="$(enviar_gestao "$jar_recusado" "$caminho" \
+      "reconectar_acao=loja_enviar_senha" "_wpnonce=invalido" "loja_id=$ID_LOJA_SABOR")"
+    registrar "$([ "${resposta%% *}" = "403" ] && echo sim || echo nao)" "senha recusada" "quem não administra lojas não manda o link (veio: $resposta)"
+  done
+else
+  echo "  --    carga de demonstração ausente; link de senha não verificado"
 fi
 
 # O endpoint de voto não tem URL de leitura: só responde a POST, e por isso não
@@ -1424,19 +1448,18 @@ fi
 # Ele administra o vendedor da Sabor da Terra e ainda assim não pode editar um
 # produto dele.
 #
-# `manage_options` e `manage_woocommerce` continuam na lista mesmo agora que os
-# dois papéis entram no `/wp-admin`, e é o ponto mais importante deste bloco: a
-# porta se abriu por uma capacidade própria, `reconectar_acessar_wp_admin`, e
-# não por uma das duas. Conceder `manage_options` devolveria a instalação de
-# plugins pela mesma linha que a barra — `restringir_gestao_da_tecnologia()`
-# exige exatamente ela —, e `manage_woocommerce` abriria as listagens de produto
-# e pedido de **todas** as lojas, desfazendo em silêncio o isolamento por
-# empresa que só existe dentro do `/painel-empresas/`.
+# `reconectar_acessar_wp_admin` abre a lista porque é a porta: foi por ela, e
+# não por `manage_options`, que os dois papéis entraram no `/wp-admin` até a
+# versão 9 das capacidades. `manage_options` devolveria a instalação de plugins
+# — `restringir_gestao_da_tecnologia()` exige exatamente ela —, e
+# `manage_woocommerce` abriria as listagens de produto e pedido de **todas** as
+# lojas, desfazendo em silêncio o isolamento por empresa.
 #
-# As capacidades de tema estão aqui por inteiro porque `edit_theme_options` —
-# que os dois papéis têm, por ser a única do núcleo que edita menus — abre a
-# tela Aparência → Temas. São estes casos que provam que a tela é só de leitura;
-# nenhuma URL provaria, já que ela responde 200 de propósito.
+# Post, página, menu e contas saíram dos dois papéis na versão 10: menu, rodapé,
+# páginas e contas que não são de loja ficam com o Super Administrador, e a
+# senha da loja se manda pela ficha dela. Estão aqui porque o portão do
+# `/wp-admin` esconderia a volta de qualquer uma — a URL seguiria em 302, e a
+# capacidade estaria de novo no papel, à espera de outra porta.
 echo "Capacidades proibidas ao Administrador e ao Moderador"
 if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
@@ -1447,6 +1470,20 @@ if banco_alcancavel; then
     if ( ! $atores["Administrador"] || ! $atores["Moderador"] ) { echo "::sem-dados\n"; exit; }
 
     $proibidas = array(
+      "reconectar_acessar_wp_admin",
+      "edit_posts",
+      "publish_posts",
+      "edit_others_posts",
+      "delete_posts",
+      "edit_pages",
+      "publish_pages",
+      "delete_pages",
+      "edit_theme_options",
+      "list_users",
+      "create_users",
+      "edit_users",
+      "promote_users",
+      "delete_users",
       "manage_options",
       "manage_woocommerce",
       "dokandar",
@@ -1469,12 +1506,27 @@ if banco_alcancavel; then
       }
     }
 
-    // Gestão de contas: concedida ao Administrador por desenho, negada ao
-    // Moderador. Os dois lados juntos, porque uma regressão que negasse a
-    // todo mundo passaria num teste que só verifica a negação.
-    foreach ( array( "list_users", "create_users", "edit_users", "promote_users" ) as $cap ) {
-      printf( "::%s Administrador tem: %s\n", user_can( $atores["Administrador"], $cap ) ? "ok" : "FALHA", $cap );
-      printf( "::%s Moderador: %s\n", user_can( $atores["Moderador"], $cap ) ? "FALHA" : "ok", $cap );
+    // O outro lado: o que as telas de gestão exigem continua no papel. Uma
+    // regressão que esvaziasse o papel passaria num teste que só nega.
+    foreach ( array( "upload_files", "moderate_comments", "reconectar_gerir_campanhas", "reconectar_gerir_enquetes", "reconectar_moderar" ) as $cap ) {
+      foreach ( $atores as $rotulo => $ator ) {
+        printf( "::%s %s tem: %s\n", user_can( $ator, $cap ) ? "ok" : "FALHA", $rotulo, $cap );
+      }
+    }
+
+    // Campanha e enquete **publicadas**: `map_meta_cap()` pede para elas
+    // `edit_published_posts` e `delete_published_posts`, que caem na primitiva
+    // de post quando o post type não as mapeia. Foi assim que a lixeira da
+    // campanha passou a responder 403 quando os papéis perderam as de post.
+    foreach ( array( "reconectar_campanha", "proposta_votacao" ) as $tipo ) {
+      $no_ar = get_posts( array( "post_type" => $tipo, "post_status" => "publish", "numberposts" => 1, "fields" => "ids" ) );
+      if ( ! $no_ar ) { continue; }
+      foreach ( $atores as $rotulo => $ator ) {
+        wp_set_current_user( $ator->ID );
+        foreach ( array( "edit_post", "delete_post" ) as $meta ) {
+          printf( "::%s %s tem: %s de %s publicada\n", current_user_can( $meta, $no_ar[0] ) ? "ok" : "FALHA", $rotulo, $meta, $tipo );
+        }
+      }
     }
 
     wp_set_current_user( $atores["Administrador"]->ID );
@@ -1495,8 +1547,8 @@ if banco_alcancavel; then
     # e os incrementos de `falhas` morreriam com ela — o script terminaria com
     # status 0 anunciando falhas que acabou de imprimir.
     # O rótulo já vem com o nome do ator e diz por si se o caso espera concessão
-    # ou negação ("Administrador tem: edit_users"). Escrever "negado" na mensagem,
-    # como antes, agora mentiria na metade das linhas.
+    # ou negação ("Moderador tem: upload_files"). Escrever "negado" na mensagem
+    # mentiria nas linhas de concessão.
     while IFS=" " read -r estado rotulo; do
       total=$((total + 1))
       if [ "$estado" = "ok" ]; then
@@ -1522,11 +1574,12 @@ fi
 # decoração, sem que nenhuma tela parecesse quebrada.
 #
 # Os casos aqui são meta-capacidades (`edit_user`, `promote_user`), com alvo, e
-# é por isso que este bloco não cabe no de cima: as primitivas do Administrador
-# estão concedidas de propósito, e é `negar_gestao_de_usuarios_superiores()`, em
-# `map_meta_cap`, que decide caso a caso. Os dois últimos casos são o contorno:
-# sobre a própria conta e sobre uma loja, as mesmas capacidades precisam
-# continuar funcionando, ou o filtro teria fechado o perfil inteiro.
+# é por isso que este bloco não cabe no de cima. Desde a versão 10 as primitivas
+# saíram do papel e a negação vem já delas; `negar_gestao_de_usuarios_superiores()`,
+# em `map_meta_cap`, fica como segunda camada para o dia em que alguém as
+# devolver. Os dois últimos casos são o contorno: sobre uma loja a conta também
+# não se edita mais — a senha vai pela ficha da loja —, e sobre a própria conta
+# o núcleo segue permitindo, ou o perfil de quem entra estaria fechado.
 echo "Escalada de privilégio pelo Administrador"
 if banco_alcancavel; then
   saida="$(cd "$RAIZ_PROJETO" && docker compose run --rm wpcli wp eval '
@@ -1551,7 +1604,7 @@ if banco_alcancavel; then
       printf( "::%s nao promove a administrator via campo %s\n", current_user_can( "promote_user", $ator->ID ) ? "FALHA" : "ok", $campo );
 
       $_REQUEST = array( $campo => "customer" );
-      printf( "::%s ainda promove a customer via campo %s\n", current_user_can( "promote_user", $loja->ID ) ? "ok" : "FALHA", $campo );
+      printf( "::%s nao promove uma loja a customer via campo %s\n", current_user_can( "promote_user", $loja->ID ) ? "FALHA" : "ok", $campo );
     }
     $_REQUEST = array();
 
@@ -1560,7 +1613,7 @@ if banco_alcancavel; then
     // por ali promoveria o usuário de verdade e reprovaria um filtro que está
     // correto — além de estragar o ambiente no meio da verificação. Quem chama
     // `promote_user` é a tela, e é a tela que o caso HTTP acima exercita.
-    printf( "::%s edita a conta de uma loja\n", current_user_can( "edit_user", $loja->ID ) ? "ok" : "FALHA" );
+    printf( "::%s nao edita a conta de uma loja\n", current_user_can( "edit_user", $loja->ID ) ? "FALHA" : "ok" );
     printf( "::%s edita a propria conta\n", current_user_can( "edit_user", $ator->ID ) ? "ok" : "FALHA" );' 2>/dev/null | grep "^::" | sed "s/^:://" | tr -d "\r")"
 
   if [ "$saida" = "sem-dados" ]; then

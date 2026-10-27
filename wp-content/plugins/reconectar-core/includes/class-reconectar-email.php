@@ -274,7 +274,13 @@ class Reconectar_Email {
 		// `wrap_message()` devolve o template com o CSS num `<style>`, que o
 		// Gmail descarta; `style_inline()` o embute nos elementos, como o
 		// WooCommerce faz nos e-mails dele.
-		$email['message'] = ( new WC_Email() )->style_inline( WC()->mailer()->wrap_message( $titulo, $html ) );
+		//
+		// O carteiro vem antes do `new WC_Email()`, e não na mesma expressão:
+		// é `WC()->mailer()` que carrega a classe. Numa requisição que ainda
+		// não mandou e-mail do WooCommerce — o link de senha da ficha da loja —
+		// o `new` vinha primeiro e era erro fatal. Medido: 500 no envio.
+		$carteiro         = WC()->mailer();
+		$email['message'] = ( new WC_Email() )->style_inline( $carteiro->wrap_message( $titulo, $html ) );
 
 		$cabecalho_html = 'Content-Type: text/html; charset=UTF-8';
 		if ( is_array( $email['headers'] ) ) {

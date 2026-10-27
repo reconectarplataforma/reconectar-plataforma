@@ -134,13 +134,22 @@ class Reconectar_Campanha {
 				'exclude_from_search' => true,
 				'map_meta_cap'        => true,
 				'capabilities'        => array(
-					'edit_posts'          => $capacidade,
-					'edit_others_posts'   => $capacidade,
-					'delete_posts'        => $capacidade,
-					'delete_others_posts' => $capacidade,
-					'publish_posts'       => $capacidade,
-					'read_private_posts'  => $capacidade,
-					'create_posts'        => $capacidade,
+					'edit_posts'             => $capacidade,
+					'edit_others_posts'      => $capacidade,
+					'delete_posts'           => $capacidade,
+					'delete_others_posts'    => $capacidade,
+					'publish_posts'          => $capacidade,
+					'read_private_posts'     => $capacidade,
+					'create_posts'           => $capacidade,
+					// As quatro abaixo são as que `map_meta_cap()` pede para a
+					// campanha **publicada** ou privada. Sem elas no mapa, o
+					// padrão é a primitiva de post homônima — e, quando os
+					// papéis perderam as capacidades de post, mandar uma
+					// campanha no ar para a lixeira passou a responder 403.
+					'edit_published_posts'   => $capacidade,
+					'edit_private_posts'     => $capacidade,
+					'delete_published_posts' => $capacidade,
+					'delete_private_posts'   => $capacidade,
 				),
 			)
 		);

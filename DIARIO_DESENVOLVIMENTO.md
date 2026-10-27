@@ -4832,3 +4832,44 @@ novos cobrem:
 
 No navegador, a 1600px e a 375px, nos dois perfis: moldura certa, item ativo,
 `scrollX` em 0, e o menu aberto dentro da coluna no celular.
+
+## 2026-10-23 — Só o Super Administrador no `/wp-admin`
+
+Última das quatro etapas. Com enquetes, categorias do fórum, campanhas e
+moderação já em `/gestao/<area>/`, o Administrador e o Moderador deixam de
+entrar no `/wp-admin`. As capacidades sobem para a versão 10:
+
+- `reconectar_acessar_wp_admin` fica só com o `administrator`, e sai dos outros
+  papéis por `remove_cap`, para alcançar instalação provisionada antes;
+- os dois papéis perdem as capacidades de post e de página, `edit_theme_options`
+  (menu, rodapé, Customizer) e as de usuário. Menu, rodapé, páginas e contas
+  que não são de loja ficam com o Super Administrador;
+- ficam `upload_files`, `moderate_comments`, as de campanha, enquete,
+  Incubadora, moderação e fórum.
+
+O portão manda os dois para `/modulos/`, que já não mostra "Painel Admin", e a
+barra lateral perdeu o item que levava ao `/wp-admin`.
+
+A senha da loja, que antes se trocava pela ficha do usuário no `/wp-admin`,
+passa a ir pela ficha da loja no `/painel-empresas/`: "Enviar link de
+redefinição de senha", por `retrieve_password()`. Se o e-mail não sair, a ficha
+mostra o link para copiar.
+
+Dois defeitos achados pelo verificador e corrigidos:
+
+- **Lixeira da campanha publicada em 403.** O mapa de capacidades do CPT não
+  declarava `edit_published_posts`, `delete_published_posts` e as de privado, e
+  `map_meta_cap()` caía na primitiva de post — que os papéis tinham até aqui.
+  Rascunho funcionava; só o publicado falhava. Campanha e enquete passaram a
+  mapear as onze.
+- **Envio de senha em 500.** `Reconectar_Email::embrulhar_texto_puro()` fazia
+  `new WC_Email()` antes de a classe existir: é `WC()->mailer()` quem a carrega,
+  e nenhum e-mail do WooCommerce tinha passado antes naquela requisição.
+
+As duas armadilhas estão no `CLAUDE.md`, junto com a dos dois códigos de
+negação: tela que o papel não alcança por capacidade morre em 403 no
+`menu.php`, antes do portão; tela que ainda alcançaria sai em 302 pelo portão.
+
+Medido: o `verificar-acessos.sh` foi de 464 para 512 casos, sem falha. A carga
+rodou duas vezes, a segunda sem criar nada. No navegador, a 1600px e a 375px, o
+botão de senha cabe na ficha e `scrollX` fica em 0.
