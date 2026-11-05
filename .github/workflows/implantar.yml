@@ -112,6 +112,35 @@ jobs:
             docker/Caddyfile \
             "$ALVO:$CAMINHO_REMOTO/docker/Caddyfile"
 
+      # Desligar o HTTPS é trocar o `WP_URL` do servidor para `http://` e o
+      # `WORDPRESS_PORT` para uma porta pública. Só que o proxy que já estava no
+      # ar segue segurando a 80 — o passo de subida dele apenas desiste, não o
+      # derruba —, e o `up -d wordpress` seguinte morreria com "port is already
+      # allocated". Por isso a retirada vem ANTES da subida do WordPress.
+      #
+      # `--profile https` porque `rm` de serviço atrás de profile não ativa o
+      # profile pelo nome, como o `up` ativa. Sem proxy nenhum, o comando não
+      # faz nada.
+      #
+      # A segunda guarda é a simétrica da do passo "Subir o proxy HTTPS": em
+      # `http://` com a porta ainda no loopback, o site sobe e ninguém de fora o
+      # alcança — job verde, site fora do ar.
+      - name: Retirar o proxy HTTPS quando o WP_URL é http
+        if: steps.preparar_ssh.outputs.configurado == 'true'
+        env:
+          CAMINHO_REMOTO: ${{ vars.CAMINHO_REMOTO }}
+        run: |
+          ssh $OPCOES_SSH "$ALVO" "
+            if grep -Eq '^WP_URL=.?https://' $CAMINHO_REMOTO/.env; then
+              exit 0
+            fi
+            if grep -Eq '^WORDPRESS_PORT=.?127[.]0[.]0[.]1:' $CAMINHO_REMOTO/.env; then
+              echo '::error::WP_URL é http, mas WORDPRESS_PORT está presa ao loopback: sem o proxy ninguém de fora alcança o site. Use WORDPRESS_PORT=80 (docs/DEPLOY.md).'
+              exit 1
+            fi
+            $COMPOSE --profile https rm -sf proxy
+          "
+
       # Os serviços são nomeados de propósito, e é assim que o phpMyAdmin fica fora
       # do ar sem precisar de arquivo de override: um `docker-compose.prod.yml`
       # declarando `ports` não substituiria a lista do arquivo base — o Compose

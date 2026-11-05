@@ -9,7 +9,7 @@ dados de demonstração ficam num workflow manual, fora do fluxo automático.
 | Workflow | Quando | O que faz |
 | --- | --- | --- |
 | [`verificar.yml`](../.github/workflows/verificar.yml) | todo push e todo pull request de fork | `php -l` em `reconectar-core/`, `themes/reconectar/` e `scripts/`; `bash -n` nos `scripts/*.sh` |
-| [`implantar.yml`](../.github/workflows/implantar.yml) | push na `main`, ou disparo manual | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` e, com `WP_URL` em `https://`, `up -d proxy` |
+| [`implantar.yml`](../.github/workflows/implantar.yml) | push na `main`, ou disparo manual | `rsync` do código autoral, `docker compose up -d db wordpress`, `provision.sh` e, conforme o esquema do `WP_URL`, `up -d proxy` (`https://`) ou `rm -sf proxy` (`http://`) |
 | [`demonstracao.yml`](../.github/workflows/demonstracao.yml) | só manual, com escolha `instalar`/`remover` | `seed-demo.sh instalar` ou `seed-demo.sh remover -y` |
 
 O preparo do SSH é uma ação composta, [`.github/actions/preparar-ssh/`](../.github/actions/preparar-ssh/action.yml),
@@ -101,9 +101,9 @@ os defaults do `docker-compose.yml` são de desenvolvimento e estão no
 repositório.
 
 ```
-WORDPRESS_PORT=127.0.0.1:8090
+WORDPRESS_PORT=80
 WORDPRESS_DEBUG=0
-WP_URL=https://3-148-211-66.sslip.io
+WP_URL=http://ec2-3-148-211-66.us-east-2.compute.amazonaws.com
 
 MYSQL_DATABASE=reconectar
 MYSQL_USER=reconectar
@@ -130,8 +130,10 @@ em `RECONECTAR_HOST_PADRAO`, derivado de `WP_URL`. Com o default
 `localhost`, e o sintoma é a página crua, sem CSS, para qualquer visitante.
 
 O esquema do `WP_URL` decide o HTTPS — veja a seção [HTTPS](#https) abaixo.
-Com `https://`, `WORDPRESS_PORT` **tem** de estar presa ao loopback como no
-exemplo; o deploy recusa a subida do proxy se não estiver.
+O exemplo acima é o de HTTP, o estado atual enquanto o host definitivo da
+aplicação não está decidido. Com `https://`, `WORDPRESS_PORT` **tem** de estar
+presa ao loopback (`127.0.0.1:8090`); com `http://`, **tem** de ser pública. O
+deploy recusa os dois desencontros.
 
 #### E-mail (SMTP)
 
@@ -249,6 +251,27 @@ porta 80 para o endereço canônico. Reescrevê-los é opcional, com
 Sem HSTS, de propósito, por enquanto: com ele o navegador passa a recusar o
 HTTP por meses, e um nome sslip.io que mude de IP deixa de abrir até no
 redirecionamento. Vale ligar quando houver domínio próprio.
+
+**Desligar**, enquanto o host da aplicação não estiver definido — é o estado
+atual. O HTTPS fica desligado, não removido: o `proxy`, o `Caddyfile` e as
+guardas seguem no repositório, e religar é refazer o passo 2 acima.
+
+1. No `.env` do servidor, `WP_URL=http://<DNS público>` e `WORDPRESS_PORT=80`.
+2. Disparar o `implantar.yml`. O passo "Retirar o proxy HTTPS quando o WP_URL
+   é http" remove o Caddy **antes** de o WordPress subir — sem isso o
+   `up -d wordpress` morreria com a 80 ocupada —, e o `provision.sh` regrava o
+   bloco do `wp-config.php` com `http`.
+
+O volume `caddy-data` não é apagado: religar com o mesmo nome reaproveita o
+certificado, sem gastar emissão. E a porta 443 pode ficar aberta no Security
+Group, sem nada escutando nela.
+
+Conferir: `curl -sI http://<DNS público>/` responde 200, sem redirecionar;
+`curl -s http://<DNS público>/ | grep -c 'https://3-148'` dá zero.
+
+Navegador que já abriu o site em `https://` guarda o 301 permanente do Caddy em
+cache e insiste no endereço antigo, que deixou de responder. Não é o servidor:
+aba anônima confirma, e limpar o cache do navegador resolve.
 
 ## Secrets e variables do repositório
 
