@@ -1517,6 +1517,47 @@
   margin: 0;
 }
 
+/* Galeria na página de produto
+   -------------------------------------------------------------------------- */
+
+/* A foto vem do envio da loja, no tamanho que a loja tiver: no primeiro teste em
+   produção o pingente foi enviado com 309×311px, e a coluna da galeria tem uns
+   750px. O WooCommerce não amplia acima do original, então a foto ficava presa no
+   canto superior esquerdo, com o botão de zoom solto na outra ponta da coluna.
+
+   A saída é uma moldura quadrada com a foto centralizada, esticada até a
+   moldura e **não além do arquivo original**: esticar 309px para 560 é borrar o
+   produto, e numa vitrine a foto borrada vende pior que a pequena. O teto vem
+   num `style` por imagem, de `reconectar_galeria_sem_ampliar()`, porque só o PHP
+   conhece o tamanho do original. `contain`, e não `cover`, porque a foto de
+   produto é a única que não pode perder borda — é o próprio item à venda.
+
+   O teto de 560px vai na galeria, não na moldura, para o botão de zoom — que se
+   posiciona contra a galeria — continuar no canto da foto. */
+.single-product div.product .woocommerce-product-gallery {
+  max-width: 560px;
+}
+
+.single-product div.product .woocommerce-product-gallery__image {
+  aspect-ratio: 1;
+  background: var(--rc-fundo);
+  border-radius: var(--rc-raio);
+  overflow: hidden;
+}
+
+.single-product div.product .woocommerce-product-gallery__image > a {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
+.single-product div.product .woocommerce-product-gallery__image img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
 /* Loja na página de produto
    -------------------------------------------------------------------------- */
 
