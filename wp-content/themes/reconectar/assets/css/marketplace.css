@@ -2202,18 +2202,6 @@
   margin: 0 0 12px;
 }
 
-.rc-loja__grade {
-  display: grid;
-  gap: var(--rc-espaco);
-  grid-template-columns: repeat(2, 1fr);
-}
-
-@media (max-width: 767px) {
-  .rc-loja__grade {
-    grid-template-columns: 1fr;
-  }
-}
-
 .rc-loja__vazio,
 .rc-loja__aviso {
   background: var(--rc-fundo);
@@ -4113,8 +4101,8 @@
    em que essa ordem mudar.
 
    O escopo `.site-main` deixa de fora os widgets de barra lateral, que continuam
-   com o laço do tema pai. O catálogo da página de loja não passa por aqui: usa
-   `reconectar_card_produto_linha()`. */
+   com o laço do tema pai. O catálogo da página de loja também passa por aqui,
+   por `reconectar_loja_laco()`. */
 .woocommerce .site-main ul.products.products,
 .woocommerce-page .site-main ul.products.products {
   display: grid;

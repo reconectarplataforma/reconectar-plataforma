@@ -539,11 +539,7 @@ function reconectar_loja_catalogo( $loja ) {
 				?>
 			</h2>
 
-			<div class="rc-loja__grade">
-				<?php foreach ( $produtos as $produto ) : ?>
-					<?php reconectar_card_produto_linha( $produto ); ?>
-				<?php endforeach; ?>
-			</div>
+			<?php reconectar_loja_laco( $produtos ); ?>
 		</section>
 		<?php
 		return;
@@ -559,11 +555,7 @@ function reconectar_loja_catalogo( $loja ) {
 				<?php echo esc_html( $secao['nome'] ); ?>
 			</h2>
 
-			<div class="rc-loja__grade">
-				<?php foreach ( $secao['produtos'] as $produto ) : ?>
-					<?php reconectar_card_produto_linha( $produto ); ?>
-				<?php endforeach; ?>
-			</div>
+			<?php reconectar_loja_laco( $secao['produtos'] ); ?>
 		</section>
 		<?php
 	}
@@ -576,10 +568,10 @@ function reconectar_loja_catalogo( $loja ) {
  * `data-rc-carrossel` que `assets/js/marketplace.js` já lê. Sem promoção nem
  * produto marcado como destaque, a seção não é impressa.
  *
- * Também não é impressa quando os destaques são o catálogo inteiro: o
- * catálogo vem logo abaixo, e a faixa só repetiria os mesmos cards por cima
- * dele — o caso típico de loja que acabou de abrir com um ou dois produtos,
- * todos em promoção.
+ * É impressa mesmo quando os destaques são o catálogo inteiro. Escondê-la
+ * nesse caso, para não repetir os cards do catálogo logo abaixo, foi tentado e
+ * desfeito no primeiro teste: a faixa é o que diz a quem chega quais produtos
+ * estão em oferta, e sem ela a promoção só se lia card a card.
  *
  * @param array        $loja     Loja normalizada.
  * @param WC_Product[] $produtos Produtos já carregados da loja.
@@ -588,7 +580,7 @@ function reconectar_loja_catalogo( $loja ) {
 function reconectar_loja_destaques( $loja, $produtos ) {
 	$destaques = reconectar_destaques_da_loja( $produtos );
 
-	if ( ! $destaques || count( $destaques ) === count( $produtos ) ) {
+	if ( ! $destaques ) {
 		return;
 	}
 
@@ -606,3 +598,58 @@ function reconectar_loja_destaques( $loja, $produtos ) {
 
 	reconectar_fechar_carrossel();
 }
+
+/**
+ * Imprime produtos da loja no laço do WooCommerce, o mesmo da página Produtos.
+ *
+ * O catálogo da loja usava um card em linha próprio, e a loja ficava com cara
+ * de outro site ao lado da página Produtos. O laço padrão traz junto o que o
+ * card em linha não tinha: botão de compra, selo de oferta e avaliação, já
+ * vestidos pela seção "Catálogo de produtos" de `marketplace.css`. O nome da
+ * loja some sozinho aqui, em `reconectar_catalogo_loja_no_card()`.
+ *
+ * @param WC_Product[] $produtos Produtos a imprimir.
+ * @return void
+ */
+function reconectar_loja_laco( $produtos ) {
+	global $post;
+
+	/*
+	 * O `<div class="woocommerce">` é a convenção dos shortcodes do WooCommerce,
+	 * e aqui ele é o que pinta o botão: a cor da marca está em
+	 * `.woocommerce a.button`, no `style.css`. Pôr `woocommerce` no `<body>`
+	 * daria o mesmo resultado e alcançaria todo botão da página da loja.
+	 */
+	echo '<div class="woocommerce">';
+	woocommerce_product_loop_start();
+
+	foreach ( $produtos as $produto ) {
+		$post = get_post( $produto->get_id() ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- o template do laço lê o post global.
+		setup_postdata( $post );
+		wc_get_template_part( 'content', 'product' );
+	}
+
+	woocommerce_product_loop_end();
+	echo '</div>';
+	wp_reset_postdata();
+}
+
+/**
+ * Marca a página da loja como página do WooCommerce.
+ *
+ * As regras do laço em `marketplace.css` são escopadas por `.woocommerce` ou
+ * `.woocommerce-page` no `<body>` — o escopo que separa o catálogo dos widgets
+ * de barra lateral —, e a página de loja do Dokan não recebe nenhuma das duas.
+ * Sem a classe o laço sairia com o layout em floats do Storefront.
+ *
+ * @param string[] $classes Classes do `<body>`.
+ * @return string[]
+ */
+function reconectar_loja_classe_woocommerce( $classes ) {
+	if ( function_exists( 'dokan_is_store_page' ) && dokan_is_store_page() ) {
+		$classes[] = 'woocommerce-page';
+	}
+
+	return $classes;
+}
+add_filter( 'body_class', 'reconectar_loja_classe_woocommerce' );
