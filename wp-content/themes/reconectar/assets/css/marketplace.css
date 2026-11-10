@@ -1161,8 +1161,8 @@
   grid-auto-columns: minmax(260px, 1fr);
 }
 
-/* Teto fixo, não `1fr`: a figura do card tem `aspect-ratio: 4 / 3`, então a
-   altura da foto acompanha a largura da coluna. Com `1fr`, uma loja com um só
+/* Teto fixo, não `1fr`: a figura do card tem proporção fixa, então a altura
+   da foto acompanha a largura da coluna. Com `1fr`, uma loja com um só
    produto em promoção recebia um card da largura da página inteira, e a foto
    dos Destaques ocupava a tela toda, empurrando o catálogo para baixo — foi o
    primeiro defeito relatado nos testes em produção. Com quatro cards ou mais o
@@ -1432,8 +1432,14 @@
   text-decoration: none;
 }
 
+/* Quadrada porque a miniatura é quadrada: `woocommerce_thumbnail` sai do envio
+   recortado em 1:1 (324×324, o padrão do Storefront). Em 4:3, `cover` cortava
+   mais um quarto da altura de uma foto que já tinha sido recortada — a corrente
+   do pingente sumia no primeiro teste em produção. Mudar a proporção aqui exige
+   trocar o recorte em `woocommerce_thumbnail_cropping` e regerar as miniaturas,
+   ou o corte duplo volta. */
 .rc-card-produto__figura {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
 }
 
 .rc-card-produto__conteudo {
@@ -1812,13 +1818,19 @@
   overflow: hidden;
 }
 
-/* Altura em `clamp()` e não em `aspect-ratio`: o banner é servido no tamanho
-   `large` (1024px de largura), e uma proporção fixa numa tela de 1440px o
-   esticaria além do que a imagem tem para mostrar. O piso de 120px mantém a
-   faixa reconhecível no celular. */
+/* A proporção é a do recorte que o Dokan faz no envio, 1600×320, gravada pelo
+   `provision.sh` em `dokan_appearance`. As duas têm de andar juntas. Antes a
+   altura era um `clamp()` de até 240px sobre o recorte de fábrica do Dokan
+   (625×300, 2:1): numa tela de 1920px a faixa saía em 7:1, e `cover` mostrava só
+   uma tira do meio do banner, ampliada a partir do tamanho `large` — a logo da
+   loja virava um borrão do tamanho da tela.
+
+   O piso de 120px mantém a faixa reconhecível no celular, onde 5:1 daria 70px;
+   ali `cover` corta as laterais, que é recorte, não deformação. */
 .rc-loja__banner {
+  aspect-ratio: 5 / 1;
   background: var(--rc-fundo);
-  height: clamp(120px, 20vw, 240px);
+  min-height: 120px;
   overflow: hidden;
 }
 

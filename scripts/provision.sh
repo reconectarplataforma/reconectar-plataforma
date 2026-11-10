@@ -328,6 +328,28 @@ else
   echo "Página '/vendor-onboarding/' já não está publicada."
 fi
 
+echo "== Recorte do banner da loja =="
+# O Dokan recorta o banner no envio pelas dimensões desta opção, e o padrão de
+# fábrica é 625×300 (2:1). A página da loja o exibe numa faixa de 5:1: com o
+# recorte de fábrica, `object-fit: cover` sobrava só uma tira do meio, ampliada
+# ao triplo — foi o banner "deformado" do primeiro teste em produção. As duas
+# proporções têm de ser a mesma; a da faixa está em `.rc-loja__banner`, no
+# `marketplace.css`. 1600px cobre tela larga sem ampliar; abaixo disso o
+# `srcset` entrega as versões menores.
+#
+# Só vale para banner enviado daqui em diante: o já recortado continua 2:1 e
+# precisa ser reenviado pela loja.
+for par in store_banner_width=1600 store_banner_height=320; do
+  chave="${par%%=*}"
+  valor="${par#*=}"
+
+  if [ "$(wp option pluck dokan_appearance "$chave" 2>/dev/null || true)" = "$valor" ]; then
+    echo "Banner: '$chave' já é $valor."
+  else
+    reconectar_gravar_chave_de_opcao dokan_appearance "$chave" "$valor"
+  fi
+done
+
 echo "== Meios de pagamento =="
 # O comprador paga cada loja direto, por PIX ou transferência, com os dados que
 # a própria loja cadastrou. A loja cadastra isso em Configurações → Pagamento da
