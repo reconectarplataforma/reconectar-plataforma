@@ -74,6 +74,44 @@ function reconectar_ocultar_filtro_do_dokan( $valor ) {
 add_filter( 'option_dokan_appearance', 'reconectar_ocultar_filtro_do_dokan' );
 
 /**
+ * Corrige a trilha da página de loja: "Lojas › <nome da loja>".
+ *
+ * O Dokan monta os dois elos em `Rewrites::store_page_breadcrumb()` com o
+ * `ucwords()` do segmento de URL ("Store", em inglês) e o slug do usuário — o
+ * login de quem administra a loja, não o nome dela. No primeiro teste em
+ * produção a trilha lia "Início › Store › vanusa": idioma errado e um dado de
+ * conta exposto onde o comprador esperava "VS Acessórios".
+ *
+ * Prioridade 20 porque o filtro do Dokan está na 10. O elo da loja só é trocado
+ * quando o Dokan o montou com URL: sem ela é o "Error 404" de loja inexistente,
+ * que fica como está.
+ *
+ * @param array $elos Elos da trilha, cada um `array( rótulo, url )`.
+ * @return array
+ */
+function reconectar_trilha_da_loja( $elos ) {
+	if ( ! is_array( $elos ) || ! function_exists( 'dokan_is_store_page' ) || ! dokan_is_store_page() ) {
+		return $elos;
+	}
+
+	if ( isset( $elos[1] ) ) {
+		$elos[1] = array( __( 'Lojas', 'reconectar' ), reconectar_url_das_lojas() );
+	}
+
+	if ( isset( $elos[2][1] ) && '' !== $elos[2][1] ) {
+		$usuario = get_user_by( 'slug', get_query_var( dokan_get_option( 'custom_store_url', 'dokan_general', 'store' ) ) );
+		$info    = $usuario ? dokan_get_store_info( $usuario->ID ) : array();
+
+		if ( ! empty( $info['store_name'] ) ) {
+			$elos[2][0] = $info['store_name'];
+		}
+	}
+
+	return $elos;
+}
+add_filter( 'woocommerce_get_breadcrumb', 'reconectar_trilha_da_loja', 20 );
+
+/**
  * Imprime a página inteira de uma loja.
  *
  * O parâmetro é o objeto `Vendor` que o Dokan resolve no template, e não um
@@ -138,14 +176,20 @@ function reconectar_loja_cabecalho( $loja ) {
 				 * Sem `loading="lazy"`: o banner é o maior elemento visível na
 				 * abertura da página, e adiar o carregamento dele é adiar o
 				 * próprio LCP.
+				 *
+				 * `full` e não `large`: o recorte do Dokan já é o tamanho final
+				 * (1600px), e o `large` o reduziria a 1024px para depois esticar
+				 * de volta na faixa de largura total. O `srcset` segue entregando
+				 * as versões menores ao celular.
 				 */
 				echo wp_get_attachment_image(
 					(int) $loja['banner_id'],
-					'large',
+					'full',
 					false,
 					array(
 						'alt'           => '',
 						'fetchpriority' => 'high',
+						'sizes'         => '100vw',
 					)
 				);
 				?>
@@ -532,6 +576,11 @@ function reconectar_loja_catalogo( $loja ) {
  * `data-rc-carrossel` que `assets/js/marketplace.js` já lê. Sem promoção nem
  * produto marcado como destaque, a seção não é impressa.
  *
+ * Também não é impressa quando os destaques são o catálogo inteiro: o
+ * catálogo vem logo abaixo, e a faixa só repetiria os mesmos cards por cima
+ * dele — o caso típico de loja que acabou de abrir com um ou dois produtos,
+ * todos em promoção.
+ *
  * @param array        $loja     Loja normalizada.
  * @param WC_Product[] $produtos Produtos já carregados da loja.
  * @return void
@@ -539,7 +588,7 @@ function reconectar_loja_catalogo( $loja ) {
 function reconectar_loja_destaques( $loja, $produtos ) {
 	$destaques = reconectar_destaques_da_loja( $produtos );
 
-	if ( ! $destaques ) {
+	if ( ! $destaques || count( $destaques ) === count( $produtos ) ) {
 		return;
 	}
 

@@ -460,7 +460,16 @@ function reconectar_card_produto_linha( $produto ) {
 		return;
 	}
 
-	$resumo = $produto->get_short_description();
+	$resumo = trim( wp_strip_all_tags( $produto->get_short_description() ) );
+
+	/*
+	 * Loja que preenche a descrição curta com o próprio nome é comum — o campo
+	 * fica logo abaixo do título no formulário do Dokan. Impressos os dois, o
+	 * card lia "Pingente / Pingente" no primeiro teste em produção.
+	 */
+	if ( 0 === strcasecmp( $resumo, trim( $produto->get_name() ) ) ) {
+		$resumo = '';
+	}
 	?>
 	<article class="rc-produto-linha">
 		<a class="rc-produto-linha__link" href="<?php echo esc_url( $produto->get_permalink() ); ?>">
@@ -469,7 +478,7 @@ function reconectar_card_produto_linha( $produto ) {
 
 				<?php if ( $resumo ) : ?>
 					<p class="rc-produto-linha__resumo">
-						<?php echo esc_html( wp_strip_all_tags( $resumo ) ); ?>
+						<?php echo esc_html( $resumo ); ?>
 					</p>
 				<?php endif; ?>
 
