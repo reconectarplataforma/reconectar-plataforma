@@ -1150,9 +1150,9 @@
    dois a largura acompanha a viewport, saindo do piso por volta de 743px.
 
    Sem `1fr` as colunas param de esticar e a faixa alinha à esquerda sozinha —
-   `justify-content` no grid já faz isso por padrão. As outras duas faixas
-   mantêm o `1fr` de propósito: cards de loja e de produto têm imagem de capa,
-   que ganha com a largura extra quando sobram poucos itens. */
+   `justify-content` no grid já faz isso por padrão. A faixa de destaque mantém
+   o `1fr` de propósito: o banner de campanha ganha com a largura extra. A de
+   produtos perdeu — veja logo abaixo. */
 .rc-carrossel__faixa--categorias {
   grid-auto-columns: clamp(104px, 14vw, 136px);
 }
@@ -1161,8 +1161,15 @@
   grid-auto-columns: minmax(260px, 1fr);
 }
 
+/* Teto fixo, não `1fr`: a figura do card tem `aspect-ratio: 4 / 3`, então a
+   altura da foto acompanha a largura da coluna. Com `1fr`, uma loja com um só
+   produto em promoção recebia um card da largura da página inteira, e a foto
+   dos Destaques ocupava a tela toda, empurrando o catálogo para baixo — foi o
+   primeiro defeito relatado nos testes em produção. Com quatro cards ou mais o
+   teto não muda nada: nos ~980px úteis do `.col-full`, o `1fr` já os deixava
+   abaixo de 240px. */
 .rc-carrossel__faixa--produtos {
-  grid-auto-columns: minmax(180px, 1fr);
+  grid-auto-columns: minmax(180px, 240px);
 }
 
 /* ==========================================================================
