@@ -89,3 +89,82 @@ function reconectar_produto_loja_vendedora() {
 	<?php
 }
 add_action( 'woocommerce_single_product_summary', 'reconectar_produto_loja_vendedora', 6 );
+
+/**
+ * Omite a descrição curta quando ela só repete o nome do produto.
+ *
+ * A descrição curta é o campo logo abaixo do título no formulário do Dokan, e
+ * loja que acabou de abrir costuma preenchê-lo com o próprio nome. No primeiro
+ * teste em produção a tela lia "Pingente" no título e "Pingente" de novo abaixo
+ * do preço. O template `single-product/short-description.php` não imprime nada
+ * quando o filtro devolve vazio, então o bloco some inteiro, sem `<div>` órfã.
+ *
+ * Restrito à página do produto porque o filtro é global e o `$product` só é
+ * confiável ali. Os cards da vitrine leem o campo direto e tratam a repetição
+ * em `reconectar_card_produto_linha()`.
+ *
+ * @param string $resumo Descrição curta, com HTML.
+ * @return string
+ */
+function reconectar_omitir_resumo_igual_ao_nome( $resumo ) {
+	global $product;
+
+	if ( ! is_product() || ! $product instanceof WC_Product ) {
+		return $resumo;
+	}
+
+	if ( 0 === strcasecmp( trim( wp_strip_all_tags( $resumo ) ), trim( $product->get_name() ) ) ) {
+		return '';
+	}
+
+	return $resumo;
+}
+add_filter( 'woocommerce_short_description', 'reconectar_omitir_resumo_igual_ao_nome' );
+
+/**
+ * Limita cada foto da galeria à largura do arquivo original.
+ *
+ * A moldura da galeria (`.woocommerce-product-gallery__image`, em
+ * `marketplace.css`) estica a foto até a largura dela, para que a foto boa
+ * preencha o quadro. A foto pequena não pode acompanhar: o pingente do primeiro
+ * teste em produção foi enviado com 309px, e esticá-lo a 560 o borraria. O CSS
+ * não conhece o tamanho do arquivo, e o `width` do `<img>` também não serve —
+ * é o do tamanho intermediário servido, que pode ser menor que o original. A
+ * largura que vale é a do original, que o WooCommerce já calcula para o zoom.
+ *
+ * O `sizes` acompanha o teto da moldura: o padrão do núcleo descreve a imagem
+ * pelo tamanho intermediário, e o navegador escolheria no `srcset` um arquivo
+ * menor que o quadro em que ele vai ser desenhado.
+ *
+ * @param array $atributos Atributos do `<img>` da galeria.
+ * @return array
+ */
+function reconectar_galeria_sem_ampliar( $atributos ) {
+	$largura = isset( $atributos['data-large_image_width'] ) ? absint( $atributos['data-large_image_width'] ) : 0;
+
+	if ( $largura > 0 ) {
+		$atributos['style'] = 'max-width: ' . $largura . 'px';
+	}
+
+	$atributos['sizes'] = '(max-width: 767px) 100vw, 560px';
+
+	return $atributos;
+}
+add_filter( 'woocommerce_gallery_image_html_attachment_image_params', 'reconectar_galeria_sem_ampliar' );
+
+/*
+ * Leva o selo de oferta para dentro da coluna do resumo, acima do título.
+ *
+ * O WooCommerce imprime o selo em `woocommerce_before_single_product_summary`,
+ * fora das duas colunas, e ele só aparecia sobre o resumo por acaso: como
+ * `inline-block` logo depois da galeria flutuante, ele encostava na borda dela,
+ * que coincidia com o início da coluna do resumo. Com o teto de largura da
+ * galeria (veja `.woocommerce-product-gallery` em `marketplace.css`) a borda
+ * recuou, e o selo foi parar no vão entre as duas colunas.
+ *
+ * Prioridade 4, antes do título (5). O gancho é do WooCommerce, que carrega
+ * antes do tema, então o `remove_action` no corpo do arquivo encontra o
+ * registro — a armadilha do pai que carrega depois é do Storefront.
+ */
+remove_action( 'woocommerce_before_single_product_summary', 'woocommerce_show_product_sale_flash', 10 );
+add_action( 'woocommerce_single_product_summary', 'woocommerce_show_product_sale_flash', 4 );
