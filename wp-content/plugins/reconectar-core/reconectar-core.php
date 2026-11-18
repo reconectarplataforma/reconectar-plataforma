@@ -78,12 +78,14 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-incubadora-intera
 // avalia e o IP de quem visita. Uma troca de tema não pode reabrir isso.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-avatar-local.php';
 
-// Pagamento direto do comprador à loja, por PIX ou transferência. O dinheiro
-// não passa pela plataforma: o que existe aqui é o cadastro da chave na
-// dashboard do Dokan e a instrução que o comprador recebe depois do pedido.
+// Pagamento direto do comprador à loja, por PIX, transferência ou combinado
+// pelo WhatsApp. O dinheiro não passa pela plataforma: o que existe aqui é o
+// cadastro da chave na dashboard do Dokan e a instrução que o comprador recebe
+// depois do pedido.
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/funcoes-pix.php';
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/funcoes-qrcode.php';
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamento-pix.php';
+require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamento-whatsapp.php';
 require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-pagamento-direto.php';
 // Fecha o ciclo do pagamento direto: o comprador anexa o comprovante, a loja
 // confere e confirma o recebimento. Depois de `class-reconectar-pagamento-direto.php`
@@ -119,7 +121,7 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-privacidade.php';
 // SMTP por variável de ambiente e a marca nos e-mails, inclusive nos de texto
 // puro do núcleo e do BuddyPress.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-email.php';
-// As três classes de gateway ficam de fora daqui de propósito: elas estendem
+// As quatro classes de gateway ficam de fora daqui de propósito: elas estendem
 // `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
 // exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do
 // filtro `woocommerce_payment_gateways`.
@@ -149,6 +151,7 @@ function reconectar_core_init() {
 	Reconectar_Cadastro_De_Lojas::init();
 	Reconectar_Campanha::init();
 	Reconectar_Pagamento_Pix::init();
+	Reconectar_Pagamento_Whatsapp::init();
 	Reconectar_Pagamento_Direto::init();
 	Reconectar_Comprovante::init();
 	Reconectar_Servicos::init();

@@ -33,6 +33,11 @@ class Reconectar_Pagamento_Direto {
 	const GATEWAY_TRANSFERENCIA = 'reconectar_transferencia';
 
 	/**
+	 * Identificador do gateway de pagamento combinado com a loja (WhatsApp).
+	 */
+	const GATEWAY_COMBINAR = 'reconectar_combinar';
+
+	/**
 	 * Meta do pedido pai com o mapa `loja_id => gateway_id`.
 	 */
 	const META_MEIOS = '_reconectar_meios_por_loja';
@@ -143,7 +148,7 @@ class Reconectar_Pagamento_Direto {
 			'reconectar-pagamento',
 			RECONECTAR_CORE_URL . 'assets/css/pagamento.css',
 			array(),
-			'0.5.5'
+			'0.6.0'
 		);
 		wp_enqueue_script(
 			'reconectar-pagamento',
@@ -163,7 +168,7 @@ class Reconectar_Pagamento_Direto {
 	}
 
 	/**
-	 * Acrescenta os dois gateways à lista do WooCommerce.
+	 * Acrescenta os três gateways à lista do WooCommerce.
 	 *
 	 * Os arquivos das classes são exigidos **aqui**, e não no carregamento do
 	 * plugin: `WC_Payment_Gateway` é do WooCommerce, e um `extends` de classe
@@ -172,15 +177,17 @@ class Reconectar_Pagamento_Direto {
 	 * ordem de carregamento irrelevante.
 	 *
 	 * @param array $gateways Gateways já conhecidos.
-	 * @return array Gateways com os dois autorais no fim.
+	 * @return array Gateways com os três autorais no fim.
 	 */
 	public static function registrar_gateways( $gateways ) {
 		require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-gateway-direto.php';
 		require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-gateway-pix.php';
 		require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-gateway-transferencia.php';
+		require_once RECONECTAR_CORE_PATH . 'includes/pagamento/class-reconectar-gateway-combinar.php';
 
 		$gateways[] = 'Reconectar_Gateway_Pix';
 		$gateways[] = 'Reconectar_Gateway_Transferencia';
+		$gateways[] = 'Reconectar_Gateway_Combinar';
 
 		return $gateways;
 	}
@@ -989,6 +996,7 @@ class Reconectar_Pagamento_Direto {
 		$icones = array(
 			'pix'           => '<path d="M12 3l4 4-4 4-4-4zM12 13l4 4-4 4-4-4zM3 12l4-4 4 4-4 4zM13 12l4-4 4 4-4 4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
 			'transferencia' => '<path d="M4 10h16M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18M12 3l9 5H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+			'combinar'      => '<path d="M12 4.5c-4.7 0-8.5 3.2-8.5 7.2 0 2.2 1.1 4.2 3 5.5L6 20.5l4.1-2.2c.6.1 1.2.2 1.9.2 4.7 0 8.5-3.2 8.5-7.2S16.7 4.5 12 4.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
 			'cartao'        => '<rect x="3" y="5.5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18M6.5 15h4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
 			'boleto'        => '<path d="M4 5v14M7 5v14M9.5 5v14M13 5v14M15.5 5v14M18 5v14M20 5v14" fill="none" stroke="currentColor" stroke-width="1.6"/>',
 		);
@@ -1005,6 +1013,12 @@ class Reconectar_Pagamento_Direto {
 				// O título do gateway é "Transferência bancária": longo demais para
 				// a aba de 7rem, que no celular divide a linha com outra.
 				'nome'  => __( 'Transferência', 'reconectar-core' ),
+			),
+			array(
+				'id'    => self::GATEWAY_COMBINAR,
+				'icone' => 'combinar',
+				// Pela mesma razão da transferência: o título do gateway não cabe.
+				'nome'  => __( 'WhatsApp', 'reconectar-core' ),
 			),
 			array(
 				'id'    => '',
@@ -1269,8 +1283,14 @@ class Reconectar_Pagamento_Direto {
 			 *
 			 * O `class_exists` fica sozinho na condição, nunca num `||` com a
 			 * chamada — a armadilha do curto-circuito antes do autoload.
+			 *
+			 * E fora do pagamento combinado: dinheiro na entrega não tem
+			 * comprovante, e a coluna da loja já diz "não se aplica" a esse meio
+			 * — pedir o arquivo de um lado e ignorá-lo do outro seria mentir.
 			 */
-			if ( 'tela' === $contexto && class_exists( 'Reconectar_Comprovante' ) ) {
+			$combinado = isset( $meios[ $indice ] ) && self::GATEWAY_COMBINAR === $meios[ $indice ]->id;
+
+			if ( 'tela' === $contexto && ! $combinado && class_exists( 'Reconectar_Comprovante' ) ) {
 				Reconectar_Comprovante::campo( $bloco['pedido'], $bloco['loja_id'] );
 			}
 

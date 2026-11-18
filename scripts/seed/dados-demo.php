@@ -249,18 +249,24 @@ return array(
 				'distancia' => '2,4 km',
 			),
 			'pagamento' => array(
-				'pix'  => array(
+				'pix'      => array(
 					'tipo_chave'   => 'cnpj',
 					'chave'        => '12345678000190',
 					'beneficiario' => 'Sabor da Terra Agroecolog',
 					'cidade'       => 'Maceió',
 				),
-				'bank' => array(
+				'bank'     => array(
 					'ac_name'        => 'Cooperativa Sabor da Terra',
 					'bank_name'      => 'Banco do Brasil',
 					'routing_number' => '1234-5',
 					'ac_number'      => '98765-4',
 					'ac_type'        => 'Conta corrente',
+				),
+				// Os três meios: é a loja em que o comprador escolhe entre todos.
+				// Número fictício, no molde da chave PIX de telefone da Casa Viva.
+				'whatsapp' => array(
+					'numero' => '5582900000001',
+					'recado' => 'Aceito dinheiro e cartão na entrega.',
 				),
 			),
 			'subcategorias' => array(
@@ -944,8 +950,9 @@ return array(
 	/*
 	 * Rótulos dos meios de pagamento.
 	 *
-	 * São os dois que a plataforma oferece de fato — `Reconectar_Gateway_Pix` e
-	 * `Reconectar_Gateway_Transferencia`, ambos registrados em
+	 * São os três que a plataforma oferece de fato — `Reconectar_Gateway_Pix`,
+	 * `Reconectar_Gateway_Transferencia` e `Reconectar_Gateway_Combinar`, todos
+	 * registrados em
 	 * `woocommerce_payment_gateways`. O `id` é o do gateway, e não um nome
 	 * inventado: o painel do pedido imprime esse identificador e, se ele não
 	 * casar com gateway nenhum, o rótulo gravado promete ao comprador um meio
@@ -964,6 +971,10 @@ return array(
 		'transferencia' => array(
 			'id'     => 'reconectar_transferencia',
 			'titulo' => 'Transferência bancária',
+		),
+		'combinar'      => array(
+			'id'     => 'reconectar_combinar',
+			'titulo' => 'Combinar com a loja (WhatsApp)',
 		),
 	),
 

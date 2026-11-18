@@ -351,8 +351,8 @@ for par in store_banner_width=1600 store_banner_height=320; do
 done
 
 echo "== Meios de pagamento =="
-# O comprador paga cada loja direto, por PIX ou transferência, com os dados que
-# a própria loja cadastrou. A loja cadastra isso em Configurações → Pagamento da
+# O comprador paga cada loja direto, por PIX, transferência ou combinando pelo
+# WhatsApp, com os dados que a própria loja cadastrou. A loja cadastra isso em Configurações → Pagamento da
 # dashboard do Dokan, e essa tela só lista os métodos que estiverem nesta opção.
 #
 # `withdraw_methods` é um **mapa**, não uma lista: medido, o valor de fábrica é
@@ -360,10 +360,10 @@ echo "== Meios de pagamento =="
 # repete o próprio nome. Gravar `["pix","bank"]` aqui não liga nada e ainda
 # apaga o `bank` que já estava de pé, e o sintoma é a tela existir vazia com
 # "No withdraw method is available", sem dizer por quê.
-if [ "$(wp option pluck dokan_withdraw withdraw_methods --format=json 2>/dev/null || true)" = '{"paypal":"","bank":"bank","pix":"pix"}' ]; then
+if [ "$(wp option pluck dokan_withdraw withdraw_methods --format=json 2>/dev/null || true)" = '{"paypal":"","bank":"bank","pix":"pix","whatsapp":"whatsapp"}' ]; then
   echo "Métodos de recebimento da loja já configurados."
 else
-  reconectar_gravar_chave_de_opcao dokan_withdraw withdraw_methods --format=json '{"paypal":"","bank":"bank","pix":"pix"}'
+  reconectar_gravar_chave_de_opcao dokan_withdraw withdraw_methods --format=json '{"paypal":"","bank":"bank","pix":"pix","whatsapp":"whatsapp"}'
 fi
 
 # Os gateways de fábrica do WooCommerce competem com os autorais e mandariam o

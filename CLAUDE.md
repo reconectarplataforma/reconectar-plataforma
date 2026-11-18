@@ -163,7 +163,8 @@ do PIX é guardada por `wp_verify_nonce( …, 'dokan_payment_settings_nonce' )`:
 sem essa guarda, salvar a loja em outra aba apagaria os dados de pagamento, sem
 erro e sem aviso. Veja `Reconectar_Pagamento_Pix::gravar()`.
 
-E a opção `dokan_withdraw['withdraw_methods']` precisa ligar `pix` e `bank` —
+E a opção `dokan_withdraw['withdraw_methods']` precisa ligar `pix`, `bank` e
+`whatsapp` —
 sem isso **toda loja vê "No withdraw method is available"**: a tela existe, está
 vazia, e nada indica o porquê. O `provision.sh` a ajusta.
 
@@ -171,7 +172,7 @@ O formato é um **mapa**, não uma lista: medido, o valor de fábrica é
 `{"paypal":"","bank":"bank"}` — chave desligada guarda string vazia, ligada
 repete o próprio nome. Gravar `["pix","bank"]` não liga nada e ainda apaga o
 `bank` que já estava de pé, com o mesmo sintoma mudo. O valor correto é
-`{"paypal":"","bank":"bank","pix":"pix"}`.
+`{"paypal":"","bank":"bank","pix":"pix","whatsapp":"whatsapp"}`.
 
 ### O bloco `woocommerce/checkout` não enxerga gateway clássico
 
