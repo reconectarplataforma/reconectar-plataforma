@@ -1,8 +1,8 @@
 # Pagamentos — pagamento direto à loja
 
-A plataforma **não toca no dinheiro**. O comprador paga a loja por **PIX** ou
-**transferência bancária**, usando os dados que a própria loja cadastrou na
-dashboard do Dokan. Não há credencial de provedor, não há split e não há
+A plataforma **não toca no dinheiro**. O comprador paga a loja por **PIX**,
+**transferência bancária** ou **combinando com ela pelo WhatsApp**, usando os
+dados que a própria loja cadastrou na dashboard do Dokan. Não há credencial de provedor, não há split e não há
 confirmação automática de recebimento.
 
 Este documento registra o cenário escolhido, o que ele resolve, o que ele
@@ -42,12 +42,13 @@ interno não valeria o custo de manutenção.
 | --- | --- |
 | PIX | tipo de chave, chave, nome do beneficiário, cidade |
 | Conta bancária | titular, banco, agência, conta, tipo, CPF/CNPJ |
+| Combinar pelo WhatsApp | número com DDD, recado opcional (até 140 caracteres) |
 
 Beneficiário e cidade não são enfeite no PIX: são o que falta para montar um BR
 Code válido.
 
 A opção `dokan_withdraw['withdraw_methods']` é ajustada pelo `provision.sh` para
-`{"paypal":"","bank":"bank","pix":"pix"}`. Sem isso ela fica no padrão de
+`{"paypal":"","bank":"bank","pix":"pix","whatsapp":"whatsapp"}`. Sem isso ela fica no padrão de
 fábrica, com só o PayPal ligado, e **toda loja vê "No withdraw method is
 available"** — a tela existe, está vazia, e nada indica o porquê.
 
@@ -68,12 +69,12 @@ prometeria um repasse que não existe.
 > `wp_verify_nonce( …, 'dokan_payment_settings_nonce' )`. Sem essa guarda, salvar
 > a loja em outra aba apagaria os dados de pagamento, sem erro e sem aviso.
 
-`Reconectar_Lojas::preparar_loja()` semeia a chave `'pix' => array()` junto de
-`'bank'`, para que loja nova nasça com a estrutura esperada.
+`Reconectar_Lojas::preparar_loja()` semeia as chaves `'pix'` e `'whatsapp'`, vazias,
+junto de `'bank'`, para que loja nova nasça com a estrutura esperada.
 
 ## Como o comprador paga
 
-Dois gateways autorais em
+Três gateways autorais em
 `wp-content/plugins/reconectar-core/includes/pagamento/`, estendendo
 `WC_Payment_Gateway` e registrados em `woocommerce_payment_gateways`:
 
@@ -81,8 +82,9 @@ Dois gateways autorais em
 | --- | --- | --- |
 | `Reconectar_Gateway_Pix` | `reconectar_pix` | PIX |
 | `Reconectar_Gateway_Transferencia` | `reconectar_transferencia` | Transferência bancária |
+| `Reconectar_Gateway_Combinar` | `reconectar_combinar` | Combinar com a loja (WhatsApp) |
 
-Ambas estendem `Reconectar_Gateway_Direto`, que concentra o comportamento comum.
+Todas estendem `Reconectar_Gateway_Direto`, que concentra o comportamento comum.
 
 ### O checkout tem de ser o clássico
 
@@ -446,6 +448,34 @@ funciona, e ainda espalharia a rota de upload por caixas de entrada.
 Medido nos 27 templates de e-mail da instalação, nos dois estados de pedido:
 nenhum traz `<form`, `enctype`, `type="file"` nem a rota. As instruções de
 pagamento continuam saindo, que é o comportamento desejado.
+
+## Combinar com a loja pelo WhatsApp
+
+Pedido das lojistas nos primeiros testes: muita venda de feira se acerta na
+conversa — dinheiro na entrega, cartão na maquininha, um PIX passado na hora. O
+meio existe para isso, e por isso a instrução **não traz dado de pagamento**:
+traz o caminho até a loja.
+
+- **Cadastro.** `Reconectar_Pagamento_Whatsapp` registra o método no Dokan, no
+  mesmo molde do PIX e com a mesma guarda de nonce. O número é normalizado para
+  só dígitos com o 55 na frente (`(82) 99876-5432` → `5582998765432`), que é o
+  formato que o `wa.me` exige; número incompleto é gravado, mas a tela o marca
+  com `aria-invalid` e a loja não aparece no checkout para esse meio.
+- **Tela de agradecimento e e-mail.** Um botão "Conversar com a loja no
+  WhatsApp" para `https://wa.me/<número>?text=…`, com a mensagem já escrita:
+  número do pedido, nome do site e o valor **desta loja** — não o total, pela
+  mesma razão do BR Code. O número sai também por extenso, para quem compra num
+  computador sem WhatsApp.
+- **Sem comprovante.** Não há o que anexar: a forma de pagamento foi combinada
+  fora da plataforma. O campo só aparece para PIX e transferência, e a coluna do
+  painel da loja mostra "não se aplica".
+- **Status.** O pedido fica em **Aguardando** (`on-hold`), com estoque já
+  reservado, até a loja mudar o status à mão — o mesmo fim do ciclo dos outros
+  dois meios, sem o degrau de conferência.
+
+O ícone é um balão de conversa, não o logotipo do WhatsApp (a marca é de
+terceiro), e o botão usa a cor institucional: o verde da marca com texto branco
+não passa no contraste da WCAG.
 
 ## O que este cenário não resolve
 

@@ -333,14 +333,16 @@ class Reconectar_Lojas {
 		$perfil = array(
 			'store_name'         => $nome,
 			'social'             => array(),
-			// O `pix` nasce vazio junto dos outros para que a estrutura exista antes
-			// de a loja preencher. `Reconectar_Pagamento_Pix` lê por chave e um
-			// `payment` sem ela obrigaria toda leitura a checar existência — e a que
-			// esquecesse emitiria aviso, que neste projeto cancela redirect.
+			// O `pix` e o `whatsapp` nascem vazios junto dos outros para que a
+			// estrutura exista antes de a loja preencher. As classes de pagamento
+			// leem por chave, e um `payment` sem ela obrigaria toda leitura a checar
+			// existência — e a que esquecesse emitiria aviso, que neste projeto
+			// cancela redirect.
 			'payment'            => array(
-				'paypal' => array( 'email' => '' ),
-				'bank'   => array(),
-				'pix'    => array(),
+				'paypal'   => array( 'email' => '' ),
+				'bank'     => array(),
+				'pix'      => array(),
+				'whatsapp' => array(),
 			),
 			'phone'              => sanitize_text_field( $telefone ),
 			'show_email'         => 'no',

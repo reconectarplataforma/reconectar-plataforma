@@ -5736,6 +5736,10 @@
   color: var(--reconectar-cor-institucional, #663191);
 }
 
+.rc-checkout .rc-meio-icone--combinar {
+  color: var(--reconectar-cor-secundaria, #CF6442);
+}
+
 .rc-checkout .rc-checkout__meio-nome {
   font-size: var(--rc-fonte-base);
   font-weight: 600;
