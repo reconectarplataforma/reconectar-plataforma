@@ -100,6 +100,20 @@ reconectar_host_padrao="${WP_URL#*://}"
 reconectar_esquema_padrao="${WP_URL%%://*}"
 php /var/www/scripts/configurar-url-dinamica.php "$(wp config path)" "$reconectar_host_padrao" "$reconectar_esquema_padrao"
 
+echo "== Fuso horário (Maceió) =="
+# Quem garante o fuso é o filtro de `Reconectar_Fuso`, no plugin autoral; a
+# opção gravada aqui é a rede para quando o plugin estiver desligado. Sem os dois
+# a instalação nasce em UTC, e o "Aberta agora" das lojas erra por três horas.
+#
+# `--skip-plugins` porque, com o plugin ativo, o filtro faz `get_option` já
+# responder Maceió e o `update` se recusa a gravar ("unchanged") — o banco
+# ficaria vazio para sempre, e a rede, furada.
+if [ "$(wp option get timezone_string --skip-plugins 2>/dev/null || true)" = "America/Maceio" ]; then
+  echo "Fuso já é America/Maceio."
+else
+  wp option update timezone_string America/Maceio --skip-plugins
+fi
+
 echo "== Idioma (pt_BR) =="
 wp language core is-installed pt_BR || wp language core install pt_BR
 wp site switch-language pt_BR || true

@@ -121,6 +121,11 @@ require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-privacidade.php';
 // SMTP por variável de ambiente e a marca nos e-mails, inclusive nos de texto
 // puro do núcleo e do BuddyPress.
 require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-email.php';
+// Fuso de Maceió. Registrado aqui, no carregamento do arquivo, e não em
+// `reconectar_core_init()`: qualquer plugin que leia a hora antes de
+// `plugins_loaded` já precisa enxergar o fuso certo.
+require_once RECONECTAR_CORE_PATH . 'includes/class-reconectar-fuso.php';
+Reconectar_Fuso::init();
 // As quatro classes de gateway ficam de fora daqui de propósito: elas estendem
 // `WC_Payment_Gateway`, que só existe depois de o WooCommerce carregar. Quem as
 // exige é `Reconectar_Pagamento_Direto::registrar_gateways()`, já dentro do

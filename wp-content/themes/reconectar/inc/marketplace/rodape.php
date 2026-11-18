@@ -85,7 +85,7 @@ function reconectar_rodape_legal() {
 			printf(
 				/* translators: 1: ano corrente; 2: nome do site. */
 				esc_html__( '© %1$s %2$s. Todos os direitos reservados.', 'reconectar' ),
-				esc_html( gmdate( 'Y' ) ),
+				esc_html( wp_date( 'Y' ) ),
 				esc_html( get_bloginfo( 'name' ) )
 			);
 			?>

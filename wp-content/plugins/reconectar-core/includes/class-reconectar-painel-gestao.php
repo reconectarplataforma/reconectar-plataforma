@@ -524,13 +524,18 @@ class Reconectar_Painel_Gestao {
 	/**
 	 * Converte `Y-m-d` em data legível, ou devolve o texto de recuo.
 	 *
+	 * A data é lida já no fuso do site. `strtotime()` a leria em UTC (o PHP do
+	 * WordPress roda em UTC), e o dia certo na tela dependeria de o
+	 * `date_i18n()` desfazer essa diferença — uma compensação da função legada
+	 * que `wp_date()` não faz: trocar uma pela outra mostraria a véspera.
+	 *
 	 * @param string $data  Data em `Y-m-d`, ou vazio.
 	 * @param string $recuo Texto quando não há data.
 	 * @return string
 	 */
 	public static function data_legivel( $data, $recuo ) {
-		$instante = '' !== $data ? strtotime( $data . ' 00:00:00' ) : false;
+		$instante = '' !== $data ? DateTimeImmutable::createFromFormat( '!Y-m-d', $data, wp_timezone() ) : false;
 
-		return $instante ? date_i18n( get_option( 'date_format' ), $instante ) : $recuo;
+		return $instante ? wp_date( get_option( 'date_format' ), $instante->getTimestamp() ) : $recuo;
 	}
 }

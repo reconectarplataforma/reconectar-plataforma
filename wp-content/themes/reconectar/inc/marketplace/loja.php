@@ -419,7 +419,7 @@ function reconectar_loja_horario( $vendedor_id ) {
 
 	$hoje = function_exists( 'dokan_current_datetime' )
 		? strtolower( dokan_current_datetime()->format( 'l' ) )
-		: strtolower( gmdate( 'l' ) );
+		: strtolower( current_datetime()->format( 'l' ) );
 
 	$abertura   = dokan_get_store_times( $hoje, 'opening_time', null, $vendedor_id );
 	$fechamento = dokan_get_store_times( $hoje, 'closing_time', null, $vendedor_id );

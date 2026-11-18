@@ -474,6 +474,16 @@ E a comissão tem de ir a **zero** no mesmo bloco: o padrão que o assistente
 propõe é 10% mais R$10, e aqui a plataforma não retém nada — aceitar o padrão
 exibiria na dashboard de cada loja um desconto que ninguém cobra.
 
+### `pre_option_*` faz o `wp option update` recusar a gravação
+
+O fuso é imposto por `Reconectar_Fuso`, em `pre_option_timezone_string`, porque
+instalação nova nasce com a opção vazia — UTC no núcleo — e o "Aberta agora" das
+lojas errava por três horas. O efeito colateral: com o plugin ativo,
+`wp option update timezone_string …` lê o valor **filtrado**, conclui que nada
+mudou e responde "unchanged" sem gravar. O banco fica vazio e a mensagem parece
+sucesso. Gravação de opção que o plugin filtra vai com `--skip-plugins`, na
+leitura e na escrita.
+
 ### `wp option patch update` exige a chave; `patch insert` exige a opção
 
 Nenhuma das duas falha em silêncio — falham com erro, e sob `set -euo pipefail`
