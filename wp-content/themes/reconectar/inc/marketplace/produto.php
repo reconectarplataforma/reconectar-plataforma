@@ -121,16 +121,36 @@ function reconectar_omitir_resumo_igual_ao_nome( $resumo ) {
 }
 add_filter( 'woocommerce_short_description', 'reconectar_omitir_resumo_igual_ao_nome' );
 
-/**
- * Limita cada foto da galeria à largura do arquivo original.
+/*
+ * Menor lado, em pixels, com que a foto abre no lightbox.
  *
- * A moldura da galeria (`.woocommerce-product-gallery__image`, em
- * `marketplace.css`) estica a foto até a largura dela, para que a foto boa
- * preencha o quadro. A foto pequena não pode acompanhar: o pingente do primeiro
- * teste em produção foi enviado com 309px, e esticá-lo a 560 o borraria. O CSS
- * não conhece o tamanho do arquivo, e o `width` do `<img>` também não serve —
- * é o do tamanho intermediário servido, que pode ser menor que o original. A
- * largura que vale é a do original, que o WooCommerce já calcula para o zoom.
+ * O PhotoSwipe abre a foto no tamanho declarado em `data-large_image_width` e
+ * nunca acima dele: o pingente do primeiro teste em produção, enviado com
+ * 309×311px, abria como um selo no meio da tela preta. Declarar mais que o
+ * arquivo tem faz o navegador esticá-lo — a foto perde nitidez, mas o
+ * comprador consegue ver o produto, que era o que a loja queria ao enviá-la.
+ */
+const RECONECTAR_GALERIA_LADO_NO_LIGHTBOX = 1200;
+
+/*
+ * Largura da moldura da galeria, a mesma do `max-width` de
+ * `.woocommerce-product-gallery` em `marketplace.css`.
+ */
+const RECONECTAR_GALERIA_LARGURA = 560;
+
+/**
+ * Prepara cada foto da galeria para preencher a moldura e abrir grande.
+ *
+ * A moldura (`.woocommerce-product-gallery__image`, em `marketplace.css`)
+ * estica a foto até a largura dela, inclusive a foto menor que o quadro. Antes
+ * a foto pequena ficava no tamanho do arquivo, para não borrar, e o produto
+ * aparecia no meio de uma moldura quase vazia, pequeno demais para ser visto.
+ *
+ * As dimensões declaradas sobem até `RECONECTAR_GALERIA_LADO_NO_LIGHTBOX`,
+ * mantida a proporção. Elas servem a duas coisas no `single-product.js` do
+ * WooCommerce: o lightbox abre a foto nesse tamanho, e o zoom por cima da foto
+ * só liga quando a largura declarada passa da largura da galeria — com os 309px
+ * reais ele nunca ligava. O arquivo servido continua o mesmo.
  *
  * O `sizes` acompanha o teto da moldura: o padrão do núcleo descreve a imagem
  * pelo tamanho intermediário, e o navegador escolheria no `srcset` um arquivo
@@ -139,18 +159,64 @@ add_filter( 'woocommerce_short_description', 'reconectar_omitir_resumo_igual_ao_
  * @param array $atributos Atributos do `<img>` da galeria.
  * @return array
  */
-function reconectar_galeria_sem_ampliar( $atributos ) {
+function reconectar_galeria_preencher_moldura( $atributos ) {
 	$largura = isset( $atributos['data-large_image_width'] ) ? absint( $atributos['data-large_image_width'] ) : 0;
+	$altura  = isset( $atributos['data-large_image_height'] ) ? absint( $atributos['data-large_image_height'] ) : 0;
 
-	if ( $largura > 0 ) {
-		$atributos['style'] = 'max-width: ' . $largura . 'px';
+	if ( $largura > 0 && $altura > 0 && min( $largura, $altura ) < RECONECTAR_GALERIA_LADO_NO_LIGHTBOX ) {
+		$escala = RECONECTAR_GALERIA_LADO_NO_LIGHTBOX / min( $largura, $altura );
+
+		$atributos['data-large_image_width']  = (int) round( $largura * $escala );
+		$atributos['data-large_image_height'] = (int) round( $altura * $escala );
 	}
 
-	$atributos['sizes'] = '(max-width: 767px) 100vw, 560px';
+	$atributos['sizes'] = '(max-width: 767px) 100vw, ' . RECONECTAR_GALERIA_LARGURA . 'px';
 
 	return $atributos;
 }
-add_filter( 'woocommerce_gallery_image_html_attachment_image_params', 'reconectar_galeria_sem_ampliar' );
+add_filter( 'woocommerce_gallery_image_html_attachment_image_params', 'reconectar_galeria_preencher_moldura' );
+
+/**
+ * Amplia o zoom da galeria quando o arquivo é menor que a moldura.
+ *
+ * O `jquery.zoom` desenha a foto no tamanho natural do arquivo vezes
+ * `magnify`, que o WooCommerce deixa em 1. Com a foto de 309px numa moldura de
+ * 560, a "ampliação" sairia menor que a própria foto na tela, e o movimento do
+ * mouse a arrastaria no sentido contrário — a razão do `jquery.zoom` fica
+ * negativa. O fator leva o menor arquivo da galeria a uma vez e meia a moldura,
+ * e é o mesmo para todas as fotos porque o WooCommerce passa as opções uma vez
+ * por página: uma galeria que misture foto grande e pequena amplia mais a
+ * grande, o que não quebra nada.
+ *
+ * @param array $opcoes Opções do `jquery.zoom`.
+ * @return array
+ */
+function reconectar_galeria_zoom_proporcional( $opcoes ) {
+	$produto = wc_get_product( get_queried_object_id() );
+
+	if ( ! $produto ) {
+		return $opcoes;
+	}
+
+	$menor = 0;
+
+	foreach ( array_merge( array( $produto->get_image_id() ), $produto->get_gallery_image_ids() ) as $imagem_id ) {
+		$arquivo = $imagem_id ? wp_get_attachment_image_src( $imagem_id, 'full' ) : false;
+
+		if ( $arquivo && $arquivo[1] > 0 && ( 0 === $menor || $arquivo[1] < $menor ) ) {
+			$menor = (int) $arquivo[1];
+		}
+	}
+
+	$alvo = RECONECTAR_GALERIA_LARGURA * 1.5;
+
+	if ( $menor > 0 && $menor < $alvo ) {
+		$opcoes['magnify'] = round( $alvo / $menor, 2 );
+	}
+
+	return $opcoes;
+}
+add_filter( 'woocommerce_single_product_zoom_options', 'reconectar_galeria_zoom_proporcional' );
 
 /*
  * Leva o selo de oferta para dentro da coluna do resumo, acima do título.
